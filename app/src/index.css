@@ -1,0 +1,185 @@
+@import 'tailwindcss';
+@import 'maplibre-gl/dist/maplibre-gl.css';
+
+/* Theme: violet primary (also the map selection color), warm off-white surfaces. */
+:root {
+  --radius: 0.75rem;
+  --background: #fbfaf8;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --primary: rgb(124 58 237);
+  --primary-foreground: #ffffff;
+  --muted: #f1efec;
+  --muted-foreground: #475569;
+  --accent: #f3efff;
+  --accent-foreground: #4c1d95;
+  --border: #e7e5e4;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+}
+
+@theme {
+  --font-sans: 'DM Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Space Grotesk', 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  --color-violet-brand: rgb(124 58 237);
+  /* Type scale: nothing below 12px except map attribution. */
+  --text-caption: 12px;
+  --text-caption--line-height: 1.4;
+  --text-small: 13px;
+  --text-small--line-height: 1.45;
+  --text-body: 14px;
+  --text-body--line-height: 1.5;
+  --text-lead: 16px;
+  --text-lead--line-height: 1.45;
+  --text-title: 20px;
+  --text-title--line-height: 1.25;
+  --text-display: 26px;
+  --text-display--line-height: 1.15;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: #f6f5f3;
+  color: #1e293b;
+  font-size: 14px;
+  line-height: 1.5;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'tnum' 1, 'cv11' 1;
+}
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Quiet scrollbars for panels */
+.scroll-quiet {
+  scrollbar-width: thin;
+  scrollbar-color: #d6d3d1 transparent;
+}
+.scroll-quiet::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scroll-quiet::-webkit-scrollbar-thumb {
+  background: #d6d3d1;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* Weight slider: filled track up to the thumb, accent color per scenario via --fill */
+input[type='range'].weight {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 22px;
+  background: transparent;
+  cursor: pointer;
+}
+input[type='range'].weight::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--fill, #7c3aed) 0 var(--pct, 50%), #e7e5e4 var(--pct, 50%) 100%);
+}
+input[type='range'].weight::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: #e7e5e4;
+}
+input[type='range'].weight::-moz-range-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--fill, #7c3aed);
+}
+input[type='range'].weight::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #fff;
+  border: 2px solid var(--fill, #7c3aed);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
+  transition: transform 0.15s;
+}
+input[type='range'].weight::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #fff;
+  border: 2px solid var(--fill, #7c3aed);
+}
+input[type='range'].weight:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+input[type='range'].weight:focus-visible {
+  outline: none;
+}
+input[type='range'].weight:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgb(124 58 237 / 0.25);
+}
+
+/* Map chrome */
+.maplibregl-ctrl-group {
+  border-radius: 10px !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 4px 12px rgb(0 0 0 / 0.06) !important;
+}
+.maplibregl-ctrl-attrib {
+  font-size: 11px;
+}
+.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-inner {
+  display: none;
+}
+.maplibregl-ctrl-attrib.maplibregl-compact:hover .maplibregl-ctrl-attrib-inner,
+.maplibregl-ctrl-attrib.maplibregl-compact:focus-within .maplibregl-ctrl-attrib-inner {
+  display: block;
+}
+
+/* "No data" texture */
+.hatch {
+  background-image: repeating-linear-gradient(135deg, #e7e5e4 0 3px, #f5f5f4 3px 6px);
+}
+
+/* Search pin label */
+.vp-pin-label {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 4px);
+  transform: translateX(-50%);
+  white-space: nowrap;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: #fff;
+  color: #1e293b;
+  font: 600 12px/1.4 var(--font-sans);
+  padding: 2px 8px;
+  border-radius: 999px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.1), 0 4px 12px rgb(0 0 0 / 0.12);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+}

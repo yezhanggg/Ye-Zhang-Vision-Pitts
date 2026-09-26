@@ -1,0 +1,18 @@
+import { chromium } from 'playwright';
+const file = new URL('../../export/index.html', import.meta.url).href;
+const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--allow-file-access-from-files'] });
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+const errors = [];
+page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 160)); });
+page.on('pageerror', (e) => errors.push(String(e).slice(0, 160)));
+await page.goto(file);
+await page.waitForSelector('text=Open VisionPitts', { timeout: 20000 });
+await page.click('text=Open VisionPitts');
+await page.waitForSelector('text=Find a place', { timeout: 20000 });
+await page.waitForTimeout(9000);
+await page.click('text=Hazelwood');
+await page.waitForSelector('text=Best match here', { timeout: 20000 });
+await page.waitForTimeout(3000);
+await page.screenshot({ path: new URL('../../docs/screenshots/07-single-file-export.png', import.meta.url).pathname });
+console.log('single-file export OK over file://; console errors:', errors.filter((e) => !/openfreemap|favicon|404|mapterhorn|Failed to fetch|AJAXError|api\/explain/.test(e)));
+await browser.close();

@@ -1,0 +1,181 @@
+export type Conf = 'high' | 'medium' | 'low';
+export type Weights = Record<string, number>;
+
+export interface FactorDef {
+  id: string;
+  label: string;
+  short: string;
+  description: string;
+  raw_field: string | null;
+  unit: string;
+  sources: string[];
+  year: number;
+  direction_note?: string;
+}
+
+export interface Typology {
+  id: string;
+  label: string;
+  long: string;
+  color: string;
+}
+
+export interface Preset {
+  id: string;
+  label: string;
+  blurb?: string;
+  weights: Weights;
+}
+
+export interface ScoringConfig {
+  version: string;
+  scope?: string;
+  notes?: string;
+  factors: FactorDef[];
+  typologies: Typology[];
+  fit: { label: string; matrix: Record<string, Record<string, number>> };
+  scoring: { formula?: string; stability_draws: number; stability_concentration: number; stability_seed?: number };
+  presets: Preset[];
+  confidence?: { rule: string; levels: string[] };
+  pressure?: { label: string; bivariate: string; flat_band: number };
+  bins: { note?: string; score: number[] };
+}
+
+/** One tract's properties, as written by scripts/04_export_app_data.py. */
+export interface TractProps {
+  GEOID: string;
+  name: string;
+  neighborhood: string | null;
+  /** Demo-tract label, or null. */
+  focus: string | null;
+  residential: boolean;
+  pgh_share: number;
+  need: number | null;
+  market_strength: number | null;
+  displacement_risk: number | null;
+  subsidy_eligible: number | null;
+  transit_access: number | null;
+  flood_exposure: number | null;
+  need_conf: Conf | null;
+  market_strength_conf: Conf | null;
+  displacement_risk_conf: Conf | null;
+  subsidy_eligible_conf: Conf | null;
+  transit_access_conf: Conf | null;
+  flood_exposure_conf: Conf | null;
+  need_count: number | null;
+  need_count_cv: number | null;
+  mva21: string | null;
+  mva16: string | null;
+  mva21_score: number | null;
+  mva16_score: number | null;
+  mva_change: number | null;
+  svi_overall: number | null;
+  svi_t1: number | null;
+  svi_t2: number | null;
+  svi_t3: number | null;
+  svi_t4: number | null;
+  chas_burden_le50_share: number | null;
+  eviction_filing_rate: number | null;
+  eviction_filings_est: number | null;
+  eviction_coverage: number | null;
+  eviction_zips: string | null;
+  hcv_count: number | null;
+  hcv_per_renter: number | null;
+  displacement_n: number | null;
+  qct: boolean | null;
+  dda: boolean | null;
+  oz: boolean | null;
+  cdbg: boolean | null;
+  zcta: string | null;
+  transit_departures: number | null;
+  transit_departures_per_acre: number | null;
+  flood_share_pct: number | null;
+  flood_deep_share_pct: number | null;
+  veg_cover_land_pct: number | null;
+  n_neighbors: number | null;
+  market_lag: number | null;
+  market_pressure: number | null;
+  market_pressure_pct: number | null;
+  need_tercile: 'L' | 'M' | 'H' | null;
+  market_direction: 'falling' | 'flat' | 'rising' | null;
+  bivariate_class: string | null;
+  watch_list: boolean;
+  pop: number | null;
+  households: number | null;
+  med_hh_income: number | null;
+  med_hh_income_cv: number | null;
+  med_gross_rent: number | null;
+  med_gross_rent_cv: number | null;
+  med_home_value: number | null;
+  renter_hh: number | null;
+  renter_share: number | null;
+  rent_burdened_share: number | null;
+  vacancy_share: number | null;
+  [key: string]: unknown;
+}
+
+export interface TractFeature {
+  type: 'Feature';
+  properties: TractProps;
+  geometry: { type: 'Polygon' | 'MultiPolygon'; coordinates: unknown };
+}
+
+export interface FC<F> {
+  type: 'FeatureCollection';
+  features: F[];
+}
+
+export interface NeighborhoodProps {
+  name: string;
+  tract: string | null;
+  c: [number, number];
+}
+export type NeighborhoodFeature = { type: 'Feature'; properties: NeighborhoodProps; geometry: { type: string; coordinates: unknown } };
+
+export interface BuildingProps {
+  h: number;
+  src: 'overture_height' | 'overture_floors' | 'assessment_stories' | 'accessory' | 'default' | string;
+  GEOID: string;
+  yb?: number | null;
+}
+
+export interface SourceDef {
+  id: string;
+  name: string;
+  url: string;
+  vintage: string;
+  geography: string;
+  method?: string;
+  caveats?: string;
+}
+
+export interface FocusDef {
+  geoid: string;
+  label: string;
+  neighborhood?: string;
+}
+
+export interface Meta {
+  built_at?: string;
+  scope?: string;
+  n_tracts?: number;
+  n_residential?: number | null;
+  scoring_version?: string;
+  city_medians?: Record<string, number | null>;
+  factor_coverage?: Record<string, number>;
+  confidence_counts?: Record<string, Record<string, number>>;
+  watch_list_count?: number | null;
+  building_height_share?: Record<string, number>;
+}
+
+export interface Scenario {
+  id: string;
+  name: string;
+  weights: Weights;
+}
+
+export interface Pin {
+  lng: number;
+  lat: number;
+  label: string;
+}

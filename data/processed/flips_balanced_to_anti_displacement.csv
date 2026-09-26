@@ -1,0 +1,15 @@
+GEOID,from,to,neighborhood
+42003060300,small_apartment,townhome,Lower Lawrenceville
+42003080400,adu,townhome,Bloomfield
+42003080900,small_apartment,senior,Bloomfield
+42003130600,senior,small_apartment,East Hills
+42003140200,townhome,senior,Squirrel Hill North
+42003140400,townhome,adu,Point Breeze
+42003191500,small_apartment,townhome,Mount Washington
+42003191700,townhome,adu,Brookline
+42003192000,adu,townhome,Beechview
+42003562000,small_apartment,senior,North Oakland
+42003562600,senior,small_apartment,Elliott
+42003562800,small_apartment,senior,East Carnegie
+42003565300,townhome,adu,Hays
+42003980700,small_apartment,townhome,South Shore

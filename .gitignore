@@ -1,0 +1,43 @@
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+
+# Raw and bulky data never enter git (organizer rule). Processed outputs in data/processed are small and tracked.
+data/raw/
+data/interim/
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.gpkg
+*.tif
+*.tiff
+*.pbf
+*.parquet
+!data/processed/*.parquet
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Node / Vite
+node_modules/
+app/dist/
+app/.vercel/
+.vercel/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Inter-terminal handoff notes (never published)
+handoff/

@@ -1,0 +1,2 @@
+# Vitest files under api/ must not become serverless functions.
+api/*.test.ts

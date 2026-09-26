@@ -1,0 +1,26 @@
+// Smoke test + screenshots against the dev server (or a URL in argv[2]). Writes docs/screenshots/*.png.
+import { chromium } from 'playwright';
+const base = process.argv[2] || 'http://localhost:5173';
+const out = new URL('../../docs/screenshots/', import.meta.url).pathname;
+const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+const errors = [];
+page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+page.on('pageerror', (e) => errors.push(String(e)));
+const shot = async (name, ms = 2500) => { await page.waitForTimeout(ms); await page.screenshot({ path: `${out}${name}.png` }); console.log('shot', name); };
+const open = async (hash, waitFor) => { await page.goto(`${base}/${hash}`); await page.reload({ waitUntil: 'networkidle' }); if (waitFor) await page.waitForSelector(waitFor, { timeout: 25000 }); };
+await open('', 'text=Open VisionPitts');
+await shot('01-landing', 5000);
+const W = 'w=need:2,market_strength:0.5,displacement_risk:3,subsidy_eligible:1.5,transit_access:1,flood_exposure:1';
+await open(`#m=explore&t=42003562300&${W}&c=top`, 'text=Best match here');
+await shot('02-explore-hazelwood', 4500);
+await open(`#m=explore&c=lens.bivariate`, 'text=Start here');
+await shot('03-watch-list-map', 4000);
+await open(`#m=tracts&t=42003562300&b=42003140300&c=top`, 'text=Why they differ');
+await shot('04-compare-tracts', 4500);
+await open(`#m=scenarios&t=42003562300`, 'text=How the two scenarios weigh things');
+await shot('05-compare-scenarios', 4500);
+await page.click('text=Sources');
+await shot('06-sources', 1500);
+console.log('console errors:', errors.filter((e) => !/openfreemap|favicon|404|api\/explain|mapterhorn|Failed to fetch|AJAXError/.test(e)));
+await browser.close();
