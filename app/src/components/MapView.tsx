@@ -39,6 +39,8 @@ export interface OverlayLayer {
   tooltip?: (id: string) => ReactNode;
 }
 
+export type IntroPhase = 'spin' | 'fly' | 'done';
+
 interface Props {
   paint: MapPaint;
   selectedId: string | null;
@@ -69,6 +71,11 @@ interface Props {
   buildings?: boolean;
   /** Feature under the cursor changed (tract layers and interactive overlays). */
   onHover?: (id: string | null, overlayId?: string) => void;
+  /** Play the globe → Pittsburgh flight once the style loads (landing page → Explore). */
+  intro?: boolean;
+  /** Increment to cut the flight short. */
+  skipSignal?: number;
+  onIntroPhase?: (p: IntroPhase) => void;
 }
 
 const NON_RESIDENTIAL = '#efede9';
@@ -157,6 +164,7 @@ export default function MapView(props: Props) {
     idleTimer: 0,
     elevRaf: 0,
     camAt: 0,
+    introDone: !props.intro,
     dem: null as DemConfig | null,
     firstSymbol: undefined as string | undefined,
     overlayAnchor: undefined as string | undefined,
@@ -172,14 +180,15 @@ export default function MapView(props: Props) {
     Promise.all([loadBasemapStyle(), loadDemConfig()]).then(([style, dem]) => {
       if (disposed || !el.current) return;
       st.dem = dem;
+      const introOn = !!live.current.intro && !live.current.lite;
       const v0 = live.current.initialView ?? PGH_VIEW;
       map = new maplibregl.Map({
         container: el.current,
         style,
-        center: v0.center,
-        zoom: v0.zoom,
-        pitch: v0.pitch,
-        bearing: v0.bearing,
+        center: introOn ? [-128, 34] : v0.center,
+        zoom: introOn ? 1.3 : v0.zoom,
+        pitch: introOn ? 0 : v0.pitch,
+        bearing: introOn ? 0 : v0.bearing,
         interactive: live.current.interactive ?? true,
         maxPitch: 78,
         attributionControl: { compact: true, customAttribution: [dem.attribution, 'Search © OpenStreetMap / Photon · US Census Geocoder'] },
@@ -191,8 +200,13 @@ export default function MapView(props: Props) {
       if (live.current.interactive ?? true) map.addControl(new maplibregl.NavigationControl({ visualizePitch: true, showCompass: true }), 'bottom-right');
       map.on('style.load', () => {
         if (!map) return;
-        setup(map);
+        setup(map, introOn);
         setReady(true);
+        if (introOn) runIntro(map);
+        else {
+          st.introDone = true;
+          live.current.onIntroPhase?.('done');
+        }
       });
       map.on('error', (e) => {
         const msg = String((e as { error?: Error }).error?.message ?? '');
@@ -215,7 +229,14 @@ export default function MapView(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function setup(map: MLMap) {
+  function setup(map: MLMap, introOn = false) {
+    if (introOn) {
+      try {
+        map.setProjection({ type: 'globe' });
+      } catch {
+        /* older engines */
+      }
+    }
     try {
       map.setSky({
         'sky-color': '#dfe9f3',
@@ -265,7 +286,7 @@ export default function MapView(props: Props) {
         layout: vis,
         paint: {
           'fill-color': withNonResidential(p0.kind === 'cat' ? catExpression(p0.palette) : p0.kind === 'relief' ? 'rgba(0,0,0,0)' : seqExpression(p0.palette, p0.bins ?? SCORE_BINS)),
-          'fill-opacity': fillOpacity,
+          'fill-opacity': introOn ? 0 : fillOpacity,
           'fill-opacity-transition': { duration: 900, delay: 0 },
         },
       },
@@ -379,7 +400,7 @@ export default function MapView(props: Props) {
     map.on('click', 'tract-fill', (e) => {
       if (live.current.baseTracts === false) return;
       const f = e.features?.[0];
-      if (f) live.current.onSelect?.(String(f.id ?? f.properties?.GEOID));
+      if (f && st.introDone) live.current.onSelect?.(String(f.id ?? f.properties?.GEOID));
     });
 
     // Pair sync: mirror zoom / pitch / bearing, keep each map's own center.
@@ -438,7 +459,7 @@ export default function MapView(props: Props) {
     if (rec.selected) map.setFeatureState({ source, id: rec.selected }, { selected: false });
     if (id) map.setFeatureState({ source, id }, { selected: true });
     rec.selected = id;
-    if (id && cfg.zoomTo) {
+    if (id && cfg.zoomTo && st.introDone) {
       const b = featureBounds(cfg.data, cfg.idField, id);
       if (b) flyToBounds(map, b);
     }
@@ -496,7 +517,7 @@ export default function MapView(props: Props) {
           const r = st.overlays.get(cfg.id);
           if (!r?.cfg.interactive) return;
           const f = e.features?.[0];
-          if (f) r.cfg.onSelect?.(String(f.id ?? f.properties?.[r.cfg.idField]));
+          if (f && st.introDone) r.cfg.onSelect?.(String(f.id ?? f.properties?.[r.cfg.idField]));
         },
       },
     };
@@ -649,6 +670,32 @@ export default function MapView(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.flips, ready]);
 
+  // ------------------------------------------------------------ intro: globe spin, then fly to Pittsburgh
+  function runIntro(map: MLMap) {
+    live.current.onIntroPhase?.('spin');
+    map.easeTo({ center: [-96, 38], duration: 2200, easing: (t) => t });
+    map.once('moveend', () => {
+      if (st.introDone) return;
+      live.current.onIntroPhase?.('fly');
+      map.flyTo({ ...PGH_VIEW, duration: 5000, curve: 1.5, essential: true });
+      map.once('moveend', () => finishIntro(map));
+    });
+  }
+  function finishIntro(map: MLMap) {
+    if (st.introDone) return;
+    st.introDone = true;
+    if (map.getLayer('tract-fill')) map.setPaintProperty('tract-fill', 'fill-opacity', fillOpacity);
+    live.current.onIntroPhase?.('done');
+  }
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !props.skipSignal || st.introDone) return;
+    map.stop();
+    map.jumpTo(PGH_VIEW);
+    finishIntro(map);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.skipSignal, ready]);
+
   // ------------------------------------------------------------ selection: outline, camera, buildings grow
   useEffect(() => {
     const map = mapRef.current;
@@ -658,7 +705,7 @@ export default function MapView(props: Props) {
     if (id) map.setFeatureState({ source: 'tracts', id }, { selected: true });
     const changed = st.selected !== id;
     st.selected = id;
-    if (!id || !changed) return;
+    if (!id || !changed || !st.introDone) return;
     const b = tractBounds.get(id);
     if (b) flyToBounds(map, b);
     if (map.getLayer('focus-3d')) {
@@ -760,7 +807,7 @@ export default function MapView(props: Props) {
       st.orbitRaf = 0;
     };
     const orbit = (now: number) => {
-      if (map.isMoving()) {
+      if (!st.introDone || map.isMoving()) {
         last = now;
         st.orbitRaf = requestAnimationFrame(orbit);
         return;

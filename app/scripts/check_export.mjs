@@ -11,7 +11,13 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice
 page.on('pageerror', (e) => errors.push(String(e).slice(0, 160)));
 page.on('request', (r) => { if (r.url().includes('supabase.co')) supabase.push(r.url()); });
 await page.goto(file);
+await page.waitForSelector('text=Open VisionPitts', { timeout: 20000 });
+await page.click('text=Open VisionPitts');
 await page.waitForSelector('text=Layers', { timeout: 20000 });
+// the globe intro runs after Open; cut it short so the rest of the check is deterministic
+await page.waitForTimeout(1500);
+const skip = page.locator('text=Skip intro');
+if (await skip.count()) await skip.first().click();
 const protocol = await page.evaluate(() => location.protocol);
 if (protocol !== 'file:') throw new Error(`expected the export to run over file:, got ${protocol}`);
 await page.waitForTimeout(6000);

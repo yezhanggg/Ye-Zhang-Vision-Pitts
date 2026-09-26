@@ -86,6 +86,9 @@ export function parseHash(h: string): Partial<AppState> {
   if (mode && MODES.includes(mode)) {
     patch.mode = mode;
     if (mode !== 'explore') patch.lastAnalysis = mode;
+    // A link into the app skips the landing page and the globe intro.
+    patch.view = 'app';
+    patch.introDone = true;
   }
   const t = q.get('t');
   if (t && tractById.has(t)) patch.selectedId = t;
@@ -175,6 +178,11 @@ export function startHashSync() {
     window.clearTimeout(timer);
     timer = window.setTimeout(() => {
       try {
+        if (s.view === 'landing') {
+          if (last !== '') history.replaceState(null, '', window.location.pathname + window.location.search);
+          last = '';
+          return;
+        }
         const next = encodeHash(s);
         if (next === last) return;
         last = next;

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { ExpressionSpecification } from 'maplibre-gl';
 import { useApp, type Level } from '../../lib/store';
@@ -9,7 +9,8 @@ import { EXPLORE_UI, scopeText } from '../../lib/explore/copy';
 import { useGeo, useVariable } from '../../lib/explore/remote';
 import { resolveForLevel } from '../../lib/explore/search';
 import type { UnitProps } from '../../lib/explore/types';
-import MapView, { type OverlayLayer } from '../MapView';
+import MapView, { type IntroPhase, type OverlayLayer } from '../MapView';
+import IntroOverlay from '../IntroOverlay';
 import Rail, { RailSection } from '../Rail';
 import TractSearch from '../TractSearch';
 import DataLegend from './DataLegend';
@@ -36,6 +37,14 @@ const LINE: Record<BoundaryId, OverlayLayer['line']> = {
   city: { color: '#7c3aed', width: 2.5 },
 };
 const NEUTRAL_FILL = { color: '#64748b', opacity: 0.08 };
+const SKIP_KEY = 'visionpitts.skipIntro';
+const readSkip = () => {
+  try {
+    return localStorage.getItem(SKIP_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
 
 const indexOf = (features: { properties: UnitProps }[]) => new Map(features.map((f) => [f.properties.GEOID, f.properties]));
 
@@ -47,6 +56,10 @@ export default function ExploreView() {
   const hoverId = useApp((s) => s.hoverId);
   const setBrowse = useApp((s) => s.setBrowse);
   const set = useApp((s) => s.set);
+  // The globe → Pittsburgh flight plays once after the landing page's Open button (not on deep links, not with reduced motion).
+  const [intro] = useState(() => useApp.getState().introNonce > 0 && !useApp.getState().introDone && !readSkip() && !lite);
+  const [phase, setPhase] = useState<IntroPhase>(intro ? 'spin' : 'done');
+  const [skip, setSkip] = useState(0);
 
   const geo = { tracts: useGeo('tract'), bg: useGeo('bg'), zcta: useGeo('zcta'), county: useGeo('county'), city: useGeo('city') };
   const level = browse.level;
@@ -126,17 +139,42 @@ export default function ExploreView() {
             if (useApp.getState().hoverId !== id) set({ hoverId: id });
           }}
           padding={PADDING}
+          intro={intro}
+          skipSignal={skip}
+          onIntroPhase={(p) => {
+            setPhase(p);
+            if (p === 'done') set({ introDone: true });
+          }}
         />
-        <div className="scroll-quiet absolute bottom-3 right-3 top-3 z-20 w-[440px] overflow-y-auto rounded-2xl bg-white/95 shadow-[0_10px_40px_-10px_rgba(15,23,42,0.25)] ring-1 ring-black/5 backdrop-blur">
+        <IntroOverlay
+          phase={phase}
+          onSkip={() => {
+            try {
+              localStorage.setItem(SKIP_KEY, '1');
+            } catch {
+              /* private mode */
+            }
+            setSkip((n) => n + 1);
+          }}
+        />
+        <AnimatePresence>
+          {phase === 'done' && (
+        <motion.div key="panel" initial={lite ? false : { opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 24 }} transition={{ type: 'spring', stiffness: 260, damping: 30 }} className="scroll-quiet absolute bottom-3 right-3 top-3 z-20 w-[440px] overflow-y-auto rounded-2xl bg-white/95 shadow-[0_10px_40px_-10px_rgba(15,23,42,0.25)] ring-1 ring-black/5 backdrop-blur">
           <AnimatePresence mode="wait" initial={false}>
             <motion.div key={panelKey} initial={lite ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={lite ? undefined : { opacity: 0, y: -6 }} transition={{ duration: 0.16 }}>
               {browse.selected && selectedFC ? <PlaceCard selected={browse.selected} fc={selectedFC} /> : variable && loaded ? <VariableSummary variable={variable} level={level} values={loaded} /> : <ExploreIntro />}
             </motion.div>
           </AnimatePresence>
-        </div>
-        <div className="absolute bottom-3 left-3 z-20">
+        </motion.div>
+          )}
+        </AnimatePresence>
+        <AnimatePresence>
+          {phase === 'done' && (
+        <motion.div key="legend" initial={lite ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute bottom-3 left-3 z-20">
           <DataLegend variable={variable} level={level} values={values} breaks={breaks} ext={ext} hoverId={hoverId} layers={layers} scope={scope} />
-        </div>
+        </motion.div>
+          )}
+        </AnimatePresence>
       </main>
     </div>
   );

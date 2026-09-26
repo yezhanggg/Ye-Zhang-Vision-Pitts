@@ -1,5 +1,5 @@
 // Smoke test + screenshots against the dev server (or a URL in argv[2]). Writes docs/screenshots/*.png.
-// Shots follow the app's two sections: Explore (01-02), Analysis (03-06, 08) and the Sources modal (07).
+// Shots: landing (00), then the app's two sections: Explore (01-02), Analysis (03-06, 08) and the Sources modal (07).
 // The single-file export shot (09-single-file-export.png) comes from scripts/check_export.mjs.
 import { chromium } from 'playwright';
 const base = process.argv[2] || 'http://localhost:5173';
@@ -13,7 +13,11 @@ const shot = async (name, ms = 2500) => { await page.waitForTimeout(ms); await p
 const open = async (hash, waitFor) => { await page.goto(`${base}/${hash}`); await page.reload({ waitUntil: 'networkidle' }); if (waitFor) await page.waitForSelector(waitFor, { timeout: 25000 }); };
 const W = 'w=need:2,market_strength:0.5,displacement_risk:3,subsidy_eligible:1.5,transit_access:1,flood_exposure:1';
 
-// Explore: what the app opens on (default layers, intro card).
+// Landing page: the live hero map and the four doors.
+await page.goto(`${base}/`);
+await page.waitForSelector('text=Open VisionPitts', { timeout: 25000 });
+await shot('00-landing', 6000);
+// Explore: the first screen after Open (deep links skip the globe intro).
 await open('#m=explore', 'text=Layers');
 await shot('01-explore', 5000);
 // Explore: block groups colored by median gross rent, with tracts and the city limits on.

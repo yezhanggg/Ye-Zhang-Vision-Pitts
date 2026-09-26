@@ -33,7 +33,7 @@ Written at kickoff for the AI Horizons 2026 · AI for Housing Hackathon, Track 3
 | D2 | Demo script, screenshots, submission form | 2 h | |
 | P7 | Explore data: 37 ACS 2020–2024 variables (estimate, 90% MOE, CV) for tracts, block groups, ZCTAs, Allegheny County and the city; county-wide CSVs, city subset bundled (`scripts/07_build_acs_levels.py`) | 2 h | done |
 | P8 | Supabase: migration `supabase/migrations/0001_init.sql` (public read under RLS, scenarios table for later) and the PostgREST loader `scripts/08_publish_supabase.py` | 1.5 h | done (migration and loader written; the publish runs with `SUPABASE_SECRET_KEY` in `.env` and is re-run after every step 7) |
-| W4 | Explore data browser as the opening screen (search, layers, Data panel, hover tooltip, place card vs city and county, legend); Analysis section with Match / Compare tracts / Compare scenarios sub-tabs and Copy link; the landing page becomes the About modal (Sources, Limitations) | 4 h | done |
+| W4 | Explore data browser as the first screen after the landing page (globe intro kept) (search, layers, Data panel, hover tooltip, place card vs city and county, legend); Analysis section with Match / Compare tracts / Compare scenarios sub-tabs and Copy link; the landing page stays and its content is also in the About modal (Sources, Limitations, Home) | 4 h | done |
 | E2 | Single-file export re-checked after Explore: bundled city subset over `file://`, no Supabase requests, Analysis reachable (`app/scripts/check_export.mjs`) | 0.5 h | done (about 5.5 MB) |
 | Stretch | Supabase saved scenarios; LISA clusters; IZ overlay polygons; zoning; 3D buildings; terrain | | |
 

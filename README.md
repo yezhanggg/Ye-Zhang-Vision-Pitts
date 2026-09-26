@@ -6,11 +6,13 @@ A census data browser and an anti-displacement housing matchmaker for the **City
 
 **Live app:** [ye-zhang-vision-pitts.vercel.app](https://ye-zhang-vision-pitts.vercel.app) · **Offline:** double-click `export/index.html` · **Docs:** [plan](docs/PLAN.md) · [methods](docs/data/factor_methods.md) · [value judgments](docs/assumptions.md) · [sources](data/processed/sources.md)
 
-![Explore: block groups colored by median gross rent](docs/screenshots/02-explore-rent-bg.png)
+![Landing page: a live 3D map of Downtown and the four doors](docs/screenshots/00-landing.png)
 
 ## What it does
 
-**Explore** (the opening screen) is a census data browser on a 3D map.
+The app opens on a landing page with a live 3D map. **Open VisionPitts** flies from a globe down to Pittsburgh and lands in Explore.
+
+**Explore** is a census data browser on a 3D map.
 Search an address, turn layers on and off (buildings, terrain, tracts, block groups, ZIP codes, county, city), and pick one of **37 ACS 2020–2024 variables**: population, race, income, work, housing stock, tenure, rent and cost burden, commuting. The map colors tracts, block groups or ZIP codes. Hover for the value and its margin of error; click for a place card next to the city and county. These values are **descriptive, never scored**.
 
 **Analysis** is the Track 3 matchmaker. For any city tract it answers one question: *which housing type (ADU, duplex/triplex, townhome, small apartment, senior housing) best serves households at or below 50% of area median income without accelerating displacement?*

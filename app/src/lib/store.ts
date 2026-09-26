@@ -69,6 +69,11 @@ export const defaultLayers = (lite = liteDefault): Layers => ({ buildings: true,
 export const defaultBrowse = (): Browse => ({ level: 'tract', variable: null, selected: null });
 
 export interface AppState {
+  /** Landing page first; deep links (any hash with a mode) open the app directly. */
+  view: 'landing' | 'app';
+  /** Incremented by the landing page's Open button; the globe intro plays once per increment. */
+  introNonce: number;
+  introDone: boolean;
   mode: Mode;
   /** Last Analysis sub-tab, so the Analysis button returns to it. */
   lastAnalysis: AnalysisMode;
@@ -102,6 +107,9 @@ export interface AppState {
 const initialScenarios = defaultScenarios();
 
 export const useApp = create<AppState>((set, get) => ({
+  view: 'landing',
+  introNonce: 0,
+  introDone: false,
   mode: 'explore',
   lastAnalysis: 'match',
   selectedId: null,

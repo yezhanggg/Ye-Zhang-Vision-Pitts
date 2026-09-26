@@ -86,6 +86,15 @@ export function AboutModal({ open, onClose, onLimits }: { open: boolean; onClose
         <button onClick={openAnalysis} className={BTN_PRIMARY}>
           Open Analysis →
         </button>
+        <button
+          onClick={() => {
+            useApp.setState({ view: 'landing' });
+            onClose();
+          }}
+          className={BTN_SECONDARY}
+        >
+          Home page
+        </button>
       </div>
       <div className="flex items-start gap-4 border-t border-stone-100 pt-5">
         <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-violet-600 font-display text-xl font-bold text-white">{ABOUT.name.split(' ').map((w) => w[0]).join('')}</div>

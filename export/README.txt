@@ -8,7 +8,7 @@ HOW TO OPEN
      Stop it later with: kill $(lsof -t -i:8765)
 
 WHERE THINGS ARE
-  The app opens on Explore: search an address, neighborhood, tract or ZIP; switch map layers (3D buildings,
+  The app opens on its home page; Open VisionPitts flies from a globe to Pittsburgh and lands on Explore: search an address, neighborhood, tract or ZIP; switch map layers (3D buildings,
   terrain, census tracts, block groups, ZIP codes, county, city limits); pick a census variable under Data to
   color the map; hover a shape for its value and margin of error; click it for a place card next to the city
   and the county.
