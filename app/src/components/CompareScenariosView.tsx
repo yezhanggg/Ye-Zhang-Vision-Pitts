@@ -13,7 +13,7 @@ import WeightPanel from './WeightPanel';
 import SyncedMapPair from './SyncedMapPair';
 import Legend from './Legend';
 import Slopegraph from './Slopegraph';
-import { MapTooltip } from './ExploreView';
+import { MapTooltip } from './MatchView';
 import { MapChip } from './CompareTractsView';
 import { Dot, SectionTitle } from './primitives';
 

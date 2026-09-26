@@ -1,4 +1,4 @@
-import { activeFactors, scoring } from '../lib/data';
+import { activeFactors, hasAskingRents, scoring } from '../lib/data';
 import { UI, factorName } from '../lib/copy';
 import type { MapMetric } from '../lib/store';
 import { SectionTitle, Segmented } from './primitives';
@@ -9,6 +9,7 @@ const dec = (s: string): MapMetric => {
   const [k, id] = s.split('.');
   if (k === 'factor') return { kind: 'factor', id };
   if (k === 'lens') return { kind: 'lens', id: id === 'bivariate' ? 'bivariate' : 'pressure' };
+  if (k === 'info') return { kind: 'info', id: 'rent_growth_existing' };
   if (k === 'layer') return { kind: 'layer', id: 'elevation' };
   return { kind: 'typology', id };
 };
@@ -42,6 +43,11 @@ export default function MetricPicker({ value, onChange, step }: { value: MapMetr
                 </option>
               ))}
             </optgroup>
+            {hasAskingRents && (
+              <optgroup label="Information (licensed listing data, not scored)">
+                <option value="info.rent_growth_existing">{UI.rentLayer}</option>
+              </optgroup>
+            )}
             <optgroup label="Terrain (for reference, not scored)">
               <option value="layer.elevation">Elevation</option>
             </optgroup>

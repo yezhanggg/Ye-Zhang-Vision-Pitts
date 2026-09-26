@@ -44,6 +44,8 @@ export default defineConfig(({ mode }) => {
   return {
     base: './',
     plugins: [react(), tailwindcss(), devApi(), ...(single ? [viteSingleFile({ removeViteModuleLoader: true })] : [])],
+    // Read the repo-root .env so VITE_SUPABASE_* reach the browser bundle (only VITE_-prefixed keys are exposed).
+    envDir: resolve(__dirname, '..'),
     server: { port: 5173 },
     build: {
       target: 'es2022',

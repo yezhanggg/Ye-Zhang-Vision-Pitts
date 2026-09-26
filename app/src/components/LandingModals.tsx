@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ABOUT, LIMITS } from '../lib/about';
+import { UI } from '../lib/copy';
+import { useApp } from '../lib/store';
 import Logo from './Logo';
 
 export function InfoModal({ open, title, sub, onClose, children }: { open: boolean; title: string; sub?: string; onClose: () => void; children: ReactNode }) {
@@ -48,10 +50,44 @@ export function LimitsModal({ open, onClose }: { open: boolean; onClose: () => v
   );
 }
 
-export function AboutModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+const BTN = 'rounded-lg px-3 py-1.5 text-small font-semibold ring-1 transition';
+const BTN_SECONDARY = `${BTN} bg-white text-slate-700 ring-stone-300 hover:ring-stone-400`;
+const BTN_PRIMARY = `${BTN} bg-slate-900 text-white ring-slate-900 hover:bg-slate-800`;
+
+/** The app's home: what VisionPitts is, where the sources and limits live, who built it. */
+export function AboutModal({ open, onClose, onLimits }: { open: boolean; onClose: () => void; onLimits: () => void }) {
+  const { set, setMode } = useApp.getState();
+  const openSources = () => {
+    set({ sourcesOpen: true });
+    onClose();
+  };
+  const openAnalysis = () => {
+    setMode('match');
+    onClose();
+  };
   return (
-    <InfoModal open={open} onClose={onClose} title="About" sub="Who built this, and why.">
-      <div className="flex items-start gap-4">
+    <InfoModal open={open} onClose={onClose} title={UI.aboutTitle} sub="Which housing fits where · City of Pittsburgh">
+      <div>
+        <p className="font-display text-display font-bold leading-tight tracking-tight text-slate-900">{ABOUT.tagline}</p>
+        <p className="mt-1 text-lead text-slate-600">{ABOUT.taglineSub}</p>
+      </div>
+      <div className="space-y-3 text-body leading-relaxed text-slate-800">
+        {ABOUT.intro.map((p, i) => (
+          <p key={i}>{p}</p>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button onClick={openSources} className={BTN_SECONDARY}>
+          Sources
+        </button>
+        <button onClick={onLimits} className={BTN_SECONDARY}>
+          Limitations & future work
+        </button>
+        <button onClick={openAnalysis} className={BTN_PRIMARY}>
+          Open Analysis →
+        </button>
+      </div>
+      <div className="flex items-start gap-4 border-t border-stone-100 pt-5">
         <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-violet-600 font-display text-xl font-bold text-white">{ABOUT.name.split(' ').map((w) => w[0]).join('')}</div>
         <div>
           <div className="font-display text-title font-bold text-slate-900">{ABOUT.name}</div>
@@ -73,7 +109,7 @@ export function AboutModal({ open, onClose }: { open: boolean; onClose: () => vo
         ))}
       </ul>
       <div className="flex items-center gap-2 border-t border-stone-100 pt-3 text-caption text-slate-500">
-        <Logo size={16} /> VisionPitts · Great decisions need vision. We give you one.
+        <Logo size={16} /> {ABOUT.credits}
       </div>
     </InfoModal>
   );

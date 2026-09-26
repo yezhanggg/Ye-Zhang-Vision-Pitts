@@ -1,7 +1,7 @@
 // Data files in src/data are read at build time (Vite inlines them), so the single-file export works over file://.
 // A missing file never breaks the build: each loader has a fallback.
 import { featureAt, type IndexedFeature } from './geo';
-import type { BuildingProps, FC, FocusDef, Meta, NeighborhoodFeature, ScoringConfig, SourceDef, TractFeature, TractProps } from './types';
+import type { AskingRentsContext, BuildingProps, FC, FocusDef, Meta, NeighborhoodFeature, ScoringConfig, SourceDef, TractFeature, TractProps } from './types';
 
 const raw = import.meta.glob('../data/*.json', { eager: true, query: '?raw', import: 'default' }) as Record<string, string>;
 
@@ -31,6 +31,8 @@ export const buildingsFC = load<FC<{ type: 'Feature'; properties: BuildingProps;
 export const sources = load<SourceDef[]>('sources', []);
 export const focusDefs = load<FocusDef[]>('focus', []);
 export const meta = load<Meta>('meta', {});
+/** County / city asking-rent trend; empty when step 6 has not run (the layer then hides itself). */
+export const askingRents = load<AskingRentsContext>('asking_rents', {});
 
 export const tracts: TractProps[] = tractsFC.features.map((f) => f.properties);
 export const tractById = new Map<string, TractProps>(tracts.map((t) => [t.GEOID, t]));
@@ -45,6 +47,9 @@ export const factorById = new Map(scoring.factors.map((f) => [f.id, f]));
 export const typologyById = new Map(scoring.typologies.map((t) => [t.id, t]));
 export const sourceById = new Map(sources.map((s) => [s.id, s]));
 export const fieldAvailable = (field: string) => tracts.some((t) => typeof t[field] === 'number');
+/** True when the Dewey asking-rent information layer was built (any tract has a 2025–26 level or a growth value). */
+export const hasAskingRents = fieldAvailable('rent_2br_2025_26') || fieldAvailable('rent_2br_growth_existing');
+export const FMR_2BR = askingRents.fmr_2br_fy2026 ?? 1299;
 
 // ------------------------------------------------------------------ geometry helpers
 function bounds(geom: { type: string; coordinates: unknown }): [[number, number], [number, number]] {

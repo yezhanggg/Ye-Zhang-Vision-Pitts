@@ -12,7 +12,7 @@ import SyncedMapPair from './SyncedMapPair';
 import Legend from './Legend';
 import TypologyRankList, { StabilityBadge } from './TypologyRankList';
 import FactorDeltaBars from './FactorDeltaBars';
-import { MapTooltip } from './ExploreView';
+import { MapTooltip } from './MatchView';
 import { Dot, SectionTitle } from './primitives';
 
 export const COLOR_A = '#7c3aed';

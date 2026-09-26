@@ -2,7 +2,7 @@
 
 How `src/visionpitts/ingest.py` and `factors.py` turn public sources into the six scoring factors in `config/scoring.json`, and how geographies, periods and definitions were reconciled. Every factor value is **observed data processed by code**; the fit matrix, weights and presets are value judgments and live in `config/scoring.json` and `docs/assumptions.md`. Source URLs, vintages and checksums: `data/processed/sources.md`.
 
-Build: `uv run python scripts/01_build_tracts.py && uv run python scripts/02_build_factors.py && uv run python scripts/03_build_pressure.py && uv run python scripts/04_export_app_data.py`.
+Build: `uv run python scripts/01_build_tracts.py && uv run python scripts/02_build_factors.py && uv run python scripts/03_build_pressure.py && uv run python scripts/04_export_app_data.py`. Optional information layer (licensed data): `uv run python scripts/06_build_asking_rents.py` (§7).
 
 ## 1. Study set and common rules
 
@@ -110,3 +110,24 @@ None of this enters the score. It drives the market-pressure and bivariate map m
 
 ## 6. Scoring (reference; `scoring.py` and `app/src/lib/scoring.ts`)
 `S(t,k) = Σ_f w_f · c(x_tf, d_kf) / Σ_f w_f · |d_kf|` over factors with data and weight > 0; `c = d·x` if `d ≥ 0`, else `|d|·(1 − x)`. The denominator makes S a weighted-average fit in [0, 1], so a typology with more or larger fit entries is not favored for that alone. Stability: 200 Dirichlet draws (concentration 25) around the user's weights; report the share of draws where the top pick holds. Both engines are checked against `tests/fixtures/scoring_cases.json` (40 cases).
+
+## 7. Asking rents: an information layer, never a factor (`asking_rents.py`, `scripts/06_build_asking_rents.py`)
+
+**Source.** Dewey Data rental listings for Pennsylvania (scrapes January 2014 to August 2026), a licensed academic dataset, plus Dewey's listing → property mapping, which restores `PROPERTY_ID` / `UNIT_ID` for rows scraped before mid-2023 (100% of 2019–2023 rows, 85–98% of 2014–2018 rows). The two caches in `data/raw/dewey_cache/` are git-ignored; only tract aggregates leave the pipeline. Dewey's terms allow publishing summary insights derived from the data but not the data itself (§3.2), restrict use to academic, non-commercial research (§1.12) and ask for attribution to Dewey Data Inc. and the data provider (§3.3).
+
+**Pipeline.**
+1. 2,887,420 rows in the Allegheny bounding box → 2,623,804 inside a county 2020 tract by point-in-polygon (coordinates are 100% complete) → 2,615,854 with rent $300–$10,000 and 0–5 bedrooms.
+2. One observation per **unit per scrape month** (median rent within the month): 841,373 unit-months, 450,690 of them in the 128 city tracts. The unit key is `UNIT_ID`; the 3.9% of rows that still lack one (all pre-2019) use property + beds + rent, or the location rounded to 5 decimals when there is no property id either.
+3. **Levels.** Tract × year medians for 2BR and all units, 2019–2026, and the pooled 2025–26 medians. A cell is hidden below **10 distinct units** (20 for pooled levels, the index and growth). Unit-months are reported next to distinct units and never used for suppression.
+4. **Existing-stock growth** = pooled 2025–26 median ÷ pooled 2019–20 median − 1, over 2BR units whose **building was first listed before 2019**. Dewey re-keys `PROPERTY_ID` between scrape eras: none of the 2025 property ids appear in 2014–2019 and only 20% appear in 2024, so the literal rule ("`PROPERTY_ID` first seen before 2019") marks 0.1% of 2025–26 units as existing. A building is therefore identified by its `PROPERTY_ID` **or its site**, the geocoded location rounded to 4 decimals (about 10 m), whichever was seen first; 30% of the city's 2025–26 2BR units then belong to existing stock. All-listings growth (new buildings included) is kept as a second, labeled column.
+5. **Bedroom-mix-adjusted index** = tract median of rent ÷ county median for the same bedroom count and year; 1.0 = county-typical.
+6. **FMR flag**: 2025–26 2BR median above the HUD FY2026 2-bedroom Fair Market Rent for the Pittsburgh HMFA, $1,299.
+7. **Confidence** from distinct 2BR units in 2025–26: ≥50 high, 20–49 medium, otherwise low. The market-rate skew applies to every tract and is stated in the caveat rather than the tag.
+
+**Output** (`data/processed/asking_rents.csv`, 128 rows). The app receives seven fields: `rent_2br_2025_26`, `n_units_2025_26` (distinct 2BR units), `rent_2br_growth_existing`, `rent_2br_growth_all`, `rent_index_2025_26`, `rent_2br_gt_fmr`, `asking_rents_conf`. The CSV also carries per-year levels, unit and unit-month counts, the pooled 2019–20 medians and the existing-stock counts behind each growth value. `data/processed/asking_rents_trend.json` (and `app/src/data/asking_rents.json`) hold the county and city year series shown in the Sources modal.
+
+**Results (build of 2026-09-26).** 108 of 128 city tracts have a 2025–26 2BR level (median $1,450 county-wide; 76 of the 108 sit above the FMR); existing-stock growth exists for 30 tracts (median +20%, range −17% to +75%) and all-listings growth for 51 (median +28%). County 2BR growth 2019–20 → 2025–26 is +22.5% across all listings and +20.0% for existing stock; the city is +19.1% and +10.9%. The 2025–26 all-unit tract level has Spearman 0.64 with the ACS 2020–24 median gross rent, as expected for asking rents that lead in-place rents.
+
+**Why information only.** Existing-stock growth has Spearman 0.03 with `market_strength` and −0.31 with the 2016→2021 MVA change, so it neither confirms nor refines the market signals the score uses; it covers a minority of ranked tracts; and the source is licensed, so a judge cannot reproduce it. The layer therefore appears on the tract card ("About this place"), as a map layer under *More layers*, and in the Sources modal, with the caveat "licensed listing data, market-rate skew", and never enters `config/scoring.json`.
+
+**Caveats.** Asking rents, not contract rents: professionally managed and turnover units are over-represented, subsidized and long-tenure units absent. Scrape volume grows tenfold from 2019 to 2025, so the early window is thin outside the East End. The site key can merge adjacent rowhouses within 10 m, so an infill unit next to an old building can count as existing; the effect is small at tract level. A tract's confidence reflects 2025–26 coverage only.

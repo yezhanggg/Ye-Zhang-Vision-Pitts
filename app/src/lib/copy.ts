@@ -133,6 +133,13 @@ export const SCORE_HOW =
 export const PRESSURE_HOW =
   'Market pressure compares a tract’s housing-market strength with the average of its neighbors (tracts that share a border). Positive means the neighbors are stronger, so price pressure can spill in. The watch list is tracts in the top third for need whose own market has been rising since 2016. Neither enters the score; they are a lens for reading it.';
 
+// ------------------------------------------------------------------ asking rents (information layer)
+export const RENT_HOW =
+  'Median asking rent for 2-bedroom listings scraped from rental platforms (Dewey Data), counted once per unit per month and pooled over 2025–26. Growth compares 2019–20 with 2025–26 for units in buildings that were already listed before 2019, so a new luxury building cannot read as repricing; the all-listings growth is kept as a second figure. Anything with fewer than 20 distinct units is hidden. Asking rents skew market-rate: subsidized and long-tenure units are absent. Information only; nothing here enters the score.';
+export const RENT_CAVEAT = 'Licensed listing data (Dewey), market-rate skew. Information only, not scored.';
+export const RENT_WHY_INFO =
+  'Why information only: existing-stock rent growth has no positive relation to the market signals the score uses (Spearman 0.03 with market strength, −0.31 with the 2016→2021 market change), it exists for only a minority of ranked tracts because the 2019–20 scrape is thin, and the source is licensed, so scored factors stay public-data only.';
+
 // ------------------------------------------------------------------ UI strings
 export const UI = {
   searchPlaceholder: 'Search an address, neighborhood or tract',
@@ -153,6 +160,17 @@ export const UI = {
   buildingsLegend: '3D buildings: solid = height from records · faded = height guessed',
   terrainTip: '3D hills and elevation lines',
   notRanked: 'Fewer than 25 households live here (park, river, campus or stadium land), so this tract is shown but not ranked.',
+  rentLayer: 'Asking-rent growth, existing stock',
+  rentLayerSub: 'Median 2BR asking rent, 2019–20 → 2025–26, buildings listed before 2019 · Dewey listings, information only',  // sections and the Analysis sub-tab bar
+  explore: 'Explore',
+  analysis: 'Analysis',
+  matchTab: 'Match',
+  compareTractsTab: 'Compare tracts',
+  compareScenariosTab: 'Compare scenarios',
+  copyLink: 'Copy link',
+  linkCopied: 'Link copied ✓',
+  aboutTitle: 'About VisionPitts',
+  analysisCaption: 'Housing typology matchmaker · value judgments are labeled',
 };
 
 export function directionWord(d: string | null | undefined): string {

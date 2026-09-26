@@ -1,4 +1,5 @@
-import { activeFactors, buildingStats, meta } from '../lib/data';
+import { activeFactors, buildingStats, hasAskingRents, meta } from '../lib/data';
+import { fmtInt } from '../lib/format';
 import { UI, factorName } from '../lib/copy';
 import type { Conf, TractProps } from '../lib/types';
 import { Explainer } from './primitives';
@@ -61,6 +62,15 @@ export default function DataLimitsPanel({ t }: { t: TractProps }) {
         {t.mva21_score == null && t.residential && <li>• No housing-market classification here (too few sales or non-residential land), so market strength is left out.</li>}
         {t.mva16_score == null && t.mva21_score != null && <li>• No 2016 market type to compare with, so the change since 2016 is treated as flat.</li>}
         <li>• Flood exposure comes from a terrain screening model, not a FEMA floodplain.</li>
+        {hasAskingRents &&
+          (t.rent_2br_2025_26 != null ? (
+            <li>
+              • Asking rents are licensed listing data (Dewey) with a market-rate skew: managed and turnover units are over-represented, subsidized and long-tenure units absent. {fmtInt(t.n_units_2025_26)} distinct 2BR units were listed here in 2025–26 ({t.asking_rents_conf ?? 'low'} confidence). Information only, never scored.
+              {t.rent_2br_growth_existing == null && ' Existing-stock rent growth is hidden: fewer than 20 units listed before 2019 appear in both 2019–20 and 2025–26.'}
+            </li>
+          ) : (
+            <li>• Asking rent is hidden: fewer than 20 distinct 2BR units were listed here in 2025–26 (licensed listing data, market-rate skew; information only).</li>
+          ))}
         <li>• Zoning, infrastructure capacity and embodied carbon are not integrated. The tool does not claim to answer them.</li>
         {bld && (
           <li>

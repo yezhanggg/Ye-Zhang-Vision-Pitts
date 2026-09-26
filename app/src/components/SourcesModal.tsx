@@ -1,8 +1,9 @@
 import { AnimatePresence, motion } from 'motion/react';
-import { activeFactorIds, meta, scoring, sources } from '../lib/data';
-import { FACTOR_COPY, GLOSSARY, PRESSURE_HOW, SCORE_HOW, factorName } from '../lib/copy';
+import { FMR_2BR, activeFactorIds, askingRents, hasAskingRents, meta, scoring, sources } from '../lib/data';
+import { FACTOR_COPY, GLOSSARY, PRESSURE_HOW, RENT_HOW, RENT_WHY_INFO, SCORE_HOW, factorName } from '../lib/copy';
 import { useApp } from '../lib/store';
-import { cx } from '../lib/format';
+import { cx, fmtInt, fmtMoney, fmtSignedPct } from '../lib/format';
+import { RELIABILITY, catalogue, groups, hasBrowser, levelMeta, variables, variablesByGroup } from '../lib/explore/catalog';
 
 const WEB_SERVICES = [
   { id: 'openfreemap', name: 'OpenFreeMap / OpenStreetMap basemap', url: 'https://openfreemap.org', use: 'Streets, labels and background 3D buildings' },
@@ -11,6 +12,27 @@ const WEB_SERVICES = [
   { id: 'census_geocoder', name: 'US Census Geocoder', url: 'https://geocoding.geo.census.gov/geocoder/', use: 'Street address → census tract (on Enter)' },
   { id: 'nominatim', name: 'Nominatim (OpenStreetMap)', url: 'https://nominatim.openstreetmap.org', use: 'Last-resort address lookup, at most one request per second' },
 ];
+
+/** Numerator stems joined with " + "; three or more consecutive stems of one table collapse to "B01001_003…006". Shares end in " / den". */
+function formula(num: string[], den: string | null): string {
+  const runs: string[] = [];
+  for (let i = 0; i < num.length; ) {
+    const [table, start] = num[i].split('_');
+    let j = i;
+    while (j + 1 < num.length) {
+      const [t, n] = num[j + 1].split('_');
+      if (t !== table || Number(n) !== Number(num[j].split('_')[1]) + 1) break;
+      j++;
+    }
+    runs.push(j - i >= 2 ? `${table}_${start}…${num[j].split('_')[1]}` : num.slice(i, j + 1).join(' + '));
+    i = j + 1;
+  }
+  const lhs = runs.join(' + ');
+  if (!den) return lhs;
+  return `${runs.length > 1 || num.length > 1 ? `(${lhs})` : lhs} / ${den}`;
+}
+
+const pct = (x: number) => `${Math.round(x * 100)}%`;
 
 export default function SourcesModal() {
   const open = useApp((s) => s.sourcesOpen);
@@ -65,6 +87,48 @@ export default function SourcesModal() {
                   </table>
                 </div>
               </section>
+              {hasBrowser && (
+                <section>
+                  <h3 className="mb-1 text-body font-semibold text-sky-800">Explore data browser (ACS {catalogue.meta?.vintage ?? '2020–2024 5-year'})</h3>
+                  <p className="mb-2 text-small text-slate-700">
+                    The Explore section colors tracts, block groups and ZIP codes by {variables.length} American Community Survey variables and shows any place next to the city and the county. These values are descriptive context and are never scored. The app bundles the city subset ({levelMeta('tract').bundled} tracts, {levelMeta('bg').bundled} block groups, {levelMeta('zcta').bundled} ZIP codes); county-wide rows load from Supabase when the app is online.
+                  </p>
+                  <p className="mb-2 text-caption text-slate-600">
+                    Every value is an estimate with its 90% margin of error. Reliability comes from the coefficient of variation (MOE ÷ 1.645 ÷ estimate): under {pct(RELIABILITY.high)} high, up to {pct(RELIABILITY.medium)} medium, above that low. Sums combine margins root-sum-square; shares use the ACS proportion formula (ratio form when the radicand is negative). Poverty uses C17002 and vehicles B25044 because B17001 and B08201 are not published for block groups.
+                  </p>
+                  <div className="overflow-hidden rounded-xl ring-1 ring-stone-200">
+                    <table className="w-full text-left text-small">
+                      <thead className="bg-stone-50 text-caption font-semibold text-slate-700">
+                        <tr>
+                          <th className="px-3 py-2">Variable</th>
+                          <th className="px-3 py-2">Table</th>
+                          <th className="px-3 py-2">Unit</th>
+                          <th className="px-3 py-2">Formula</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {groups.map((g) => [
+                          <tr key={g.id} className="border-t border-stone-200 bg-stone-100/70">
+                            <th colSpan={4} scope="colgroup" className="px-3 py-1.5 text-left text-caption font-semibold text-slate-700">
+                              {g.label}
+                            </th>
+                          </tr>,
+                          ...variablesByGroup(g.id).map((v, i) => (
+                            <tr key={v.id} className={cx('align-top', i % 2 ? 'bg-stone-50/50' : '')}>
+                              <td className="px-3 py-1.5 font-medium text-slate-800" title={v.description}>
+                                {v.label}
+                              </td>
+                              <td className="px-3 py-1.5 text-slate-700 tnum">{v.table_id}</td>
+                              <td className="px-3 py-1.5 text-slate-700">{v.unit}</td>
+                              <td className="px-3 py-1.5 font-mono text-caption text-slate-700">{formula(v.num, v.den)}</td>
+                            </tr>
+                          )),
+                        ])}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              )}
               <section>
                 <h3 className="mb-2 text-body font-semibold text-emerald-800">The six factors (each ranked against the {meta.n_residential ?? ''} residential city tracts)</h3>
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -80,6 +144,52 @@ export default function SourcesModal() {
                 </div>
                 <p className="mt-2 text-caption text-slate-600">{PRESSURE_HOW}</p>
               </section>
+              {hasAskingRents && askingRents.county && askingRents.city && (
+                <section>
+                  <h3 className="mb-1 text-body font-semibold text-sky-800">Asking rents: information only, never scored</h3>
+                  <p className="mb-2 text-small text-slate-700">{RENT_HOW}</p>
+                  <div className="overflow-hidden rounded-xl ring-1 ring-stone-200">
+                    <table className="w-full text-left text-small">
+                      <thead className="bg-stone-50 text-caption font-semibold text-slate-700">
+                        <tr>
+                          <th className="px-3 py-2">Scrape year</th>
+                          <th className="px-3 py-2">Allegheny County · median 2BR asking rent (distinct units)</th>
+                          <th className="px-3 py-2">City of Pittsburgh · median 2BR asking rent (distinct units)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(askingRents.years ?? []).map((y, i) => {
+                          const c = askingRents.county?.[String(y)];
+                          const p = askingRents.city?.[String(y)];
+                          return (
+                            <tr key={y} className={cx(i % 2 ? 'bg-stone-50/50' : '')}>
+                              <td className="px-3 py-1.5 text-slate-800 tnum">
+                                {y}
+                                {y === 2026 ? ' (to Aug)' : ''}
+                              </td>
+                              <td className="px-3 py-1.5 text-slate-700 tnum">
+                                {fmtMoney(c?.median_2br)} ({fmtInt(c?.n_units)})
+                              </td>
+                              <td className="px-3 py-1.5 text-slate-700 tnum">
+                                {fmtMoney(p?.median_2br)} ({fmtInt(p?.n_units)})
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {askingRents.growth && (
+                    <p className="mt-2 text-caption text-slate-700">
+                      2BR growth 2019–20 → 2025–26: county {fmtSignedPct(askingRents.growth.county.all.growth)} across all listings, {fmtSignedPct(askingRents.growth.county.existing.growth)} for existing stock; city {fmtSignedPct(askingRents.growth.city.all.growth)} across all listings, {fmtSignedPct(askingRents.growth.city.existing.growth)} for existing stock. HUD FY2026 2BR Fair Market Rent, Pittsburgh HMFA: {fmtMoney(FMR_2BR)}.
+                      {askingRents.coverage && ` Tract values: ${askingRents.coverage.n_with_rent_2025_26} of ${askingRents.coverage.n_city_tracts} city tracts have a 2025–26 level, ${askingRents.coverage.n_with_growth_existing} have existing-stock growth, ${askingRents.coverage.n_with_growth_all} have all-listings growth.`}
+                    </p>
+                  )}
+                  <p className="mt-1 text-caption text-slate-600">
+                    {RENT_WHY_INFO} {askingRents.license}
+                  </p>
+                </section>
+              )}
               <section>
                 <h3 className="mb-1 text-body font-semibold text-violet-800">Fit rules: a value judgment (editable in config/scoring.json)</h3>
                 <p className="mb-2 text-small text-slate-700">{SCORE_HOW}</p>

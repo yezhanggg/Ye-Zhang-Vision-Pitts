@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { focusTracts, tractById, tractLabel } from '../lib/data';
-import { localMatches, looksLikeAddress, photonSuggest, quickPicks, resolveResult, searchOnEnter, type GeoResult } from '../lib/geocode';
+import { censusLookup, localMatches, looksLikeAddress, nominatimSearch, photonSuggest, quickPicks, resolveResult, searchOnEnter, type GeoResult, type Resolved } from '../lib/geocode';
 import { UI } from '../lib/copy';
 import { useApp } from '../lib/store';
 import { cx } from '../lib/format';
@@ -15,6 +15,12 @@ interface Props {
   showQuickPicks?: boolean;
   exclude?: string | null;
   label?: string;
+  /** Custom placement of a result (Explore resolves into block groups or ZIPs, county-wide when online). Default: city tracts. */
+  resolve?: (r: GeoResult) => Resolved;
+  /** Label for the current value when it is not a city tract (Explore units). */
+  currentLabel?: string | null;
+  /** Message for a result that falls outside the resolvable area. */
+  outsideText?: string;
 }
 
 const GROUP_TITLE: Record<string, string> = { neighborhood: 'Neighborhoods', tract: 'Census tracts', address: 'Addresses & places' };
@@ -41,7 +47,32 @@ function KindIcon({ kind }: { kind: GeoResult['kind'] }) {
   );
 }
 
-export default function TractSearch({ value, onChange, tag, tagColor = '#7c3aed', placeholder = UI.searchPlaceholder, showQuickPicks = true, exclude, label = 'Search' }: Props) {
+/** Enter with a custom resolver: the same geocoder chain as searchOnEnter, but each hit is placed by `resolve`. */
+async function enterWith(q: string, resolve: (r: GeoResult) => Resolved, signal?: AbortSignal): Promise<Resolved> {
+  const text = q.trim();
+  if (!text) return { ok: false, reason: 'notfound' };
+  const attempts: (() => Promise<GeoResult | null | undefined>)[] = [];
+  if (looksLikeAddress(text)) attempts.push(() => censusLookup(text));
+  else attempts.push(async () => localMatches(text)[0]);
+  attempts.push(async () => (await photonSuggest(text, signal))[0]);
+  attempts.push(() => nominatimSearch(text, signal));
+  let outside: Resolved | null = null;
+  for (const fn of attempts) {
+    if (signal?.aborted) break;
+    try {
+      const r = await fn();
+      if (!r) continue;
+      const res = resolve(r);
+      if (res.ok) return res;
+      if (res.reason === 'outside') outside = res;
+    } catch {
+      /* next */
+    }
+  }
+  return outside ?? { ok: false, reason: 'notfound' };
+}
+
+export default function TractSearch({ value, onChange, tag, tagColor = '#7c3aed', placeholder = UI.searchPlaceholder, showQuickPicks = true, exclude, label = 'Search', resolve, currentLabel, outsideText = UI.outsideCity }: Props) {
   const pin = useApp((s) => s.pin);
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
@@ -83,6 +114,7 @@ export default function TractSearch({ value, onChange, tag, tagColor = '#7c3aed'
   }, [q, local, remote]);
 
   const current = value ? tractById.get(value) : null;
+  const currentText = currentLabel ?? (current ? `${tractLabel(current)} · ${current.name}` : null);
   const finish = () => {
     setQ('');
     setOpen(false);
@@ -90,8 +122,8 @@ export default function TractSearch({ value, onChange, tag, tagColor = '#7c3aed'
     inputRef.current?.blur();
   };
   const pick = (r: GeoResult) => {
-    const res = resolveResult(r);
-    if (!res.ok) return setStatus({ kind: 'error', text: res.reason === 'outside' ? UI.outsideCity : 'We could not place that result on the map.' });
+    const res = (resolve ?? resolveResult)(r);
+    if (!res.ok) return setStatus({ kind: 'error', text: res.reason === 'outside' ? outsideText : 'We could not place that result on the map.' });
     if (res.geoid === exclude) return setStatus({ kind: 'error', text: 'That is the other place in this comparison. Pick a different one.' });
     setStatus(null);
     const set = useApp.getState().set;
@@ -109,10 +141,10 @@ export default function TractSearch({ value, onChange, tag, tagColor = '#7c3aed'
     const ctl = new AbortController();
     enterCtl.current = ctl;
     setStatus({ kind: 'busy', text: 'Looking up that address…' });
-    const res = await searchOnEnter(text, ctl.signal);
+    const res = resolve ? await enterWith(text, resolve, ctl.signal) : await searchOnEnter(text, ctl.signal);
     if (ctl.signal.aborted) return;
     if (res.ok) pick(res.result);
-    else setStatus({ kind: 'error', text: res.reason === 'outside' ? UI.outsideCity : 'No match found. Try a street address with a house number, or a neighborhood name.' });
+    else setStatus({ kind: 'error', text: res.reason === 'outside' ? outsideText : 'No match found. Try a street address with a house number, or a neighborhood name.' });
   };
   const clear = () => {
     enterCtl.current?.abort();
@@ -175,8 +207,8 @@ export default function TractSearch({ value, onChange, tag, tagColor = '#7c3aed'
                 inputRef.current?.blur();
               }
             }}
-            placeholder={current && !open ? `${tractLabel(current)} · ${current.name}` : placeholder}
-            className={cx('min-w-0 flex-1 bg-transparent text-body outline-none', current && !open ? 'placeholder:font-medium placeholder:text-slate-900' : 'placeholder:text-slate-500')}
+            placeholder={currentText && !open ? currentText : placeholder}
+            className={cx('min-w-0 flex-1 bg-transparent text-body outline-none', currentText && !open ? 'placeholder:font-medium placeholder:text-slate-900' : 'placeholder:text-slate-500')}
           />
           {(q || pin) && (
             <button onMouseDown={(e) => e.preventDefault()} onClick={clear} className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-slate-500 hover:bg-stone-100 hover:text-slate-900" aria-label="Clear search and pin">

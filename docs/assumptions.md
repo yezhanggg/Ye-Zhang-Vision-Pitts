@@ -79,7 +79,33 @@ Sliders run 0–3 in steps of 0.25; 0 removes a factor. **Revisit by:** whoever 
 Market pressure is **not** a scoring factor. Promoting it into displacement risk is an open decision (default: no).
 
 ## 7. Things deliberately not modeled
-Zoning and by-right feasibility · infrastructure capacity · embodied carbon and VMT · parcel availability · listing rents · school quality. Each appears in the data-limits panel as "not integrated" rather than as a fabricated score.
+Zoning and by-right feasibility · infrastructure capacity · embodied carbon and VMT · parcel availability · contract (in-place) rents · school quality. Each appears in the data-limits panel as "not integrated" rather than as a fabricated score. Asking rents from listings are integrated as information only (§9), and the Explore data browser (§10) shows census variables as description only; neither enters a score.
 
 ## 8. Demo tracts
 Hazelwood (hero, watch list) · Garfield · Middle Hill · Homewood North · Lower Lawrenceville · South Side Flats · Squirrel Hill North · Beechview. Chosen to span the need × market grid; Garfield and Beechview were resolved to the tract with the largest overlap with the neighborhood polygon (42003101900, 42003191600).
+
+## 9. Asking rents: information only (`asking_rents.py`)
+
+| Choice | Value | Rationale | Revisit by |
+|---|---|---|---|
+| Role | Information layer on the tract card, the map and the Sources modal; **never a scoring factor** | Existing-stock growth has no positive relation to the market signals the score uses (Spearman 0.03 with market strength, −0.31 with the 2016→2021 market change); it exists for only 30 of 114 ranked tracts; and the source is licensed, so judges cannot open it. Scored factors stay public-data only. | Ye, after a public rent source appears |
+| Level | Median 2BR asking rent, pooled 2025–26, one observation per unit per scrape month | 2BR is the FMR benchmark unit and the largest listing share (35%). | |
+| Growth window | Pooled 2019–20 → pooled 2025–26 | 2019–20 is the earliest window with enough listings; pooling smooths the thin 2020 scrape. | |
+| Existing stock | A building's site (location rounded to 4 decimals, about 10 m) first listed before 2019 | Removes new buildings from both windows so growth reads as repricing. Dewey re-keys PROPERTY_ID between scrape eras (none of the 2025 ids appear before 2019), so the site is the only identity that persists. | Data teammate |
+| Suppression | Fewer than 10 distinct units per tract-year cell; fewer than 20 for pooled levels, the index and growth | Distinct units, not unit-months: a unit re-listed monthly is one unit. | |
+| Confidence | Distinct 2BR units in 2025–26: ≥50 high, 20–49 medium, else low | Coverage is the only tract-specific uncertainty; the market-rate skew applies everywhere and is stated in the caveat instead. | |
+| FMR benchmark | HUD FY2026 2BR FMR, Pittsburgh HMFA, $1,299 | The 40th-percentile rent HUD uses for vouchers. | |
+| Publication | Tract aggregates only; raw rows and the caches stay in git-ignored `data/raw/dewey_cache` | Dewey terms §3.2 permit summary insights, not the licensed data; §3.3 asks for attribution to Dewey and the provider. | Ye |
+
+## 10. Explore data browser: description only (`acs_levels.py`, `geo_levels.py`, `app/src/lib/explore/`)
+
+| Choice | Value | Rationale | Revisit by |
+|---|---|---|---|
+| Role | 37 ACS 2020–2024 5-year variables at tract, block-group and ZIP level, with the city and county as reference lines; **never a scoring factor** | People want to see the census behind a tract before they trust a score; keeping the browser out of the score keeps the six-factor method auditable. | Ye |
+| Reliability chip | From the coefficient of variation, CV = MOE ÷ 1.645 ÷ estimate: high < 15%, medium 15–30%, low > 30%, n/a when the estimate is 0 or missing | The Census Bureau's own rule of thumb for 90% margins; the same thresholds the tract card already uses. | |
+| Color bins | 5 quantile classes computed over the loaded scope (city subset offline, county-wide online); tied breaks collapse into fewer classes | Quantiles show contrast within whatever is on screen. Re-binning when the scope changes is deliberate, so a county-wide load re-colors the city. Colors are not comparable across variables or scopes; the legend prints the breaks. | |
+| City subset | Tracts and block groups with ≥ 50% of their area inside the city limits (128, 314); ZCTAs with ≥ 1% (32) | The tract rule is the study set and block groups follow it. ZCTAs are large and straddle the line, so a 50% rule would drop ZIP codes that city addresses use. | |
+| Bundled vs online | The export and the first paint carry the city subset; when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are set and the page is not `file://`, county-wide rows (394 tracts, 1,062 block groups, 170 ZCTAs) replace them; any fetch error falls back to the bundle | A double-clickable file must work offline; the hosted app gets the county without a rebuild. The tables are read-only under row-level security. | |
+| Table substitutions | Poverty from C17002 (not B17001); vehicles from B25044 (not B08201) | B17001 and B08201 are not published for block groups; the substitutes give the same shares wherever both exist. | |
+| Sentinels and rounding | Negative estimates → null; MOE −555555555 → 0; other negative MOEs → null; counts, dollars and years as integers, shares to 4 decimals, CV to 3 | Nothing is imputed; topcoded medians stay as published. | |
+| Simplification | EPSG:2272, 5 m for tracts and block groups, 10 m for ZCTAs, county and city; coordinates to 5 decimals | Keeps the bundle small enough for one file; fine for choropleths, not for parcel work. | |

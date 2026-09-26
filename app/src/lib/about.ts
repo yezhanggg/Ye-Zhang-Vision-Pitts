@@ -1,6 +1,14 @@
-// Text for the landing page's About and Limitations panels. Edit freely; nothing here feeds the scores.
+// Text for the About and Limitations modals (About is the app's home page now). Edit freely; nothing here feeds the scores.
 
 export const ABOUT = {
+  tagline: 'Great decisions need vision. We give you one.',
+  taglineSub: 'Which housing fits each Pittsburgh place, and why.',
+  intro: [
+    'VisionPitts is two tools on one map of the City of Pittsburgh. Explore browses Census data for every tract, block group and ZIP code: pick a variable, read its estimate and margin of error, compare a place with the city and the county. Analysis is a housing typology matchmaker: search a place, set your priorities, and see which of five housing types fits it best and why.',
+    'Observed data and value judgments are kept apart and labeled everywhere they appear. The fit rules and presets are value judgments open to review; the factors are public data ranked city-wide; each tract carries its own data-limits panel; no model computes a score.',
+    'Everything is shareable by link, and the whole app also runs as a single file with no server, so a planner can keep it on a laptop.',
+  ],
+  credits: '© 2026 Ye Zhang · AI Horizons 2026 · Track 3',
   name: 'Ye Zhang',
   role: 'Builder of VisionPitts · solo entry, AI Horizons 2026 · AI for Housing Hackathon, Track 3',
   bio: [

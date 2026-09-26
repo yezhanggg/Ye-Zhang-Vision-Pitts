@@ -48,3 +48,48 @@ export function featureAt(lng: number, lat: number, features: Iterable<IndexedFe
 /** Generous City of Pittsburgh bounding box for search bias and quick "outside the city" checks. */
 export const CITY_BBOX: [number, number, number, number] = [-80.11, 40.36, -79.85, 40.51];
 export const inCityBox = (lng: number, lat: number) => lng >= CITY_BBOX[0] && lng <= CITY_BBOX[2] && lat >= CITY_BBOX[1] && lat <= CITY_BBOX[3];
+
+// ------------------------------------------------------------------ bounds and indexes (any polygon set)
+export type Bounds = [[number, number], [number, number]];
+
+/** [[west, south], [east, north]] of a Polygon or MultiPolygon. */
+export function boundsOf(geom: GeoGeometry | null | undefined): Bounds {
+  let w = 180, s = 90, e = -180, n = -90;
+  const walk = (c: unknown) => {
+    if (Array.isArray(c) && typeof c[0] === 'number') {
+      const [x, y] = c as number[];
+      if (x < w) w = x;
+      if (x > e) e = x;
+      if (y < s) s = y;
+      if (y > n) n = y;
+    } else if (Array.isArray(c)) c.forEach(walk);
+  };
+  walk(geom?.coordinates);
+  return [[w, s], [e, n]];
+}
+
+/** Smallest box around several boxes, or null for none. */
+export function unionBounds(list: Iterable<Bounds>): Bounds | null {
+  let out: Bounds | null = null;
+  for (const [[w, s], [e, n]] of list) {
+    if (!out) out = [[w, s], [e, n]];
+    else {
+      if (w < out[0][0]) out[0][0] = w;
+      if (s < out[0][1]) out[0][1] = s;
+      if (e > out[1][0]) out[1][0] = e;
+      if (n > out[1][1]) out[1][1] = n;
+    }
+  }
+  return out;
+}
+
+/** Point-in-polygon index for any feature collection keyed by `idField`. */
+export function indexFC(fc: { features: { properties: Record<string, unknown>; geometry: GeoGeometry }[] }, idField = 'GEOID'): IndexedFeature[] {
+  const out: IndexedFeature[] = [];
+  for (const f of fc.features) {
+    const id = f.properties?.[idField];
+    if (id == null) continue;
+    out.push({ id: String(id), geometry: f.geometry, bounds: boundsOf(f.geometry) });
+  }
+  return out;
+}

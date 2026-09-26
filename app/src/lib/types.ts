@@ -111,6 +111,18 @@ export interface TractProps {
   renter_share: number | null;
   rent_burdened_share: number | null;
   vacancy_share: number | null;
+  /** Asking rents (Dewey listings): information only, never scored. Written by scripts/06_build_asking_rents.py. */
+  rent_2br_2025_26: number | null;
+  /** Distinct 2BR units listed in 2025–26 (the suppression and confidence basis). */
+  n_units_2025_26: number | null;
+  /** 2BR median growth 2019–20 → 2025–26 for units in buildings first listed before 2019. */
+  rent_2br_growth_existing: number | null;
+  /** Same growth over every listing (new buildings included). */
+  rent_2br_growth_all: number | null;
+  /** Bedroom-mix-adjusted level: 1.0 = county typical for the same bedroom count and year. */
+  rent_index_2025_26: number | null;
+  rent_2br_gt_fmr: boolean | null;
+  asking_rents_conf: Conf | null;
   [key: string]: unknown;
 }
 
@@ -166,6 +178,33 @@ export interface Meta {
   confidence_counts?: Record<string, Record<string, number>>;
   watch_list_count?: number | null;
   building_height_share?: Record<string, number>;
+  asking_rents?: { n_with_rent_2025_26: number; n_with_growth_existing: number; n_with_growth_all: number; n_above_fmr: number; confidence_counts: Record<string, number> } | null;
+}
+
+/** County / city asking-rent context (app/src/data/asking_rents.json, from scripts/06_build_asking_rents.py). */
+export interface RentTrendYear {
+  median_2br: number | null;
+  n_units: number;
+  n_unit_months: number;
+}
+export interface RentPooled {
+  median_2019_20: number | null;
+  median_2025_26: number | null;
+  n_units_2019_20: number;
+  n_units_2025_26: number;
+  growth: number | null;
+}
+export interface AskingRentsContext {
+  source?: string;
+  license?: string;
+  fmr_2br_fy2026?: number;
+  years?: number[];
+  county?: Record<string, RentTrendYear>;
+  city?: Record<string, RentTrendYear>;
+  growth?: Record<'county' | 'city', { all: RentPooled; existing: RentPooled }>;
+  thresholds?: { min_units_cell: number; min_units_pooled: number; conf_units: Record<string, number>; existing_before: number };
+  coverage?: { n_city_tracts: number; n_with_rent_2025_26: number; n_with_growth_existing: number; n_with_growth_all: number };
+  built_at?: string;
 }
 
 export interface Scenario {

@@ -1,15 +1,39 @@
 import { create } from 'zustand';
-import { activeFactorIds, focusTracts, scoring } from './data';
+import { activeFactorIds, focusTracts, scoring, tractById } from './data';
 import type { Pin, Scenario, Weights } from './types';
 
-export type Mode = 'explore' | 'tracts' | 'scenarios';
+/** Top-level sections: Explore (data browser) and Analysis (Match, Compare tracts, Compare scenarios). */
+export type Mode = 'explore' | 'match' | 'tracts' | 'scenarios';
+export type AnalysisMode = Exclude<Mode, 'explore'>;
+export const MODES: Mode[] = ['explore', 'match', 'tracts', 'scenarios'];
+export const sectionOf = (m: Mode): 'explore' | 'analysis' => (m === 'explore' ? 'explore' : 'analysis');
+
 export type MapMetric =
   | { kind: 'top' } // score of the best-matching typology (sequential)
   | { kind: 'pick' } // which typology wins (categorical)
   | { kind: 'typology'; id: string } // one typology's score
   | { kind: 'factor'; id: string } // one observed factor (percentile)
   | { kind: 'lens'; id: 'pressure' | 'bivariate' } // anti-displacement lens (observed, derived)
+  | { kind: 'info'; id: 'rent_growth_existing' } // information layer (licensed listing data), never scored
   | { kind: 'layer'; id: 'elevation' }; // terrain tint, for reference
+
+// ------------------------------------------------------------------ Explore: layers and the data browser
+/** Geographies the data browser can paint. County and city are single values shown as reference lines. */
+export type Level = 'tract' | 'bg' | 'zcta';
+export const LEVELS: Level[] = ['tract', 'bg', 'zcta'];
+export type LayerId = 'buildings' | 'terrain' | 'tracts' | 'bg' | 'zcta' | 'county' | 'city';
+export const LAYER_IDS: LayerId[] = ['buildings', 'terrain', 'tracts', 'bg', 'zcta', 'county', 'city'];
+export type Layers = Record<LayerId, boolean>;
+/** The map layer that carries a browse level. */
+export const LAYER_FOR_LEVEL: Record<Level, LayerId> = { tract: 'tracts', bg: 'bg', zcta: 'zcta' };
+
+export interface Browse {
+  level: Level;
+  /** Catalogue variable id painted on the map, or null. */
+  variable: string | null;
+  /** Unit opened in the place card. */
+  selected: { level: Level; geoid: string } | null;
+}
 
 export const SCENARIO_COLORS = ['#7c3aed', '#0f766e', '#c2410c', '#be185d'];
 export const MAX_SCENARIOS = 4;
@@ -41,11 +65,13 @@ try {
   /* no window in tests */
 }
 
+export const defaultLayers = (lite = liteDefault): Layers => ({ buildings: true, terrain: !lite, tracts: true, bg: false, zcta: false, county: false, city: true });
+export const defaultBrowse = (): Browse => ({ level: 'tract', variable: null, selected: null });
+
 export interface AppState {
-  view: 'landing' | 'app';
-  introNonce: number;
-  introDone: boolean;
   mode: Mode;
+  /** Last Analysis sub-tab, so the Analysis button returns to it. */
+  lastAnalysis: AnalysisMode;
   selectedId: string | null;
   compareId: string | null;
   weights: Weights;
@@ -56,8 +82,11 @@ export interface AppState {
   metric: MapMetric;
   pin: Pin | null;
   lite: boolean;
-  terrain: boolean;
   sourcesOpen: boolean;
+  layers: Layers;
+  browse: Browse;
+  /** Unit under the cursor in Explore (for the legend tick). */
+  hoverId: string | null;
   set: (p: Partial<AppState>) => void;
   setMode: (m: Mode) => void;
   select: (id: string | null) => void;
@@ -66,15 +95,15 @@ export interface AppState {
   setScenarioWeights: (which: 'A' | 'B', w: Weights) => void;
   saveScenario: (name: string, w: Weights) => void;
   removeScenario: (id: string) => void;
+  setLayer: (id: LayerId, on: boolean) => void;
+  setBrowse: (p: Partial<Browse>) => void;
 }
 
 const initialScenarios = defaultScenarios();
 
 export const useApp = create<AppState>((set, get) => ({
-  view: 'landing',
-  introNonce: 0,
-  introDone: false,
   mode: 'explore',
+  lastAnalysis: 'match',
   selectedId: null,
   compareId: null,
   weights: presetWeights(scoring.presets[0]?.id ?? 'balanced'),
@@ -85,12 +114,15 @@ export const useApp = create<AppState>((set, get) => ({
   metric: { kind: 'top' },
   pin: null,
   lite: liteDefault,
-  terrain: !liteDefault,
   sourcesOpen: false,
+  layers: defaultLayers(),
+  browse: defaultBrowse(),
+  hoverId: null,
   set: (p) => set(p),
   setMode: (mode) => {
     const s = get();
     const patch: Partial<AppState> = { mode };
+    if (mode !== 'explore') patch.lastAnalysis = mode;
     if (mode === 'tracts' && !s.compareId) {
       const others = focusTracts.filter((t) => t.GEOID !== s.selectedId);
       patch.compareId = others[0]?.GEOID ?? null;
@@ -118,5 +150,24 @@ export const useApp = create<AppState>((set, get) => ({
     if (s.scenarios.length <= 1) return;
     const rest = s.scenarios.filter((x) => x.id !== id);
     set({ scenarios: rest, scenA: s.scenA === id ? rest[0].id : s.scenA, scenB: s.scenB === id ? (rest[1] ?? rest[0]).id : s.scenB });
+  },
+  setLayer: (id, on) => {
+    const s = get();
+    const patch: Partial<AppState> = { layers: { ...s.layers, [id]: on } };
+    if (id === 'terrain' && on && s.lite) patch.lite = false;
+    set(patch);
+  },
+  setBrowse: (p) => {
+    const s = get();
+    const browse: Browse = { ...s.browse, ...p };
+    const patch: Partial<AppState> = { browse };
+    // Choosing a level or a variable turns that level's map layer on so the choice is visible.
+    if ((p.level && p.level !== s.browse.level) || (p.variable && !s.browse.variable)) {
+      const layer = LAYER_FOR_LEVEL[browse.level];
+      if (!s.layers[layer]) patch.layers = { ...s.layers, [layer]: true };
+    }
+    // A selected city tract is also the Analysis tract, so "Open in Analysis" lands on it.
+    if (p.selected && p.selected.level === 'tract' && tractById.has(p.selected.geoid)) patch.selectedId = p.selected.geoid;
+    set(patch);
   },
 }));

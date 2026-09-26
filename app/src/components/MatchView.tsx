@@ -1,14 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { focusTracts, meta, rankedTracts, scoring, tractById, tractLabel, tractSubLabel, typologyById } from '../lib/data';
+import { FMR_2BR, focusTracts, hasAskingRents, meta, rankedTracts, scoring, tractById, tractLabel, tractSubLabel, typologyById } from '../lib/data';
 import { stabilityFor, tLabel, topCounts, useAllResults, type TractResult } from '../lib/derived';
 import { usePaint } from '../lib/paint';
 import { MAX_SCENARIOS, matchPreset, useApp } from '../lib/store';
-import { fmtInt, fmtMoney, fmtPct, score100 } from '../lib/format';
-import { PRESSURE_HOW, SCORE_HOW, UI, directionWord, matchText, percentilePhrase } from '../lib/copy';
+import { fmtInt, fmtMoney, fmtPct, fmtSignedPct, score100 } from '../lib/format';
+import { PRESSURE_HOW, RENT_CAVEAT, RENT_HOW, SCORE_HOW, UI, directionWord, matchText, percentilePhrase } from '../lib/copy';
 import { useExplanation } from '../lib/explainRemote';
 import type { TractProps } from '../lib/types';
-import MapView, { type IntroPhase } from './MapView';
+import MapView from './MapView';
 import Rail, { RailSection } from './Rail';
 import TractSearch from './TractSearch';
 import WeightPanel from './WeightPanel';
@@ -17,17 +17,7 @@ import Legend from './Legend';
 import TypologyRankList, { StabilityBadge } from './TypologyRankList';
 import FactorCards from './FactorCards';
 import DataLimitsPanel from './DataLimitsPanel';
-import IntroOverlay from './IntroOverlay';
-import { Dot, Explainer, InfoTip, ObservedBadge, SectionTitle, readableColor } from './primitives';
-
-const SKIP_KEY = 'visionpitts.skipIntro';
-const readSkip = () => {
-  try {
-    return localStorage.getItem(SKIP_KEY) === '1';
-  } catch {
-    return false;
-  }
-};
+import { ConfChip, Dot, Explainer, InfoTip, ObservedBadge, SectionTitle, readableColor } from './primitives';
 
 export function MapTooltip({ id, results }: { id: string; results: Map<string, TractResult> }) {
   const t = tractById.get(id);
@@ -63,6 +53,61 @@ function Stat({ k, v }: { k: string; v: string }) {
   );
 }
 
+/** One line of asking-rent context from licensed listing data. Information only: nothing here enters the score. */
+function AskingRentLine({ t }: { t: TractProps }) {
+  const set = useApp((s) => s.set);
+  if (!hasAskingRents) return null;
+  const rent = t.rent_2br_2025_26;
+  const n = t.n_units_2025_26 ?? 0;
+  const gx = t.rent_2br_growth_existing;
+  const ga = t.rent_2br_growth_all;
+  let growth: React.ReactNode;
+  if (gx != null) {
+    growth = (
+      <>
+        <b className="text-slate-900">{fmtSignedPct(gx)}</b> since 2019–20 for existing stock
+        {ga != null && <span className="text-slate-600"> (all listings {fmtSignedPct(ga)})</span>}
+      </>
+    );
+  } else if (ga != null) {
+    growth = (
+      <>
+        <b className="text-slate-900">{fmtSignedPct(ga)}</b> since 2019–20 across all listings <span className="text-slate-600">(existing stock hidden: fewer than 20 units listed before 2019)</span>
+      </>
+    );
+  } else {
+    growth = <span className="text-slate-600">growth hidden (fewer than 20 units listed in 2019–20)</span>;
+  }
+  return (
+    <div className="mt-2 rounded-xl bg-white px-3 py-2 ring-1 ring-stone-200/80">
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-small leading-snug text-slate-800">
+          {rent != null ? (
+            <>
+              Median 2BR asking rent <b className="text-slate-900">{fmtMoney(rent)}</b> (2025–26, {fmtInt(n)} units) · vs FMR {fmtMoney(FMR_2BR)}
+              {t.rent_2br_gt_fmr != null && <span className={t.rent_2br_gt_fmr ? 'text-rose-700' : 'text-emerald-700'}> ({t.rent_2br_gt_fmr ? 'above' : 'at or below'})</span>} · {growth}
+            </>
+          ) : (
+            <>
+              Median 2BR asking rent hidden: <b className="text-slate-900">{fmtInt(n)}</b> distinct units listed in 2025–26, fewer than 20.
+            </>
+          )}
+        </div>
+        <InfoTip label="About asking rents" width={300}>
+          {RENT_HOW}
+        </InfoTip>
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-caption text-slate-600">
+        <span>{RENT_CAVEAT}</span>
+        <ConfChip conf={t.asking_rents_conf} />
+        <button onClick={() => set({ metric: { kind: 'info', id: 'rent_growth_existing' } })} className="font-semibold text-violet-700 hover:underline">
+          Show growth on the map
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function AboutPlace({ t }: { t: TractProps }) {
   return (
     <section>
@@ -73,6 +118,7 @@ function AboutPlace({ t }: { t: TractProps }) {
         <Stat k="Median rent" v={fmtMoney(t.med_gross_rent)} />
         <Stat k="Households that rent" v={fmtPct(t.renter_share)} />
       </div>
+      <AskingRentLine t={t} />
     </section>
   );
 }
@@ -265,18 +311,16 @@ export function TractDetail({ t, r, weights, onClose }: { t: TractProps; r: Trac
   );
 }
 
-export default function ExploreView() {
+/** Analysis → Match: search a place, set priorities, read which housing type fits it best and why. */
+export default function MatchView() {
   const selectedId = useApp((s) => s.selectedId);
   const weights = useApp((s) => s.weights);
   const metric = useApp((s) => s.metric);
   const lite = useApp((s) => s.lite);
-  const terrain = useApp((s) => s.terrain);
+  const layers = useApp((s) => s.layers);
   const scenarios = useApp((s) => s.scenarios);
   const pin = useApp((s) => s.pin);
   const { set, select, setWeights, saveScenario } = useApp.getState();
-  const [intro] = useState(() => useApp.getState().introNonce > 0 && !useApp.getState().introDone && !readSkip() && !lite);
-  const [phase, setPhase] = useState<IntroPhase>(intro ? 'spin' : 'done');
-  const [skip, setSkip] = useState(0);
   const results = useAllResults(weights);
   const paint = usePaint(metric, results);
   const t = selectedId ? tractById.get(selectedId) : null;
@@ -311,13 +355,8 @@ export default function ExploreView() {
           selectedId={selectedId}
           buildingColor={buildingColor}
           lite={lite}
-          terrain={terrain}
-          intro={intro}
-          skipSignal={skip}
-          onIntroPhase={(p) => {
-            setPhase(p);
-            if (p === 'done') set({ introDone: true });
-          }}
+          terrain={layers.terrain}
+          buildings={layers.buildings}
           padding={{ top: 90, bottom: 90, left: 70, right: 500 }}
           pin={pin}
           elevationReadout
@@ -325,31 +364,12 @@ export default function ExploreView() {
           idleOrbit
           tooltip={(id) => <MapTooltip id={id} results={results} />}
         />
-        <IntroOverlay
-          phase={phase}
-          onSkip={() => {
-            try {
-              localStorage.setItem(SKIP_KEY, '1');
-            } catch {
-              /* private mode */
-            }
-            setSkip((n) => n + 1);
-          }}
-        />
-        <AnimatePresence>
-          {phase === 'done' && (
-            <motion.div key="info" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 24 }} transition={{ type: 'spring', stiffness: 260, damping: 30 }} className="scroll-quiet absolute bottom-3 right-3 top-3 z-20 w-[440px] overflow-y-auto rounded-2xl bg-white/95 shadow-[0_10px_40px_-10px_rgba(15,23,42,0.25)] ring-1 ring-black/5 backdrop-blur">
-              {t && r ? <TractDetail t={t} r={r} weights={weights} onClose={() => select(null)} /> : <CitySummary results={results} />}
-            </motion.div>
-          )}
-        </AnimatePresence>
-        <AnimatePresence>
-          {phase === 'done' && (
-            <motion.div key="legend" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute bottom-3 left-3 z-20">
-              <Legend metric={metric} buildings={buildingColor} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <motion.div initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 30 }} className="scroll-quiet absolute bottom-3 right-3 top-3 z-20 w-[440px] overflow-y-auto rounded-2xl bg-white/95 shadow-[0_10px_40px_-10px_rgba(15,23,42,0.25)] ring-1 ring-black/5 backdrop-blur">
+          {t && r ? <TractDetail t={t} r={r} weights={weights} onClose={() => select(null)} /> : <CitySummary results={results} />}
+        </motion.div>
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="absolute bottom-3 left-3 z-20">
+          <Legend metric={metric} buildings={buildingColor} />
+        </motion.div>
       </main>
     </div>
   );

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import maplibregl, { type ExpressionSpecification, type Map as MLMap, type MapGeoJSONFeature } from 'maplibre-gl';
+import maplibregl, { type ExpressionSpecification, type GeoJSONSource, type Map as MLMap, type MapGeoJSONFeature, type MapLayerMouseEvent } from 'maplibre-gl';
 import { buildingsFC, scoring, tractBounds, tractsFC } from '../lib/data';
+import { boundsOf, type Bounds } from '../lib/geo';
 import { ELEV_STOPS_FT, M_TO_FT, PGH_VIEW, VIOLET, catExpression, contourSourceUrl, easeInOutCubic, easeOutCubic, loadBasemapStyle, loadDemConfig, seqExpression, type DemConfig } from '../lib/mapStyle';
 import type { MapPaint } from '../lib/paint';
 import type { Pin } from '../lib/types';
@@ -10,7 +11,33 @@ export interface SyncGroup {
   lock: boolean;
 }
 export const makeSyncGroup = (): SyncGroup => ({ maps: new Set(), lock: false });
-export type IntroPhase = 'spin' | 'fly' | 'done';
+
+/** Any polygon feature collection (tracts, block groups, ZIPs, county, city). */
+export interface OverlayFC {
+  type: 'FeatureCollection';
+  features: { type: 'Feature'; properties: Record<string, unknown>; geometry: { type: string; coordinates: unknown } }[];
+}
+
+/**
+ * A polygon layer drawn on top of the basemap, keyed by `id`. Source `ov-${id}`; layers `${id}-fill`, `-line`,
+ * `-hover`, `-sel-glow`, `-sel`, kept in array order below the basemap labels. Changing `data` calls setData,
+ * changing `fill.paint` re-derives the color expression and diffs feature state, dropping the overlay removes it.
+ */
+export interface OverlayLayer {
+  id: string;
+  data: OverlayFC;
+  /** Property promoted to the feature id (feature state and hover/select use it). */
+  idField: string;
+  /** Choropleth from a MapPaint, or a flat `color`; omitted → outline only (plus an invisible hit layer when interactive). */
+  fill?: { paint?: MapPaint; color?: string; opacity?: number | ExpressionSpecification };
+  line: { color: string; width: number | ExpressionSpecification; dash?: number[]; opacity?: number };
+  interactive?: boolean;
+  selectedId?: string | null;
+  /** Ease the camera to the selected feature when the selection changes. */
+  zoomTo?: boolean;
+  onSelect?: (id: string) => void;
+  tooltip?: (id: string) => ReactNode;
+}
 
 interface Props {
   paint: MapPaint;
@@ -20,9 +47,6 @@ interface Props {
   buildingColor?: string | null;
   lite: boolean;
   terrain: boolean;
-  intro?: boolean;
-  skipSignal?: number;
-  onIntroPhase?: (p: IntroPhase) => void;
   padding?: { top: number; right: number; bottom: number; left: number };
   onSelect?: (id: string) => void;
   tooltip?: (id: string) => ReactNode;
@@ -37,6 +61,14 @@ interface Props {
   fillOpacity?: number;
   pin?: Pin | null;
   elevationReadout?: boolean;
+  /** Extra polygon layers (Explore). */
+  overlays?: OverlayLayer[];
+  /** Draw and handle the built-in city tract layers (default true; Explore turns them off). */
+  baseTracts?: boolean;
+  /** 3D buildings (OSM backdrop + focus-tract footprints), default true. */
+  buildings?: boolean;
+  /** Feature under the cursor changed (tract layers and interactive overlays). */
+  onHover?: (id: string | null, overlayId?: string) => void;
 }
 
 const NON_RESIDENTIAL = '#efede9';
@@ -44,6 +76,9 @@ const NON_RESIDENTIAL = '#efede9';
 const ZOOM_FILL = ['interpolate', ['linear'], ['zoom'], 12, 0.62, 15, 0.35] as unknown as number;
 const fmtFt = (v: number) => `${Math.round(v).toLocaleString('en-US')} ft`;
 const SCORE_BINS = scoring.bins.score;
+const TRACT_LAYERS = ['tract-fill', 'tract-line', 'tract-focus', 'tract-flip', 'tract-hover', 'tract-sel-glow', 'tract-sel'];
+const OVERLAY_SUFFIXES = ['-fill', '-line', '-hover', '-sel-glow', '-sel'] as const;
+const DEFAULT_PAD = { top: 60, right: 60, bottom: 60, left: 60 };
 
 function tint(hex: string, amt: number) {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex);
@@ -56,11 +91,53 @@ function tint(hex: string, amt: number) {
 /** Non-residential tracts are drawn in a flat light grey whatever the metric. */
 const withNonResidential = (expr: ExpressionSpecification | string): ExpressionSpecification => ['case', ['!', ['to-boolean', ['get', 'residential']]], NON_RESIDENTIAL, expr] as unknown as ExpressionSpecification;
 
+// ------------------------------------------------------------------ overlay helpers
+interface OverlayRec {
+  cfg: OverlayLayer;
+  /** Feature state applied so far (per id) under `key`. */
+  values: Map<string, number>;
+  key: 'v' | 'k';
+  selected: string | null;
+  hovered: string | null;
+  handlers: { move: (e: MapLayerMouseEvent) => void; leave: () => void; click: (e: MapLayerMouseEvent) => void };
+}
+
+const overlaySource = (id: string) => `ov-${id}`;
+const fillVisible = (cfg: OverlayLayer) => !!cfg.fill || !!cfg.interactive;
+function fillColor(cfg: OverlayLayer): ExpressionSpecification | string {
+  const p = cfg.fill?.paint;
+  if (p?.kind === 'cat') return catExpression(p.palette);
+  if (p?.kind === 'seq') return seqExpression(p.palette, p.bins ?? SCORE_BINS);
+  if (p?.kind === 'relief') return 'rgba(0,0,0,0)';
+  return cfg.fill?.color ?? '#94a3b8';
+}
+const fillOpacityOf = (cfg: OverlayLayer): number | ExpressionSpecification => cfg.fill?.opacity ?? (cfg.fill ? ZOOM_FILL : 0);
+function linePaint(line: OverlayLayer['line']) {
+  const p: Record<string, unknown> = { 'line-color': line.color, 'line-width': line.width, 'line-opacity': line.opacity ?? 1 };
+  if (line.dash) p['line-dasharray'] = line.dash;
+  return p;
+}
+const sameLine = (a: OverlayLayer['line'], b: OverlayLayer['line']) => a.color === b.color && a.width === b.width && a.opacity === b.opacity && String(a.dash ?? '') === String(b.dash ?? '');
+
+const boundsCache = new WeakMap<OverlayFC, Map<string, Bounds | null>>();
+function featureBounds(data: OverlayFC, idField: string, id: string): Bounds | null {
+  let m = boundsCache.get(data);
+  if (!m) {
+    m = new Map();
+    boundsCache.set(data, m);
+  }
+  if (!m.has(id)) {
+    const f = data.features.find((x) => String(x.properties?.[idField]) === id);
+    m.set(id, f ? boundsOf(f.geometry) : null);
+  }
+  return m.get(id) ?? null;
+}
+
 export default function MapView(props: Props) {
   const el = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
   const [ready, setReady] = useState(false);
-  const [hover, setHover] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [hover, setHover] = useState<{ overlay: string | null; id: string; x: number; y: number } | null>(null);
   const [elev, setElev] = useState<number | null>(null);
   const markerRef = useRef<maplibregl.Marker | null>(null);
   const live = useRef(props);
@@ -76,12 +153,16 @@ export default function MapView(props: Props) {
     bldRaf: 0,
     terrainE: 0,
     terrainRaf: 0,
-    introDone: !props.intro,
     orbitRaf: 0,
     idleTimer: 0,
     elevRaf: 0,
     camAt: 0,
     dem: null as DemConfig | null,
+    firstSymbol: undefined as string | undefined,
+    overlayAnchor: undefined as string | undefined,
+    overlays: new Map<string, OverlayRec>(),
+    overlayOrder: '',
+    hoverOverlay: null as string | null,
   }).current;
 
   // ------------------------------------------------------------ create
@@ -91,15 +172,14 @@ export default function MapView(props: Props) {
     Promise.all([loadBasemapStyle(), loadDemConfig()]).then(([style, dem]) => {
       if (disposed || !el.current) return;
       st.dem = dem;
-      const introOn = !!live.current.intro && !live.current.lite;
       const v0 = live.current.initialView ?? PGH_VIEW;
       map = new maplibregl.Map({
         container: el.current,
         style,
-        center: introOn ? [-128, 34] : v0.center,
-        zoom: introOn ? 1.3 : v0.zoom,
-        pitch: introOn ? 0 : v0.pitch,
-        bearing: introOn ? 0 : v0.bearing,
+        center: v0.center,
+        zoom: v0.zoom,
+        pitch: v0.pitch,
+        bearing: v0.bearing,
         interactive: live.current.interactive ?? true,
         maxPitch: 78,
         attributionControl: { compact: true, customAttribution: [dem.attribution, 'Search © OpenStreetMap / Photon · US Census Geocoder'] },
@@ -111,13 +191,8 @@ export default function MapView(props: Props) {
       if (live.current.interactive ?? true) map.addControl(new maplibregl.NavigationControl({ visualizePitch: true, showCompass: true }), 'bottom-right');
       map.on('style.load', () => {
         if (!map) return;
-        setup(map, introOn);
+        setup(map);
         setReady(true);
-        if (introOn) runIntro(map);
-        else {
-          st.introDone = true;
-          live.current.onIntroPhase?.('done');
-        }
       });
       map.on('error', (e) => {
         const msg = String((e as { error?: Error }).error?.message ?? '');
@@ -134,18 +209,13 @@ export default function MapView(props: Props) {
         map.remove();
       }
       mapRef.current = null;
+      st.overlays.clear();
+      st.overlayOrder = '';
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function setup(map: MLMap, introOn: boolean) {
-    if (introOn) {
-      try {
-        map.setProjection({ type: 'globe' });
-      } catch {
-        /* older engines */
-      }
-    }
+  function setup(map: MLMap) {
     try {
       map.setSky({
         'sky-color': '#dfe9f3',
@@ -161,6 +231,7 @@ export default function MapView(props: Props) {
     }
     const layers = map.getStyle().layers ?? [];
     const firstSymbol = layers.find((l) => l.type === 'symbol')?.id;
+    st.firstSymbol = firstSymbol;
     for (const l of layers) if (l.type === 'symbol' && /poi|housenum/.test(l.id)) map.setLayoutProperty(l.id, 'visibility', 'none');
 
     // Elevation: hillshade always, 3D terrain on demand, hypsometric tint for the Elevation layer.
@@ -181,7 +252,9 @@ export default function MapView(props: Props) {
       /* color-relief needs MapLibre >= 5.6 */
     }
 
-    // Tracts
+    // Tracts (the built-in layers Match and the compare views paint; hidden when baseTracts is false)
+    const tractsOn = live.current.baseTracts !== false;
+    const vis = { visibility: tractsOn ? ('visible' as const) : ('none' as const) };
     map.addSource('tracts', { type: 'geojson', data: tractsFC as never, promoteId: 'GEOID' });
     const p0 = live.current.paint;
     map.addLayer(
@@ -189,27 +262,28 @@ export default function MapView(props: Props) {
         id: 'tract-fill',
         type: 'fill',
         source: 'tracts',
+        layout: vis,
         paint: {
           'fill-color': withNonResidential(p0.kind === 'cat' ? catExpression(p0.palette) : p0.kind === 'relief' ? 'rgba(0,0,0,0)' : seqExpression(p0.palette, p0.bins ?? SCORE_BINS)),
-          'fill-opacity': introOn ? 0 : fillOpacity,
+          'fill-opacity': fillOpacity,
           'fill-opacity-transition': { duration: 900, delay: 0 },
         },
       },
       firstSymbol,
     );
-    map.addLayer({ id: 'tract-line', type: 'line', source: 'tracts', paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 9, 0.3, 14, 1.2], 'line-opacity': 0.85 } }, firstSymbol);
-    map.addLayer({ id: 'tract-focus', type: 'line', source: 'tracts', filter: ['to-boolean', ['get', 'focus']], paint: { 'line-color': '#475569', 'line-width': 1.3, 'line-dasharray': [2, 1.6], 'line-opacity': 0.7 } }, firstSymbol);
-    map.addLayer({ id: 'tract-flip', type: 'line', source: 'tracts', paint: { 'line-color': '#0f172a', 'line-width': ['case', ['boolean', ['feature-state', 'flip'], false], 2.2, 0], 'line-width-transition': { duration: 350, delay: 0 } } }, firstSymbol);
-    map.addLayer({ id: 'tract-hover', type: 'line', source: 'tracts', paint: { 'line-color': '#334155', 'line-width': ['case', ['boolean', ['feature-state', 'hover'], false], 2, 0] } }, firstSymbol);
-    map.addLayer({ id: 'tract-sel-glow', type: 'line', source: 'tracts', paint: { 'line-color': VIOLET, 'line-blur': 6, 'line-opacity': 0.45, 'line-width': ['case', ['boolean', ['feature-state', 'selected'], false], 12, 0] } }, firstSymbol);
-    map.addLayer({ id: 'tract-sel', type: 'line', source: 'tracts', paint: { 'line-color': VIOLET, 'line-width': ['case', ['boolean', ['feature-state', 'selected'], false], 3.2, 0] } }, firstSymbol);
+    map.addLayer({ id: 'tract-line', type: 'line', source: 'tracts', layout: vis, paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 9, 0.3, 14, 1.2], 'line-opacity': 0.85 } }, firstSymbol);
+    map.addLayer({ id: 'tract-focus', type: 'line', source: 'tracts', layout: vis, filter: ['to-boolean', ['get', 'focus']], paint: { 'line-color': '#475569', 'line-width': 1.3, 'line-dasharray': [2, 1.6], 'line-opacity': 0.7 } }, firstSymbol);
+    map.addLayer({ id: 'tract-flip', type: 'line', source: 'tracts', layout: vis, paint: { 'line-color': '#0f172a', 'line-width': ['case', ['boolean', ['feature-state', 'flip'], false], 2.2, 0], 'line-width-transition': { duration: 350, delay: 0 } } }, firstSymbol);
+    map.addLayer({ id: 'tract-hover', type: 'line', source: 'tracts', layout: vis, paint: { 'line-color': '#334155', 'line-width': ['case', ['boolean', ['feature-state', 'hover'], false], 2, 0] } }, firstSymbol);
+    map.addLayer({ id: 'tract-sel-glow', type: 'line', source: 'tracts', layout: vis, paint: { 'line-color': VIOLET, 'line-blur': 6, 'line-opacity': 0.45, 'line-width': ['case', ['boolean', ['feature-state', 'selected'], false], 12, 0] } }, firstSymbol);
+    map.addLayer({ id: 'tract-sel', type: 'line', source: 'tracts', layout: vis, paint: { 'line-color': VIOLET, 'line-width': ['case', ['boolean', ['feature-state', 'selected'], false], 3.2, 0] } }, firstSymbol);
 
     // Contour lines in feet from the same elevation tiles, visible with Terrain from z13.
     try {
       map.addSource('contours', { type: 'vector', tiles: [contourSourceUrl(dem)], maxzoom: 15 });
-      const vis = live.current.terrain && !live.current.lite ? 'visible' : 'none';
-      map.addLayer({ id: 'contour-minor', type: 'line', source: 'contours', 'source-layer': 'contours', minzoom: 13, filter: ['==', ['get', 'level'], 0], layout: { visibility: vis }, paint: { 'line-color': '#57534e', 'line-opacity': 0.32, 'line-width': 0.6 } }, firstSymbol);
-      map.addLayer({ id: 'contour-major', type: 'line', source: 'contours', 'source-layer': 'contours', minzoom: 13, filter: ['>', ['get', 'level'], 0], layout: { visibility: vis }, paint: { 'line-color': '#44403c', 'line-opacity': 0.6, 'line-width': 1.2 } }, firstSymbol);
+      const cvis = live.current.terrain && !live.current.lite ? 'visible' : 'none';
+      map.addLayer({ id: 'contour-minor', type: 'line', source: 'contours', 'source-layer': 'contours', minzoom: 13, filter: ['==', ['get', 'level'], 0], layout: { visibility: cvis }, paint: { 'line-color': '#57534e', 'line-opacity': 0.32, 'line-width': 0.6 } }, firstSymbol);
+      map.addLayer({ id: 'contour-major', type: 'line', source: 'contours', 'source-layer': 'contours', minzoom: 13, filter: ['>', ['get', 'level'], 0], layout: { visibility: cvis }, paint: { 'line-color': '#44403c', 'line-opacity': 0.6, 'line-width': 1.2 } }, firstSymbol);
       if (map.getStyle().glyphs) {
         map.addLayer({
           id: 'contour-label',
@@ -218,7 +292,7 @@ export default function MapView(props: Props) {
           'source-layer': 'contours',
           minzoom: 13.5,
           filter: ['>', ['get', 'level'], 0],
-          layout: { visibility: vis, 'symbol-placement': 'line', 'text-field': ['concat', ['number-format', ['get', 'ele'], { locale: 'en-US' }], ' ft'], 'text-font': ['Noto Sans Regular'], 'text-size': 12, 'text-max-angle': 30, 'symbol-spacing': 320 },
+          layout: { visibility: cvis, 'symbol-placement': 'line', 'text-field': ['concat', ['number-format', ['get', 'ele'], { locale: 'en-US' }], ' ft'], 'text-font': ['Noto Sans Regular'], 'text-size': 12, 'text-max-angle': 30, 'symbol-spacing': 320 },
           paint: { 'text-color': '#44403c', 'text-halo-color': 'rgba(255,255,255,0.9)', 'text-halo-width': 1.6 },
         });
       }
@@ -227,6 +301,7 @@ export default function MapView(props: Props) {
     }
 
     // Buildings: muted OSM backdrop everywhere; detailed focus-tract buildings when the pipeline provides them.
+    const bvis = { visibility: live.current.buildings === false ? ('none' as const) : ('visible' as const) };
     if (map.getSource('openmaptiles')) {
       map.addLayer(
         {
@@ -235,6 +310,7 @@ export default function MapView(props: Props) {
           source: 'openmaptiles',
           'source-layer': 'building',
           minzoom: 14,
+          layout: bvis,
           paint: {
             'fill-extrusion-color': '#e7e5e4',
             'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 14, 0, 14.6, ['coalesce', ['get', 'render_height'], 0]],
@@ -253,29 +329,37 @@ export default function MapView(props: Props) {
           type: 'fill-extrusion',
           source: 'focus-bld',
           minzoom: 12,
+          layout: bvis,
           paint: { 'fill-extrusion-color': ['case', ['==', ['coalesce', ['get', 'src'], 'default'], 'default'], '#e7e5e4', '#d6d3d1'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-opacity': 0.92, 'fill-extrusion-vertical-gradient': true },
         },
         firstSymbol,
       );
     }
+    // Overlays go under contours and buildings, like the tract layers.
+    st.overlayAnchor = ['contour-minor', 'osm-3d', 'focus-3d'].find((l) => map.getLayer(l)) ?? firstSymbol;
 
-    // Interaction
+    // Interaction (tract layers)
     map.on('mousemove', 'tract-fill', (e) => {
+      if (live.current.baseTracts === false) return;
       const f = e.features?.[0] as MapGeoJSONFeature | undefined;
       const id = f ? String(f.id ?? f.properties?.GEOID) : null;
       if (id !== st.hovered) {
         if (st.hovered) map.setFeatureState({ source: 'tracts', id: st.hovered }, { hover: false });
         if (id) map.setFeatureState({ source: 'tracts', id }, { hover: true });
         st.hovered = id;
+        live.current.onHover?.(id);
       }
       map.getCanvas().style.cursor = id ? 'pointer' : '';
-      setHover(id ? { id, x: e.point.x, y: e.point.y } : null);
+      setHover(id ? { overlay: null, id, x: e.point.x, y: e.point.y } : null);
     });
     map.on('mouseleave', 'tract-fill', () => {
-      if (st.hovered) map.setFeatureState({ source: 'tracts', id: st.hovered }, { hover: false });
+      if (st.hovered) {
+        map.setFeatureState({ source: 'tracts', id: st.hovered }, { hover: false });
+        live.current.onHover?.(null);
+      }
       st.hovered = null;
       map.getCanvas().style.cursor = '';
-      setHover(null);
+      setHover((h) => (h && h.overlay === null ? null : h));
     });
     map.on('mousemove', (e) => {
       if (!live.current.elevationReadout) return;
@@ -293,8 +377,9 @@ export default function MapView(props: Props) {
       setElev(null);
     });
     map.on('click', 'tract-fill', (e) => {
+      if (live.current.baseTracts === false) return;
       const f = e.features?.[0];
-      if (f && st.introDone) live.current.onSelect?.(String(f.id ?? f.properties?.GEOID));
+      if (f) live.current.onSelect?.(String(f.id ?? f.properties?.GEOID));
     });
 
     // Pair sync: mirror zoom / pitch / bearing, keep each map's own center.
@@ -310,32 +395,201 @@ export default function MapView(props: Props) {
     }
   }
 
-  function runIntro(map: MLMap) {
-    live.current.onIntroPhase?.('spin');
-    map.easeTo({ center: [-96, 38], duration: 2200, easing: (t) => t });
-    map.once('moveend', () => {
-      if (st.introDone) return;
-      live.current.onIntroPhase?.('fly');
-      map.flyTo({ ...PGH_VIEW, duration: 5000, curve: 1.5, essential: true });
-      map.once('moveend', () => finishIntro(map));
-    });
-  }
-  function finishIntro(map: MLMap) {
-    if (st.introDone) return;
-    st.introDone = true;
-    map.setPaintProperty('tract-fill', 'fill-opacity', fillOpacity);
-    live.current.onIntroPhase?.('done');
+  // ------------------------------------------------------------ overlays
+  function flyToBounds(map: MLMap, b: Bounds) {
+    st.camAt = performance.now();
+    const cam = map.cameraForBounds(b, { padding: live.current.padding ?? DEFAULT_PAD, bearing: -20 });
+    if (!cam) return;
+    const target = { center: cam.center, zoom: Math.min((cam.zoom ?? 14) - 0.35, 16), pitch: 60, bearing: -20 };
+    if (live.current.lite) map.jumpTo(target);
+    else map.easeTo({ ...target, duration: 1200, easing: easeInOutCubic, essential: true });
   }
 
-  // skip intro
+  function applyOverlayValues(map: MLMap, rec: OverlayRec) {
+    const paint = rec.cfg.fill?.paint;
+    if (!paint || paint.kind === 'relief') return;
+    const source = overlaySource(rec.cfg.id);
+    const key = paint.kind === 'seq' ? 'v' : 'k';
+    if (key !== rec.key) {
+      rec.values.clear();
+      rec.key = key;
+    }
+    const seen = new Set<string>();
+    for (const [id, v] of paint.values) {
+      const val = v == null ? -1 : v;
+      seen.add(id);
+      if (rec.values.get(id) !== val) {
+        map.setFeatureState({ source, id }, { [key]: val });
+        rec.values.set(id, val);
+      }
+    }
+    for (const id of [...rec.values.keys()]) {
+      if (seen.has(id)) continue;
+      map.setFeatureState({ source, id }, { [key]: -1 });
+      rec.values.delete(id);
+    }
+  }
+
+  function applyOverlaySelection(map: MLMap, rec: OverlayRec) {
+    const { cfg } = rec;
+    const source = overlaySource(cfg.id);
+    const id = cfg.selectedId ?? null;
+    if (rec.selected === id) return;
+    if (rec.selected) map.setFeatureState({ source, id: rec.selected }, { selected: false });
+    if (id) map.setFeatureState({ source, id }, { selected: true });
+    rec.selected = id;
+    if (id && cfg.zoomTo) {
+      const b = featureBounds(cfg.data, cfg.idField, id);
+      if (b) flyToBounds(map, b);
+    }
+  }
+
+  function clearOverlayHover(map: MLMap, rec: OverlayRec) {
+    if (rec.hovered) {
+      map.setFeatureState({ source: overlaySource(rec.cfg.id), id: rec.hovered }, { hover: false });
+      rec.hovered = null;
+      live.current.onHover?.(null, rec.cfg.id);
+    }
+    if (st.hoverOverlay === rec.cfg.id) {
+      st.hoverOverlay = null;
+      map.getCanvas().style.cursor = '';
+      setHover((h) => (h && h.overlay === rec.cfg.id ? null : h));
+    }
+  }
+
+  function addOverlay(map: MLMap, cfg: OverlayLayer) {
+    const source = overlaySource(cfg.id);
+    const anchor = st.overlayAnchor;
+    map.addSource(source, { type: 'geojson', data: cfg.data as never, promoteId: cfg.idField });
+    map.addLayer({ id: `${cfg.id}-fill`, type: 'fill', source, layout: { visibility: fillVisible(cfg) ? 'visible' : 'none' }, paint: { 'fill-color': fillColor(cfg) as never, 'fill-opacity': fillOpacityOf(cfg) as never, 'fill-opacity-transition': { duration: 300, delay: 0 } } }, anchor);
+    map.addLayer({ id: `${cfg.id}-line`, type: 'line', source, layout: { 'line-join': 'round' }, paint: linePaint(cfg.line) as never }, anchor);
+    map.addLayer({ id: `${cfg.id}-hover`, type: 'line', source, paint: { 'line-color': '#334155', 'line-width': ['case', ['boolean', ['feature-state', 'hover'], false], 2, 0] } }, anchor);
+    map.addLayer({ id: `${cfg.id}-sel-glow`, type: 'line', source, paint: { 'line-color': VIOLET, 'line-blur': 6, 'line-opacity': 0.45, 'line-width': ['case', ['boolean', ['feature-state', 'selected'], false], 12, 0] } }, anchor);
+    map.addLayer({ id: `${cfg.id}-sel`, type: 'line', source, paint: { 'line-color': VIOLET, 'line-width': ['case', ['boolean', ['feature-state', 'selected'], false], 3.2, 0] } }, anchor);
+    const rec: OverlayRec = {
+      cfg,
+      values: new Map(),
+      key: 'k',
+      selected: null,
+      hovered: null,
+      handlers: {
+        move: (e) => {
+          const r = st.overlays.get(cfg.id);
+          if (!r?.cfg.interactive) return;
+          const f = e.features?.[0] as MapGeoJSONFeature | undefined;
+          const fid = f ? String(f.id ?? f.properties?.[r.cfg.idField]) : null;
+          if (fid !== r.hovered) {
+            if (r.hovered) map.setFeatureState({ source, id: r.hovered }, { hover: false });
+            if (fid) map.setFeatureState({ source, id: fid }, { hover: true });
+            r.hovered = fid;
+            st.hoverOverlay = fid ? cfg.id : null;
+            live.current.onHover?.(fid, cfg.id);
+          }
+          map.getCanvas().style.cursor = fid ? 'pointer' : '';
+          setHover(fid ? { overlay: cfg.id, id: fid, x: e.point.x, y: e.point.y } : null);
+        },
+        leave: () => {
+          const r = st.overlays.get(cfg.id);
+          if (r) clearOverlayHover(map, r);
+        },
+        click: (e) => {
+          const r = st.overlays.get(cfg.id);
+          if (!r?.cfg.interactive) return;
+          const f = e.features?.[0];
+          if (f) r.cfg.onSelect?.(String(f.id ?? f.properties?.[r.cfg.idField]));
+        },
+      },
+    };
+    map.on('mousemove', `${cfg.id}-fill`, rec.handlers.move);
+    map.on('mouseleave', `${cfg.id}-fill`, rec.handlers.leave);
+    map.on('click', `${cfg.id}-fill`, rec.handlers.click);
+    st.overlays.set(cfg.id, rec);
+    applyOverlayValues(map, rec);
+    applyOverlaySelection(map, rec);
+  }
+
+  function removeOverlay(map: MLMap, rec: OverlayRec) {
+    const { id } = rec.cfg;
+    clearOverlayHover(map, rec);
+    map.off('mousemove', `${id}-fill`, rec.handlers.move);
+    map.off('mouseleave', `${id}-fill`, rec.handlers.leave);
+    map.off('click', `${id}-fill`, rec.handlers.click);
+    for (const s of OVERLAY_SUFFIXES) if (map.getLayer(`${id}${s}`)) map.removeLayer(`${id}${s}`);
+    if (map.getSource(overlaySource(id))) map.removeSource(overlaySource(id));
+    st.overlays.delete(id);
+  }
+
+  function updateOverlay(map: MLMap, rec: OverlayRec, cfg: OverlayLayer) {
+    const prev = rec.cfg;
+    if (cfg.idField !== prev.idField) {
+      removeOverlay(map, rec);
+      addOverlay(map, cfg);
+      return;
+    }
+    rec.cfg = cfg;
+    const fillId = `${cfg.id}-fill`;
+    let dataChanged = false;
+    if (cfg.data !== prev.data) {
+      (map.getSource(overlaySource(cfg.id)) as GeoJSONSource | undefined)?.setData(cfg.data as never);
+      rec.values.clear();
+      rec.selected = null;
+      if (rec.hovered) clearOverlayHover(map, rec);
+      dataChanged = true;
+    }
+    const fillChanged = dataChanged || cfg.fill?.paint !== prev.fill?.paint || cfg.fill?.color !== prev.fill?.color || !cfg.fill !== !prev.fill;
+    if (fillChanged) map.setPaintProperty(fillId, 'fill-color', fillColor(cfg) as never);
+    if (fillChanged || cfg.fill?.opacity !== prev.fill?.opacity) map.setPaintProperty(fillId, 'fill-opacity', fillOpacityOf(cfg) as never);
+    if (fillVisible(cfg) !== fillVisible(prev)) map.setLayoutProperty(fillId, 'visibility', fillVisible(cfg) ? 'visible' : 'none');
+    if (!sameLine(cfg.line, prev.line)) {
+      const lp = linePaint(cfg.line);
+      for (const k of ['line-color', 'line-width', 'line-opacity']) map.setPaintProperty(`${cfg.id}-line`, k, lp[k] as never);
+      map.setPaintProperty(`${cfg.id}-line`, 'line-dasharray', (cfg.line.dash ?? null) as never);
+    }
+    if (!cfg.interactive && rec.hovered) clearOverlayHover(map, rec);
+    applyOverlayValues(map, rec);
+    applyOverlaySelection(map, rec);
+  }
+
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !ready || !props.skipSignal || st.introDone) return;
-    map.stop();
-    map.jumpTo(PGH_VIEW);
-    finishIntro(map);
+    if (!map || !ready) return;
+    const next = props.overlays ?? [];
+    const ids = new Set(next.map((o) => o.id));
+    for (const rec of [...st.overlays.values()]) if (!ids.has(rec.cfg.id)) removeOverlay(map, rec);
+    for (const cfg of next) {
+      const rec = st.overlays.get(cfg.id);
+      if (rec) updateOverlay(map, rec, cfg);
+      else addOverlay(map, cfg);
+    }
+    const order = next.map((o) => o.id).join('|');
+    if (order !== st.overlayOrder) {
+      for (const cfg of next) for (const s of OVERLAY_SUFFIXES) if (map.getLayer(`${cfg.id}${s}`)) map.moveLayer(`${cfg.id}${s}`, st.overlayAnchor);
+      st.overlayOrder = order;
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.skipSignal, ready]);
+  }, [props.overlays, ready]);
+
+  // built-in tract layers on/off
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    const vis = props.baseTracts === false ? 'none' : 'visible';
+    for (const l of TRACT_LAYERS) if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', vis);
+    if (props.baseTracts === false && st.hovered) {
+      map.setFeatureState({ source: 'tracts', id: st.hovered }, { hover: false });
+      st.hovered = null;
+      setHover((h) => (h && h.overlay === null ? null : h));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.baseTracts, ready]);
+
+  // 3D buildings on/off
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    const vis = props.buildings === false ? 'none' : 'visible';
+    for (const l of ['osm-3d', 'focus-3d']) if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', vis);
+  }, [props.buildings, ready]);
 
   // ------------------------------------------------------------ recolor (tweened through feature-state)
   useEffect(() => {
@@ -404,18 +658,9 @@ export default function MapView(props: Props) {
     if (id) map.setFeatureState({ source: 'tracts', id }, { selected: true });
     const changed = st.selected !== id;
     st.selected = id;
-    if (!id || !changed || !st.introDone) return;
-    st.camAt = performance.now();
+    if (!id || !changed) return;
     const b = tractBounds.get(id);
-    if (b) {
-      const pad = props.padding ?? { top: 60, right: 60, bottom: 60, left: 60 };
-      const cam = map.cameraForBounds(b, { padding: pad, bearing: -20 });
-      if (cam) {
-        const target = { center: cam.center, zoom: Math.min((cam.zoom ?? 14) - 0.35, 16), pitch: 60, bearing: -20 };
-        if (props.lite) map.jumpTo(target);
-        else map.easeTo({ ...target, duration: 1200, easing: easeInOutCubic, essential: true });
-      }
-    }
+    if (b) flyToBounds(map, b);
     if (map.getLayer('focus-3d')) {
       cancelAnimationFrame(st.bldRaf);
       const setH = (m: number) => map.setPaintProperty('focus-3d', 'fill-extrusion-height', ['*', ['get', 'h'], ['case', ['==', ['get', 'GEOID'], id], m, 1]]);
@@ -465,7 +710,7 @@ export default function MapView(props: Props) {
     m.setLngLat([pin.lng, pin.lat]).addTo(map);
     const label = m.getElement().querySelector('.vp-pin-label');
     if (label) label.textContent = pin.label;
-    if (st.introDone && performance.now() - st.camAt > 100) {
+    if (performance.now() - st.camAt > 100) {
       const target = { center: [pin.lng, pin.lat] as [number, number], zoom: Math.max(map.getZoom(), 14.5) };
       if (props.lite) map.jumpTo(target);
       else map.flyTo({ ...target, duration: 1400, essential: true });
@@ -473,7 +718,7 @@ export default function MapView(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.pin, ready]);
 
-  // terrain exaggeration eases in when a tract is selected (or always, for the hero)
+  // terrain exaggeration eases in when a tract is selected (or always, for the hero and the Terrain layer)
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
@@ -515,7 +760,7 @@ export default function MapView(props: Props) {
       st.orbitRaf = 0;
     };
     const orbit = (now: number) => {
-      if (!st.introDone || map.isMoving()) {
+      if (map.isMoving()) {
         last = now;
         st.orbitRaf = requestAnimationFrame(orbit);
         return;
@@ -544,7 +789,7 @@ export default function MapView(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.idleOrbit, props.lite, ready]);
 
-  // continuous rotation (landing hero)
+  // continuous rotation (hero)
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready || !props.autoOrbit || props.lite) return;
@@ -567,6 +812,8 @@ export default function MapView(props: Props) {
     return () => ro.disconnect();
   }, []);
 
+  const tooltipFor = hover ? (hover.overlay ? props.overlays?.find((o) => o.id === hover.overlay)?.tooltip : props.tooltip) : undefined;
+
   return (
     <div className={`relative h-full w-full overflow-hidden ${props.className ?? ''}`}>
       <div ref={el} style={{ position: 'absolute', inset: 0 }} />
@@ -581,9 +828,9 @@ export default function MapView(props: Props) {
           </div>
         </div>
       )}
-      {hover && props.tooltip && (
+      {hover && tooltipFor && (
         <div className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-[calc(100%+14px)] rounded-lg bg-slate-900/92 px-3 py-2 text-small text-white shadow-lg backdrop-blur" style={{ left: hover.x, top: hover.y }}>
-          {props.tooltip(hover.id)}
+          {tooltipFor(hover.id)}
         </div>
       )}
       {props.elevationReadout && elev != null && (

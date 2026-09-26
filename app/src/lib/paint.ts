@@ -2,7 +2,7 @@
 import { useMemo } from 'react';
 import { scoring, tracts } from './data';
 import type { TractResult } from './derived';
-import { BIVARIATE_CLASSES, BIVARIATE_PALETTE, FACTOR_BINS, FACTOR_PALETTE, PRESSURE_PALETTE, SCORE_PALETTE, pressureClass } from './mapStyle';
+import { BIVARIATE_CLASSES, BIVARIATE_PALETTE, FACTOR_BINS, FACTOR_PALETTE, PRESSURE_PALETTE, RENT_GROWTH_PALETTE, SCORE_PALETTE, pressureClass, rentGrowthClass } from './mapStyle';
 import type { MapMetric } from './store';
 
 export interface MapPaint {
@@ -36,6 +36,10 @@ export function buildPaint(metric: MapMetric, results: Map<string, TractResult>)
       values.set(t.GEOID, i >= 0 ? i : null);
     }
     return { kind: 'cat', palette: BIVARIATE_PALETTE, values };
+  }
+  if (metric.kind === 'info') {
+    for (const t of tracts) values.set(t.GEOID, rentGrowthClass(t.rent_2br_growth_existing));
+    return { kind: 'cat', palette: RENT_GROWTH_PALETTE, values };
   }
   if (metric.kind === 'layer') return { kind: 'relief', palette: [], values };
   for (const [id, r] of results) {

@@ -26,18 +26,25 @@ export const PRESSURE_LABELS = ['Neighbors much weaker', 'Neighbors weaker', 'Ab
 /** 3×3 need tercile × market direction. Rows L, M, H; columns falling, flat, rising. */
 export const BIVARIATE_CLASSES = ['L-falling', 'L-flat', 'L-rising', 'M-falling', 'M-flat', 'M-rising', 'H-falling', 'H-flat', 'H-rising'];
 export const BIVARIATE_PALETTE = ['#cfe8dd', '#e9e6df', '#f9d6b8', '#8fc7ad', '#c9bfd0', '#f0a06a', '#3f9b7a', '#8f6aa8', '#c8321f'];
+/** Asking-rent growth (existing stock), an information layer: one cool class for a fall, then a blue ramp so it never reads as a score or a factor. Breaks are shares (0.15 = +15%). */
+export const RENT_GROWTH_BREAKS = [0, 0.15, 0.3, 0.45];
+export const RENT_GROWTH_PALETTE = ['#9fcfae', '#e6eef8', '#b6cce8', '#7ea4d4', '#3d6cb3'];
+export const RENT_GROWTH_LABELS = ['Fell', '0 to +15%', '+15 to +30%', '+30 to +45%', 'More than +45%'];
 /** Hypsometric tint for the Elevation layer: [feet, color]. */
 export const ELEV_STOPS_FT: [number, string][] = [
   [700, '#eef2ea'], [850, '#d9e3cf'], [950, '#bfd1b0'], [1050, '#9fb98f'], [1150, '#7c9a6e'], [1250, '#5b7a53'], [1350, '#435c3e'],
 ];
 export const M_TO_FT = 3.28084;
 
-export function pressureClass(v: number | null | undefined): number | null {
+function classOf(v: number | null | undefined, breaks: number[]): number | null {
   if (v == null || !Number.isFinite(v)) return null;
   let i = 0;
-  while (i < PRESSURE_BREAKS.length && v > PRESSURE_BREAKS[i]) i++;
+  while (i < breaks.length && v > breaks[i]) i++;
   return i;
 }
+export const pressureClass = (v: number | null | undefined) => classOf(v, PRESSURE_BREAKS);
+/** 0 = fell (growth ≤ 0), then one class per RENT_GROWTH_BREAKS step; null = no value (suppressed or no listings). */
+export const rentGrowthClass = (v: number | null | undefined) => classOf(v, RENT_GROWTH_BREAKS);
 
 // ------------------------------------------------------------------ elevation tiles
 export interface DemConfig {

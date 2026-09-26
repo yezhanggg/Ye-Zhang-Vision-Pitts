@@ -1,6 +1,24 @@
-// The shareable part of the state lives in the URL hash: mode, tracts, weights, scenarios, map layer, pin, lite.
+// The shareable part of the state lives in the URL hash.
+//   Explore:  m=explore  L=<layers on>  g=<level>  v=<variable>  u=<level:geoid>  p=<pin>  lite=1
+//   Analysis: m=match|tracts|scenarios  t  b  w  s  sa  sb  c  L  p  lite
+// parseHash / encodeHash are pure so they can be unit-tested; readHash / startHashSync wire them to the store.
 import { activeFactorIds, scoring, tractById } from './data';
-import { MAX_SCENARIOS, useApp, type MapMetric, type Mode } from './store';
+import {
+  defaultLayers,
+  LAYER_IDS,
+  LEVELS,
+  MAX_SCENARIOS,
+  MODES,
+  sectionOf,
+  useApp,
+  type AppState,
+  type Browse,
+  type LayerId,
+  type Layers,
+  type Level,
+  type MapMetric,
+  type Mode,
+} from './store';
 import type { Pin, Scenario, Weights } from './types';
 
 const encW = (w: Weights) => activeFactorIds.map((f) => `${f}:${+(w[f] ?? 0).toFixed(2)}`).join(',');
@@ -23,6 +41,7 @@ function decMetric(s: string | null): MapMetric | null {
   if (k === 'typology' && scoring.typologies.some((t) => t.id === id)) return { kind: 'typology', id };
   if (k === 'factor' && activeFactorIds.includes(id)) return { kind: 'factor', id };
   if (k === 'lens' && (id === 'pressure' || id === 'bivariate')) return { kind: 'lens', id };
+  if (k === 'info' && id === 'rent_growth_existing') return { kind: 'info', id };
   if (k === 'layer' && id === 'elevation') return { kind: 'layer', id };
   return null;
 }
@@ -41,22 +60,32 @@ export function decPin(s: string | null): Pin | null {
   return { lng: x, lat: y, label: label.slice(0, 120) };
 }
 
-/** Restore state from the hash. Returns true when the hash pointed into the app (skips the landing page). */
-export function readHash(): boolean {
-  let h = '';
-  try {
-    h = window.location.hash.replace(/^#/, '');
-  } catch {
-    return false;
-  }
-  if (!h) return false;
-  const q = new URLSearchParams(h);
-  const patch: Record<string, unknown> = {};
-  const mode = q.get('m') as Mode | null;
-  if (mode && ['explore', 'tracts', 'scenarios'].includes(mode)) {
+const isLevel = (s: string | null): s is Level => !!s && (LEVELS as string[]).includes(s);
+const isLayer = (s: string): s is LayerId => (LAYER_IDS as string[]).includes(s);
+/** Variable ids are validated by the Explore catalogue at render time; here only the shape is checked. */
+const VAR_RE = /^[a-z][a-z0-9_]{0,40}$/;
+const GEOID_RE = /^\d{5,12}$/;
+
+const encLayers = (l: Layers) => LAYER_IDS.filter((id) => l[id]).join(',');
+function decLayers(s: string | null): Layers | null {
+  if (s == null) return null;
+  const on = new Set(s.split(',').filter(isLayer));
+  const out = {} as Layers;
+  for (const id of LAYER_IDS) out[id] = on.has(id);
+  return out;
+}
+
+/** Pure: hash string (without '#') → state patch. Unknown or malformed values are dropped, never thrown. */
+export function parseHash(h: string): Partial<AppState> {
+  const q = new URLSearchParams(h.replace(/^#/, ''));
+  const patch: Partial<AppState> = {};
+  const hasExplore = ['L', 'g', 'v', 'u'].some((k) => q.has(k));
+  let mode = q.get('m') as Mode | null;
+  // Links written before the Explore/Analysis split used m=explore for the matchmaker.
+  if (mode === 'explore' && !hasExplore && (q.has('c') || q.has('w'))) mode = 'match';
+  if (mode && MODES.includes(mode)) {
     patch.mode = mode;
-    patch.view = 'app';
-    patch.introDone = true;
+    if (mode !== 'explore') patch.lastAnalysis = mode;
   }
   const t = q.get('t');
   if (t && tractById.has(t)) patch.selectedId = t;
@@ -81,36 +110,75 @@ export function readHash(): boolean {
   if (metric) patch.metric = metric;
   const pin = decPin(q.get('p'));
   if (pin) patch.pin = pin;
+  const layers = decLayers(q.get('L'));
+  if (layers) patch.layers = layers;
+  const browse: Partial<Browse> = {};
+  const g = q.get('g');
+  if (isLevel(g)) browse.level = g;
+  const v = q.get('v');
+  if (v && VAR_RE.test(v)) browse.variable = v;
+  const u = q.get('u');
+  if (u) {
+    const [lvl, geoid] = u.split(':');
+    if (isLevel(lvl) && geoid && GEOID_RE.test(geoid)) browse.selected = { level: lvl, geoid };
+  }
+  if (Object.keys(browse).length) patch.browse = { level: 'tract', variable: null, selected: null, ...browse };
   if (q.get('lite') === '1') {
     patch.lite = true;
-    patch.terrain = false;
+    patch.layers = { ...(patch.layers ?? defaultLayers(true)), terrain: false };
   }
+  return patch;
+}
+
+/** Pure: state → hash string (without '#'). Explore and Analysis write only the params they use. */
+export function encodeHash(s: AppState): string {
+  const q = new URLSearchParams();
+  q.set('m', s.mode);
+  if (sectionOf(s.mode) === 'explore') {
+    q.set('L', encLayers(s.layers));
+    if (s.browse.level !== 'tract') q.set('g', s.browse.level);
+    if (s.browse.variable) q.set('v', s.browse.variable);
+    if (s.browse.selected) q.set('u', `${s.browse.selected.level}:${s.browse.selected.geoid}`);
+  } else {
+    if (s.selectedId) q.set('t', s.selectedId);
+    if (s.compareId) q.set('b', s.compareId);
+    q.set('w', encW(s.weights));
+    q.set('s', s.scenarios.map((x) => `${encodeURIComponent(x.name)}~${encW(x.weights)}`).join('|'));
+    q.set('sa', String(Math.max(0, s.scenarios.findIndex((x) => x.id === s.scenA))));
+    q.set('sb', String(Math.max(0, s.scenarios.findIndex((x) => x.id === s.scenB))));
+    q.set('c', encMetric(s.metric));
+    q.set('L', encLayers(s.layers));
+  }
+  if (s.pin) q.set('p', encPin(s.pin));
+  if (s.lite) q.set('lite', '1');
+  return q.toString();
+}
+
+/** Restore state from the hash. Returns true when the hash carried any state. */
+export function readHash(): boolean {
+  let h = '';
+  try {
+    h = window.location.hash.replace(/^#/, '');
+  } catch {
+    return false;
+  }
+  if (!h) return false;
+  const patch = parseHash(h);
   useApp.setState(patch);
-  return Boolean(patch.selectedId || patch.mode);
+  return Object.keys(patch).length > 0;
 }
 
 export function startHashSync() {
   let timer: number | undefined;
+  let last = '';
   return useApp.subscribe((s) => {
     window.clearTimeout(timer);
     timer = window.setTimeout(() => {
       try {
-        if (s.view === 'landing') {
-          history.replaceState(null, '', window.location.pathname + window.location.search);
-          return;
-        }
-        const q = new URLSearchParams();
-        q.set('m', s.mode);
-        if (s.selectedId) q.set('t', s.selectedId);
-        if (s.compareId) q.set('b', s.compareId);
-        q.set('w', encW(s.weights));
-        q.set('s', s.scenarios.map((x) => `${encodeURIComponent(x.name)}~${encW(x.weights)}`).join('|'));
-        q.set('sa', String(Math.max(0, s.scenarios.findIndex((x) => x.id === s.scenA))));
-        q.set('sb', String(Math.max(0, s.scenarios.findIndex((x) => x.id === s.scenB))));
-        q.set('c', encMetric(s.metric));
-        if (s.pin) q.set('p', encPin(s.pin));
-        if (s.lite) q.set('lite', '1');
-        history.replaceState(null, '', `#${q.toString()}`);
+        const next = encodeHash(s);
+        if (next === last) return;
+        last = next;
+        history.replaceState(null, '', `#${next}`);
       } catch {
         /* file:// in some browsers */
       }

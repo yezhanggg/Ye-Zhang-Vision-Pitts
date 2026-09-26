@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import { factorById, scoring, typologyById } from '../lib/data';
-import { BIVARIATE_PALETTE, ELEV_STOPS_FT, FACTOR_BINS, FACTOR_PALETTE, NO_DATA, PRESSURE_LABELS, PRESSURE_PALETTE, SCORE_PALETTE } from '../lib/mapStyle';
+import { BIVARIATE_PALETTE, ELEV_STOPS_FT, FACTOR_BINS, FACTOR_PALETTE, NO_DATA, PRESSURE_LABELS, PRESSURE_PALETTE, RENT_GROWTH_LABELS, RENT_GROWTH_PALETTE, SCORE_PALETTE } from '../lib/mapStyle';
 import { UI, factorName } from '../lib/copy';
 import type { MapMetric } from '../lib/store';
 import { Dot } from './primitives';
@@ -88,6 +88,19 @@ export default function Legend({ metric, flips, compact, buildings }: { metric: 
         </div>
       </div>
     );
+  } else if (metric.kind === 'info') {
+    title = UI.rentLayer;
+    body = (
+      <div className="space-y-0.5 pt-1">
+        {RENT_GROWTH_PALETTE.map((c, i) => (
+          <div key={c} className="flex items-center gap-1.5 text-caption text-slate-800">
+            <span className="h-3 w-4 rounded-sm" style={{ background: c }} />
+            {RENT_GROWTH_LABELS[i]}
+          </div>
+        ))}
+        {!compact && <div className="max-w-56 pt-1 text-caption leading-tight text-slate-600">{UI.rentLayerSub}</div>}
+      </div>
+    );
   } else if (metric.kind === 'layer') {
     title = 'Ground elevation';
     body = (
@@ -113,7 +126,7 @@ export default function Legend({ metric, flips, compact, buildings }: { metric: 
           {showNoData && (
             <div className="flex items-center gap-1.5">
               <span className="h-3 w-4 rounded-sm" style={{ background: NO_DATA }} />
-              No data
+              {metric.kind === 'info' ? 'Hidden: fewer than 20 units listed' : 'No data'}
             </div>
           )}
           <div className="flex items-center gap-1.5">
