@@ -165,7 +165,7 @@ function AcsSummary({ variable, level, values, fc }: { variable: VariableDef; le
           <LineChart years={series.city.years} series={[{ id: 'city', label: EXPLORE_UI.charts.city, color: SERIES.city, values: series.city.est }, { id: 'county', label: EXPLORE_UI.charts.county, color: SERIES.county, values: series.county.est }]} fmt={(v) => (variable.unit === 'usd' ? `$${fmtK(v)}` : fmtTick(v, variable.unit))} caption={EXPLORE_UI.charts.acsWindows} />
         </section>
       )}
-      <p className="text-caption text-slate-600">{EXPLORE_UI.footer}</p>
+      <p className="text-caption text-slate-600">{EXPLORE_UI.sourceOf(variable.source)}</p>
     </div>
   );
 }

@@ -6,6 +6,7 @@ import type { VariableDef } from '../../lib/explore/types';
 import { cx } from '../../lib/format';
 import { RailSection } from '../Rail';
 import { Dot, Explainer } from '../primitives';
+import { LandUseMapSwitch, ZoningMapSwitch } from './LayersPanel';
 
 function VarRow({ v, on, onPick }: { v: VariableDef; on: boolean; onPick: () => void }) {
   return (
@@ -68,12 +69,22 @@ export default function DataPanel() {
                     <span>
                       <span className="block">{g.label}</span>
                       <span className="block text-caption font-normal text-slate-600">
-                        {vars.length} variables{isAnalysisGroup(g.id) ? ` · ${EXPLORE_UI.cityTractsOnly}` : ''}
+                        {vars.length} variables{isAnalysisGroup(g.id) ? ` · ${EXPLORE_UI.cityTractsOnly}` : g.id === 'zoning' ? ` · ${EXPLORE_UI.zoningCityOnly}` : ''}
                       </span>
                     </span>
                   }
                   right={contains ? <Dot color="#7c3aed" size={8} /> : undefined}
                 >
+                  {g.id === 'zoning' && (
+                    <div className="mb-1.5">
+                      <ZoningMapSwitch id="data-zoning-map" />
+                    </div>
+                  )}
+                  {g.id === 'land' && (
+                    <div className="mb-1.5">
+                      <LandUseMapSwitch id="data-landuse-map" />
+                    </div>
+                  )}
                   <div role="radiogroup" aria-label={g.label} className="space-y-0.5">
                     {vars.map((v) => (
                       <VarRow key={v.id} v={v} on={v.id === browse.variable} onPick={() => setBrowse({ variable: v.id })} />

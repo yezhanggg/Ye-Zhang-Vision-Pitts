@@ -206,6 +206,28 @@ def test_fema_share_is_area_share_of_the_polygon_with_the_dominant_zone():
     assert out.loc["t2", "fema_sfha_pct"] == 0.0 and out.loc["t2", "fema_zone"] is None
 
 
+
+def test_fema_share_excludes_water_from_the_tract():
+    # a 100 x 100 tract with a river over its top 40 rows; the SFHA covers the river plus a 10-row bank strip
+    tracts = gpd.GeoDataFrame({"GEOID": ["t1", "dry"], "geometry": [box(0, 0, 100, 100), box(200, 0, 300, 100)]}, crs=CRS)
+    water = gpd.GeoDataFrame({"geometry": [box(-10, 60, 110, 110), box(250, 0, 350, 100)]}, crs=CRS)
+    sfha = gpd.GeoDataFrame({"FLD_ZONE": ["AE", "AE"], "geometry": [box(-10, 50, 110, 110), box(250, 0, 350, 100)]}, crs=CRS)
+    whole = pm.fema_share(tracts, sfha)
+    assert whole.loc["t1", "fema_sfha_pct"] == pytest.approx(50.0)  # the old, water-inflated share
+    land = pm.fema_share(tracts, sfha, water)
+    assert land.loc["t1", "fema_sfha_pct"] == pytest.approx(10 / 60 * 100)  # 10 rows of bank over 60 rows of land
+    assert land.loc["t1", "fema_zone"] == "AE"
+    assert land.loc["dry", "fema_sfha_pct"] == pytest.approx(0.0)  # the SFHA there is all water
+    assert land.loc["dry", "fema_zone"] is None
+
+
+def test_fema_share_is_null_for_a_tract_that_is_all_water():
+    tracts = gpd.GeoDataFrame({"GEOID": ["lake"], "geometry": [box(0, 0, 100, 100)]}, crs=CRS)
+    water = gpd.GeoDataFrame({"geometry": [box(-1, -1, 101, 101)]}, crs=CRS)
+    sfha = gpd.GeoDataFrame({"FLD_ZONE": ["AE"], "geometry": [box(0, 0, 100, 100)]}, crs=CRS)
+    out = pm.fema_share(tracts, sfha, water)
+    assert math.isnan(out.loc["lake", "fema_sfha_pct"]) and out.loc["lake", "fema_zone"] is None
+
 # ------------------------------------------------------------------------------------------------ zoning
 RULES = {
     "threshold_share": 0.05,

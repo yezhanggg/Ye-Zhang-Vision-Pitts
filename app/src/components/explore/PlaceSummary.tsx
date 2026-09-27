@@ -34,6 +34,20 @@ const RACE = [
   ['asian_nh_share', 'Asian'],
   ['hispanic_share', 'Hispanic'],
 ] as const;
+const LAND = [
+  ['lu_residential', 'Residential'],
+  ['lu_commercial', 'Commercial'],
+  ['lu_industrial', 'Industrial'],
+  ['lu_institutional', 'Institutional & public'],
+  ['lu_vacant', 'Vacant'],
+] as const;
+const ZONING = [
+  ['zoned_single', 'Single-unit'],
+  ['zoned_2_3', '2–3 unit'],
+  ['zoned_multi', 'Multi-unit'],
+  ['zoned_mixed', 'Mixed-use & commercial'],
+  ['zoned_industrial', 'Industrial'],
+] as const;
 const COMMUTE = [
   ['drive_alone_share', 'Drive alone'],
   ['transit_share', 'Transit'],
@@ -246,6 +260,16 @@ export default function PlaceSummary({ level, geoid, unit }: { level: Level; geo
       <Section title={C.commute} sub="Workers 16 and over by how they usually get to work" open={false}>
         <StackedBar parts={partsDef(COMMUTE)} rows={compositionRows(unit, COMMUTE.map((s) => s[0]))} caption={C.source} />
       </Section>
+      {est(unit?.parcels) != null && (
+        <Section title={C.landUse} sub={`Share of parcel land by assessed use · ${fmtValue(est(unit?.vacant_lots), 'count')} vacant lots of ${fmtValue(est(unit?.parcels), 'count')} parcels`}>
+          <StackedBar parts={partsDef(LAND)} rows={compositionRows(unit, LAND.map((s) => s[0]))} caption="Allegheny County property assessments, 2026. Other = utilities, railroads, agriculture and unclassed parcels." />
+        </Section>
+      )}
+      {ZONING.some(([id]) => est(unit?.[id]) != null) && (
+        <Section title={C.zoning} sub="Share of land by zoning district family" open={false}>
+          <StackedBar parts={partsDef(ZONING)} rows={compositionRows(unit, ZONING.map((s) => s[0])).filter((r) => r.label !== 'County')} caption="City of Pittsburgh zoning districts (WPRDC). Other = parks, hillside, planned and institutional districts." />
+        </Section>
+      )}
       {tract ? (
         <Section title={C.analysis} sub="Same numbers as the Analysis section, under the priorities set there">
           <AnalysisBlock t={tract} />

@@ -5,6 +5,8 @@ import { FACTOR_COPY, GLOSSARY, PRESSURE_HOW, RENT_HOW, RENT_WHY_INFO, SCORE_HOW
 import { useApp, type DetailsTab } from '../lib/store';
 import { cx, fmtInt, fmtMoney, fmtSignedPct } from '../lib/format';
 import PlanningInputsDetails from './place/PlanningInputsDetails';
+import { SlideBg, useSlide } from './primitives';
+import AnalysisCalculations from './details/AnalysisCalculations';
 import { RELIABILITY, catalogue, groups, hasBrowser, levelMeta, variables, variablesByGroup } from '../lib/explore/catalog';
 
 const WEB_SERVICES = [
@@ -39,6 +41,7 @@ const pct = (x: number) => `${Math.round(x * 100)}%`;
 const TABS: { id: DetailsTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'sources', label: 'Data & method' },
+  { id: 'calc', label: 'Calculations' },
   { id: 'limits', label: 'Limitations' },
   { id: 'next', label: 'What comes next' },
 ];
@@ -99,6 +102,21 @@ function Overview() {
   );
 }
 
+/** The tabs; the highlight slides sideways to the one that is open. */
+function DetailsTabs({ tab, onPick }: { tab: DetailsTab; onPick: (id: DetailsTab) => void }) {
+  const [ref, box] = useSlide<HTMLElement>(tab);
+  return (
+    <nav ref={ref} aria-label="Project Details & Sources" className="relative mt-2 flex flex-wrap gap-1">
+      <SlideBg box={box} className="rounded-lg bg-stone-100 ring-1 ring-black/5" />
+      {TABS.map((t) => (
+        <button key={t.id} onClick={() => onPick(t.id)} aria-current={tab === t.id ? 'page' : undefined} data-slide-on={tab === t.id} className={cx('relative rounded-lg px-3 py-1.5 text-small font-semibold transition-colors', tab === t.id ? 'text-slate-900' : 'text-slate-600 hover:text-slate-900')}>
+          {t.label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
 /** Details: everything about the project in one window. Overview, data and method, limitations, what comes next. */
 export default function DetailsModal() {
   const open = useApp((s) => s.sourcesOpen);
@@ -112,15 +130,8 @@ export default function DetailsModal() {
           <motion.div initial={{ y: 16, scale: 0.98, opacity: 0 }} animate={{ y: 0, scale: 1, opacity: 1 }} exit={{ y: 8, opacity: 0 }} transition={{ type: 'spring', stiffness: 320, damping: 30 }} onClick={(e) => e.stopPropagation()} className="scroll-quiet max-h-[86vh] w-full max-w-3xl overflow-auto rounded-2xl bg-white shadow-2xl ring-1 ring-black/5">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-stone-100 bg-white/95 px-6 py-4 backdrop-blur">
               <div className="min-w-0">
-                <h2 className="font-display text-lg font-bold text-slate-900">Details</h2>
-                <nav aria-label="Details" className="mt-2 flex flex-wrap gap-1">
-                  {TABS.map((t) => (
-                    <button key={t.id} onClick={() => set({ detailsTab: t.id })} aria-current={tab === t.id ? 'page' : undefined} className={cx('relative rounded-lg px-3 py-1.5 text-small font-semibold transition-colors', tab === t.id ? 'text-slate-900' : 'text-slate-600 hover:text-slate-900')}>
-                      {tab === t.id && <motion.span layoutId="details-tab" className="absolute inset-0 rounded-lg bg-stone-100 ring-1 ring-black/5" transition={{ type: 'spring', stiffness: 420, damping: 32 }} />}
-                      <span className="relative">{t.label}</span>
-                    </button>
-                  ))}
-                </nav>
+                <h2 className="font-display text-lg font-bold text-slate-900">Project Details &amp; Sources</h2>
+                <DetailsTabs tab={tab} onPick={(id) => set({ detailsTab: id })} />
               </div>
               <button onClick={() => set({ sourcesOpen: false })} className="self-start rounded-lg p-2 text-slate-500 hover:bg-stone-100 hover:text-slate-900" aria-label="Close">
                 <svg viewBox="0 0 20 20" className="h-4 w-4">
@@ -131,6 +142,11 @@ export default function DetailsModal() {
             {tab === 'overview' && (
               <div className="space-y-6 px-6 py-5">
                 <Overview />
+              </div>
+            )}
+            {tab === 'calc' && (
+              <div className="px-6 py-5">
+                <AnalysisCalculations />
               </div>
             )}
             {tab === 'limits' && (
@@ -144,10 +160,10 @@ export default function DetailsModal() {
               </div>
             )}
             <div className={cx('space-y-6 px-6 py-5', tab !== 'sources' && 'hidden')}>
-              <p className="text-small text-slate-600">What is observed data, and what is a value judgment.</p>
+              <p className="text-small text-slate-600">Where every number comes from, and which parts are opinions rather than facts.</p>
               <PlanningInputsDetails />
               <section>
-                <h3 className="mb-2 text-body font-semibold text-emerald-800">Observed data: where the numbers come from</h3>
+                <h3 className="mb-2 text-body font-semibold text-emerald-800">Facts: where the numbers come from</h3>
                 <div className="overflow-hidden rounded-xl ring-1 ring-stone-200">
                   <table className="w-full text-left text-small">
                     <thead className="bg-stone-50 text-caption font-semibold text-slate-700">
@@ -180,12 +196,12 @@ export default function DetailsModal() {
               </section>
               {hasBrowser && (
                 <section>
-                  <h3 className="mb-1 text-body font-semibold text-sky-800">Explore data browser (ACS {catalogue.meta?.vintage ?? '2020–2024 5-year'})</h3>
+                  <h3 className="mb-1 text-body font-semibold text-sky-800">Explore: census figures ({catalogue.meta?.vintage ?? '2020–2024 5-year'} survey)</h3>
                   <p className="mb-2 text-small text-slate-700">
-                    The Explore section colors tracts, block groups and ZIP codes by {variables.length} American Community Survey variables and shows any place next to the city and the county. These values are descriptive context and are never scored. The app bundles the city subset ({levelMeta('tract').bundled} tracts, {levelMeta('bg').bundled} block groups, {levelMeta('zcta').bundled} ZIP codes); county-wide rows load from Supabase when the app is online.
+                    Explore colors the map by {variables.length} figures, most of them from the Census Bureau’s American Community Survey, and shows any place next to the city and the county. They describe places; they are never used in a score. The city’s {levelMeta('tract').bundled} neighborhoods, {levelMeta('bg').bundled} block groups and {levelMeta('zcta').bundled} ZIP codes are built into the tool; the rest of the county loads online.
                   </p>
                   <p className="mb-2 text-caption text-slate-600">
-                    Every value is an estimate with its 90% margin of error. Reliability comes from the coefficient of variation (MOE ÷ 1.645 ÷ estimate): under {pct(RELIABILITY.high)} high, up to {pct(RELIABILITY.medium)} medium, above that low. Sums combine margins root-sum-square; shares use the ACS proportion formula (ratio form when the radicand is negative). Poverty uses C17002 and vehicles B25044 because B17001 and B08201 are not published for block groups.
+                    Census figures come from a survey, so each one is an estimate with a range of error. For specialists: reliability comes from the coefficient of variation (margin ÷ 1.645 ÷ estimate), under {pct(RELIABILITY.high)} high, up to {pct(RELIABILITY.medium)} medium, above that low; sums combine margins root-sum-square; shares use the ACS proportion formula; poverty uses C17002 and vehicles B25044 because B17001 and B08201 are not published for block groups.
                   </p>
                   <div className="overflow-hidden rounded-xl ring-1 ring-stone-200">
                     <table className="w-full text-left text-small">
@@ -221,7 +237,7 @@ export default function DetailsModal() {
                 </section>
               )}
               <section>
-                <h3 className="mb-2 text-body font-semibold text-emerald-800">The six factors (each ranked against the {meta.n_residential ?? ''} residential city tracts)</h3>
+                <h3 className="mb-2 text-body font-semibold text-emerald-800">The {factors.length} things Analysis looks at (each compared across the {meta.n_residential ?? ''} city neighborhoods that have homes)</h3>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {factors.map((f) => (
                     <div key={f.id} className="rounded-lg bg-stone-50 px-3 py-2 ring-1 ring-stone-200/70">
@@ -237,7 +253,7 @@ export default function DetailsModal() {
               </section>
               {hasAskingRents && askingRents.county && askingRents.city && (
                 <section>
-                  <h3 className="mb-1 text-body font-semibold text-sky-800">Asking rents: information only, never scored</h3>
+                  <h3 className="mb-1 text-body font-semibold text-sky-800">Asking rents: shown for information, never used in a score</h3>
                   <p className="mb-2 text-small text-slate-700">{RENT_HOW}</p>
                   <div className="overflow-hidden rounded-xl ring-1 ring-stone-200">
                     <table className="w-full text-left text-small">
@@ -282,7 +298,7 @@ export default function DetailsModal() {
                 </section>
               )}
               <section>
-                <h3 className="mb-1 text-body font-semibold text-violet-800">Fit rules: a value judgment (editable in config/scoring.json)</h3>
+                <h3 className="mb-1 text-body font-semibold text-violet-800">Housing-fit rules: an opinion, published for review</h3>
                 <p className="mb-2 text-small text-slate-700">{SCORE_HOW}</p>
                 <div className="overflow-x-auto rounded-xl ring-1 ring-stone-200">
                   <table className="w-full text-small">
@@ -317,10 +333,10 @@ export default function DetailsModal() {
                     </tbody>
                   </table>
                 </div>
-                <p className="mt-2 font-mono text-caption text-slate-600">Technical: S(t,k) = Σ w·c(x,d) / Σ w·|d| over factors with data; c = d·x if d ≥ 0, |d|·(1−x) if d &lt; 0. Stability: {scoring.scoring.stability_draws} Dirichlet draws, concentration {scoring.scoring.stability_concentration}.</p>
+                <p className="mt-2 font-mono text-caption text-slate-600">For specialists: S(t,k) = Σ w·c(x,d) / Σ w·|d| over factors with data; c = d·x if d ≥ 0, |d|·(1−x) if d &lt; 0. Stability: {scoring.scoring.stability_draws} Dirichlet draws, concentration {scoring.scoring.stability_concentration}.</p>
               </section>
               <section>
-                <h3 className="mb-2 text-body font-semibold text-slate-900">Map, terrain and search services</h3>
+                <h3 className="mb-2 text-body font-semibold text-slate-900">Map and address search</h3>
                 <ul className="space-y-1.5 text-small text-slate-700">
                   {WEB_SERVICES.map((w) => (
                     <li key={w.id}>
@@ -334,7 +350,7 @@ export default function DetailsModal() {
                 <p className="mt-1.5 text-caption text-slate-600">Terrain is shown for reference and never changes the ranking.</p>
               </section>
               <section>
-                <h3 className="mb-2 text-body font-semibold text-slate-900">Plain-language glossary</h3>
+                <h3 className="mb-2 text-body font-semibold text-slate-900">Words used in the tool</h3>
                 <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-small">
                   {Object.entries(GLOSSARY).flatMap(([k, v]) => [
                     <dt key={`t${k}`} className="font-semibold text-slate-900">
@@ -348,9 +364,9 @@ export default function DetailsModal() {
               </section>
               <section className="text-small text-slate-700">
                 <h3 className="mb-1 text-body font-semibold text-slate-900">How AI is used</h3>
-                The language model never computes scores or queries data. Code computes every number. When an AI-written explanation appears (DeepSeek or Claude, whichever this deployment is configured with), it was generated from the computed values only, and every number in the text was checked against those values before display; otherwise a template sentence built from the same values is shown.
+                AI never calculates a score or looks up data; plain code does all the math. When you see an explanation written by AI (DeepSeek, or Claude as a backup), it was written from numbers the tool had already calculated, and every number in it was checked before it was shown. If the check fails, you see a simple sentence built from the same numbers instead.
                 <p className="mt-1.5">
-                  <span className="font-semibold text-slate-900">VisionPitts-Chat</span>, the question box in Explore and Analysis, is powered by DeepSeek (the deepseek-flash model). It answers only about Pittsburgh housing, from the facts this tool sends with each question; in Analysis, an answer with a figure that cannot be traced to those facts is withheld.
+                  <span className="font-semibold text-slate-900">VisionPitts-Chat</span>, the question box in Explore and Analysis, is powered by DeepSeek (the deepseek-flash model). It answers only about Pittsburgh housing, using the facts this tool sends with each question. In Analysis, an answer with a number that cannot be matched to those facts is not shown.
                 </p>
               </section>
               {meta.built_at && <p className="text-caption text-slate-500">Data built {meta.built_at.slice(0, 19).replace('T', ' ')} UTC · scoring config v{scoring.version}</p>}

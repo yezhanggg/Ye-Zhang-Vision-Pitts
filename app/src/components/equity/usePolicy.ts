@@ -3,13 +3,14 @@
 import { useMemo } from 'react';
 import { hud } from '../../lib/place/data';
 import { usePlan } from '../../lib/place/planStore';
-import { MILES_LABEL, amiOf } from '../../lib/place/plan';
+import { MILES_LABEL } from '../../lib/place/plan';
 import { fitsRent2br, type AmiPct } from '../../lib/equity/measures';
 import { aduByRight, densityBonus, largestGaps, transitExtension, type Row } from '../../lib/equity/policy';
 import { leverSummaries, type LeverId, type PolicyResults } from '../../lib/equity/export';
 
 export function usePolicy(rows: Row[], ami: AmiPct, homes: number, on: Record<LeverId, boolean>) {
-  const level = amiOf(usePlan((s) => s.level));
+  // The plan's own level (market stays market), the same one the Place tab's recommendation uses.
+  const level = usePlan((s) => s.level);
   const size = usePlan((s) => s.size);
   const age = usePlan((s) => s.age);
   const transitMi = usePlan((s) => s.transitMi);

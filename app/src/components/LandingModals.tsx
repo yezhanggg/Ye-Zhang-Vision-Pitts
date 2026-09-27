@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Mail } from 'lucide-react';
+import { Check, Mail } from 'lucide-react';
 import { ABOUT, PROJECT } from '../lib/about';
 import { useApp } from '../lib/store';
 
@@ -43,25 +43,34 @@ function Heading({ children }: { children: ReactNode }) {
 
 /** About: the author. Background, education, experience and how to get in touch; the project itself lives under Details. */
 export function AboutModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  // The email button copies the address (no mail app needed); the address stays visible on the button.
+  const copyEmail = async () => {
+    try {
+      await navigator.clipboard.writeText(ABOUT.contact.email);
+    } catch {
+      /* clipboard blocked (file://, old browser): the address is on screen to copy by hand */
+    }
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
+  };
   const openDetails = () => {
     useApp.getState().set({ sourcesOpen: true, detailsTab: 'overview' });
     onClose();
   };
   return (
-    <InfoModal open={open} onClose={onClose} title="About">
+    <InfoModal open={open} onClose={onClose} title="About Author">
       <div className="flex items-center gap-4">
         <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-violet-600 font-display text-title font-bold text-white">{ABOUT.name.split(' ').map((w) => w[0]).join('')}</div>
         <div className="min-w-0">
           <div className="font-display text-display font-bold leading-tight text-slate-900">{ABOUT.name}</div>
-          <div className="mt-0.5 text-small text-slate-700">{ABOUT.headline}</div>
-          <div className="text-small text-slate-500">{ABOUT.place}</div>
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        <a href={`mailto:${ABOUT.contact.email}`} className="flex items-center gap-2 rounded-xl bg-slate-900 px-3.5 py-2 text-small font-semibold text-white transition hover:bg-slate-800">
-          <Mail className="h-4 w-4" />
-          {ABOUT.contact.email}
-        </a>
+        <button type="button" onClick={copyEmail} title="Copy the email address" className="flex items-center gap-2 rounded-xl bg-slate-900 px-3.5 py-2 text-small font-semibold text-white transition hover:bg-slate-800">
+          {copied ? <Check className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
+          {copied ? 'Email copied' : ABOUT.contact.email}
+        </button>
         <a href={ABOUT.contact.linkedin.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl bg-white px-3.5 py-2 text-small font-semibold text-slate-800 ring-1 ring-stone-300 transition hover:ring-violet-300">
           <LinkedInMark />
           {ABOUT.contact.linkedin.label}
@@ -89,27 +98,11 @@ export function AboutModal({ open, onClose }: { open: boolean; onClose: () => vo
           ))}
         </ul>
       </section>
-      <section>
-        <Heading>Experience</Heading>
-        <ul className="space-y-2.5">
-          {ABOUT.experience.map((e) => (
-            <li key={`${e.org}-${e.role}`} className="flex items-baseline justify-between gap-4">
-              <span className="min-w-0">
-                <span className="block text-body font-semibold text-slate-900">
-                  {e.role} <span className="font-normal text-slate-600">· {e.org}</span>
-                </span>
-                <span className="block text-small text-slate-700">{e.text}</span>
-              </span>
-              <span className="shrink-0 text-small text-slate-500 tnum">{e.when}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
       <section className="rounded-xl bg-stone-50 p-4 ring-1 ring-stone-200/80">
         <Heading>This project</Heading>
         <p className="text-small leading-relaxed text-slate-700">{PROJECT.lines[0]}</p>
         <button onClick={openDetails} className="mt-2 text-small font-semibold text-violet-700 hover:underline">
-          Project details →
+          Project Details &amp; Sources →
         </button>
       </section>
     </InfoModal>

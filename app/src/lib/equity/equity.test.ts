@@ -263,3 +263,16 @@ describe('policy levers', () => {
     expect(transitExtension(real, 0.5).changed.every((id) => (placeById.get(id)!.transit.freq_dist_mi ?? 9) <= 1)).toBe(true);
   });
 });
+
+describe('rent-gap subsidy order', () => {
+  it('funds the tracts where gap × burdened renters is largest', async () => {
+    const { largestGaps } = await import('./policy');
+    const { rankedTracts } = await import('../data');
+    const { hud, placeById } = await import('../place/data');
+    const rows = rankedTracts.filter((t) => placeById.has(t.GEOID)).map((t) => ({ id: t.GEOID, p: placeById.get(t.GEOID)! }));
+    const g = largestGaps(rows, hud, 50, 40);
+    for (let i = 1; i < g.top.length; i++) expect(g.top[i - 1].need).toBeGreaterThanOrEqual(g.top[i].need);
+    expect(g.top.every((x) => x.gap > 0)).toBe(true);
+    expect(g.total).toBe(g.top.reduce((s, x) => s + Math.max(0, x.gap) * 12 * 40, 0));
+  });
+});

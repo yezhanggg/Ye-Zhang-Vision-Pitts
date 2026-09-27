@@ -19,6 +19,7 @@ import { BareBlock, SourceLine } from './shared';
 import Tenants, { typesUpTo, TYPE_LABEL } from './Tenants';
 import Transit from './Transit';
 import ZoningPrograms from './ZoningPrograms';
+import LandUse, { landHeadline } from './LandUse';
 
 export function Fold({ title, headline, children }: { title: string; headline: ReactNode; children: ReactNode }) {
   return (
@@ -56,7 +57,7 @@ export default function PlaceFolds({ t, place, hud, rec, level, fitOrder }: { t:
   return (
     <div className="space-y-2">
       <Fold title="Affordability" headline={c.hh == null ? 'not available' : `${fmtHouseholds(c.hh)} renter households ${levelPhrase(level)}`}>
-        <Affordability place={place} hud={hud} band={band} />
+        <Affordability place={place} hud={hud} band={band} above80={level === 'market'} />
       </Fold>
       <Fold title="Who lives here" headline={lead && lead[1] > 0 ? `largest group ${levelPhrase(level)}: ${fmtHouseholds(lead[1])} ${TYPE_LABEL[lead[0]].toLowerCase()}` : 'not available'}>
         <Tenants place={place} t={t} band={typeBandFor(band)} />
@@ -69,6 +70,9 @@ export default function PlaceFolds({ t, place, hud, rec, level, fitOrder }: { t:
       </Fold>
       <Fold title="Flood" headline={isNum(f.fema_sfha_pct) ? `${f.fema_sfha_pct.toFixed(1)}% of land in a FEMA flood zone` : 'not available'}>
         <Flood place={place} t={t} />
+      </Fold>
+      <Fold title="Land use" headline={landHeadline(t.GEOID)}>
+        <LandUse geoid={t.GEOID} />
       </Fold>
       <Fold title="Zoning and programs" headline={z ? (byRight.length ? `by right: ${byRight.join(', ')} (unverified)` : 'no by-right type on file (unverified)') : 'zoning not checked'}>
         <ZoningPrograms place={place} />

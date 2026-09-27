@@ -43,3 +43,18 @@ describe('farZoom and isFar', () => {
     expect(isFar(10.8, 10.5, true)).toBe(false);
   });
 });
+
+import { spotlightRings } from '../components/MapView';
+describe('spotlight shade', () => {
+  const area = (r: number[][]) => r.reduce((a, _, i) => { const j = (i + r.length - 1) % r.length; return a + (r[j][0] - r[i][0]) * (r[j][1] + r[i][1]); }, 0);
+  it('cuts the selected shape out of a world-sized ring, wound the other way', () => {
+    const cw = [[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]];
+    const ccw = [...cw].reverse();
+    for (const hole of [cw, ccw]) {
+      const rings = spotlightRings({ type: 'Polygon', coordinates: [hole] });
+      expect(rings).toHaveLength(2);
+      expect(Math.sign(area(rings[1]))).toBe(-Math.sign(area(rings[0])));
+    }
+    expect(spotlightRings({ type: 'MultiPolygon', coordinates: [[cw], [ccw]] })).toHaveLength(3);
+  });
+});

@@ -1,10 +1,11 @@
 // "Why they differ" on Compare places, in plain sentences: the same rules the Place tab runs, read side by side.
 // Every sentence is built from the two recommendations and place.json; nothing here scores or ranks.
 import { bedroomsWord } from "./bands";
+import { lotPattern } from "./feasibility";
 import { capitalize, fmtHouseholds, isNum } from "./format";
 import { levelPhrase, type PlanLevel } from "./plan";
 import type { Recommendation } from "./recommend";
-import { THRESHOLDS, TYPOLOGY_LABEL } from "./thresholds";
+import { TYPOLOGY_LABEL } from "./thresholds";
 import type { PlaceMeasures } from "./types";
 
 export interface WhySide {
@@ -91,24 +92,38 @@ function need(s: WhySide, level: PlanLevel): string | null {
   return parts.length ? parts.join(" ") : sentence(rec.tenants.sentence);
 }
 
+/** The same lot-pattern test as the recommendation (feasibility.lotPattern): 2–4 unit share or parcel count, and
+ *  vacant parcels, each against its printed mark. */
 function land(p: PlaceMeasures | null): string | null {
   const s = p?.stock;
   if (!s) return null;
+  const lp = lotPattern(p!);
   const vac = s.vacant_parcels,
-    share = s.units_2_4_share;
+    share = s.units_2_4_share,
+    parcels = s.parcels_2_4;
   const bits: string[] = [];
   if (isNum(vac))
     bits.push(
-      vac >= THRESHOLDS.lot_vacant_parcels
+      lp.vacantLand
         ? `${fmtHouseholds(vac)} vacant parcels, so new buildings can go on empty land`
         : `${fmtHouseholds(vac)} vacant parcels, so a new building would replace something`,
     );
-  if (isNum(share)) {
-    const pct = share <= 1 ? share * 100 : share;
+  if (lp.smallBuildings != null) {
+    const pct = isNum(share)
+      ? Math.round(share <= 1 ? share * 100 : share)
+      : null;
+    const facts = [
+      pct != null ? `${pct}% of homes in 2–4 unit buildings` : null,
+      isNum(parcels)
+        ? `${fmtHouseholds(parcels)} parcels with 2–4 units`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" and ");
     bits.push(
-      pct >= THRESHOLDS.lot_units_2_4_share * 100
-        ? `${Math.round(pct)}% of homes already sit in 2–4 unit buildings, a pattern that suits conversions and ADUs`
-        : `only ${Math.round(pct)}% of homes sit in 2–4 unit buildings`,
+      lp.smallBuildings
+        ? `${facts}, enough small buildings for conversions and ADUs`
+        : `${facts}, too few small buildings for conversions to be common`,
     );
   }
   return bits.length ? `${capitalize(bits.join("; "))}.` : null;

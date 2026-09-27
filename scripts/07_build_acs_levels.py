@@ -128,6 +128,10 @@ def main() -> None:
     print("\n  outputs")
     for p in outputs:
         print(f"    {p.relative_to(ROOT)!s:45} {kb(p):>9}")
+    # Land use and zoning (scripts/11_build_land_use.py) ride in the same catalogue and bundles: put them back.
+    from visionpitts import land_use
+    if land_use.merge_into_bundles():
+        print("  land use and zoning variables merged back into the catalogue and bundles")
 
 
 if __name__ == "__main__":

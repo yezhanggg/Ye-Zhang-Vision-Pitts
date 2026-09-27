@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ZONING_FAMILIES, byRightList, zoningFC, zoningLine, zoningPaint } from './zoning';
 import { ANALYSIS_VARS } from './analysisVars';
 import { themeOf } from './palettes';
+import { bundledValues, variableById, variables } from './catalog';
 
 describe('zoning map', () => {
   it('colors every district by a known family with distinct colors', () => {
@@ -13,10 +14,19 @@ describe('zoning map', () => {
     expect(byRightList(p)).toEqual(['duplex/triplex', 'small apartment']);
     expect(zoningLine(p)).toBe('RM-M · Residential multi-unit · by right: duplex/triplex, small apartment');
   });
-  it('land-use layers get their own ramps', () => {
-    const ids = ANALYSIS_VARS.filter((v) => v.group === 'an_land').map((v) => v.id);
-    expect(ids).toEqual(['an_land_res', 'an_land_com', 'an_land_ind', 'an_land_vacant', 'an_land_vacant_lots']);
-    expect(themeOf({ id: 'an_land_res', group: 'an_land' })).toBe('landRes');
-    expect(themeOf({ id: 'an_land_ind', group: 'an_land' })).toBe('landInd');
+  it('land use and zoning are catalogue variables at every level, with their own ramps', () => {
+    expect(ANALYSIS_VARS.some((v) => v.group === 'an_land')).toBe(false);
+    const land = variables.filter((v) => v.group === 'land').map((v) => v.id);
+    expect(land).toEqual(['lu_residential', 'lu_commercial', 'lu_industrial', 'lu_institutional', 'lu_vacant', 'vacant_lots', 'parcels']);
+    expect(variables.filter((v) => v.group === 'zoning')).toHaveLength(7);
+    expect(variableById.get('lu_vacant')?.source).toBe('parcels');
+    expect(variableById.get('zoned_multi')?.source).toBe('zoning');
+    expect(variableById.get('pop')?.source).toBe('acs');
+    expect(themeOf({ id: 'lu_residential', group: 'land' })).toBe('landRes');
+    expect(themeOf({ id: 'lu_industrial', group: 'land' })).toBe('landInd');
+    // bundled values, no margins: Hazelwood's land use, and the city's zoning
+    expect(bundledValues('tract')['42003562300'].lu_vacant).toEqual([0.096, null, null]);
+    expect(bundledValues('city')['4261000'].zoned_multi[0]).toBeGreaterThan(0);
+    expect(bundledValues('muni')['4200366264'].zoned_multi).toEqual([null, null, null]);
   });
 });

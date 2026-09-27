@@ -22,7 +22,7 @@ const EMPTY_FC: UnitFC = { type: 'FeatureCollection', features: [] };
 
 export const catalogue = load<Catalogue>('acs_variables', { meta: {}, groups: [], variables: [] });
 /** Census variables (the ACS catalogue). */
-export const acsVariables: VariableDef[] = [...(catalogue.variables ?? [])].sort((a, b) => a.sort - b.sort).map((v) => ({ ...v, source: 'acs' as const }));
+export const acsVariables: VariableDef[] = [...(catalogue.variables ?? [])].sort((a, b) => a.sort - b.sort).map((v) => ({ ...v, source: v.source ?? ('acs' as const) }));
 /** Every browseable variable: the census catalogue, then the Analysis layers (city tracts only). */
 export const variables: VariableDef[] = [...acsVariables, ...ANALYSIS_VARS];
 export const variableById = new Map<string, VariableDef>(variables.map((v) => [v.id, v]));

@@ -42,7 +42,7 @@ describe('explain helpers', () => {
 
   it('says so when the market fits everywhere', () => {
     const s = explainMeasure({ def: def('rent_gap'), ami: 80, values: [{ id: 'a', value: -10 }, { id: 'b', value: -5 }], nameOf: (id) => id });
-    expect(s).toEqual(['Listings for a 2-bedroom already fit a 80% AMI household in all 2 tracts with a reliable asking rent.']);
+    expect(s).toEqual(['Listings for a 2-bedroom already fit an 80% AMI household in all 2 tracts with a reliable asking rent.']);
   });
 
   it('handles a measure with no values', () => {
@@ -84,4 +84,15 @@ describe.runIf(hud && placeById.size > 0)('explain on the real tracts', () => {
       expect(s.join(' ')).not.toMatch(/undefined|NaN|null/);
     });
   }
+});
+
+describe('market rate', () => {
+  it('uses the area median income for 3 people (HUD 90% adjustment)', async () => {
+    const { fits2br, amiWords } = await import('./measures');
+    const f = fits2br(hud, 100)!;
+    expect(f.rent).toBe(Math.round((hud!.metro.median * 0.9) / 40));
+    expect(f.formula).toContain('× 90% (3 people) × 30% ÷ 12');
+    expect(amiWords(100)).toBe('market rate (100% AMI)');
+    expect(fits2br(hud, 50)!.rent).toBe(1242);
+  });
 });

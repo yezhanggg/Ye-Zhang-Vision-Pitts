@@ -48,6 +48,8 @@ describe("why they differ", () => {
     expect(t).toContain("590 renter households at or below 50% AMI");
     expect(t).toContain("Hazelwood has 3.6 times as many");
     expect(t).toContain("641 vacant parcels");
+    // Hazelwood: 6% share is under the 10% mark but 63 parcels clear the 50 mark, so the lot pattern supports conversions.
+    expect(t).toContain("6% of homes in 2–4 unit buildings and 63 parcels with 2–4 units, enough small buildings");
     expect(t).not.toMatch(/\/ ?100| = /);
     expect(t).toContain("gap $653 a month");
   });

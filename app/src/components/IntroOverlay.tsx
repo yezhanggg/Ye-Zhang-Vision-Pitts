@@ -1,7 +1,9 @@
 import { AnimatePresence, motion } from 'motion/react';
 import type { IntroPhase } from './MapView';
 
-export default function IntroOverlay({ phase, onSkip }: { phase: IntroPhase; onSkip: () => void }) {
+/** The title over the globe while the intro flight plays. (No skip button: the flight is short, and deep links and
+ * reduced motion skip it.) `onSkip` is kept for callers and unused. */
+export default function IntroOverlay({ phase }: { phase: IntroPhase; onSkip?: () => void }) {
   return (
     <>
       <AnimatePresence>
@@ -14,13 +16,6 @@ export default function IntroOverlay({ phase, onSkip }: { phase: IntroPhase; onS
               <p className="mt-2 font-display text-xl text-slate-600 drop-shadow-[0_1px_8px_rgba(255,255,255,0.9)]">Which housing fits each Pittsburgh place, and why.</p>
             </motion.div>
           </motion.div>
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {phase !== 'done' && (
-          <motion.button key="skip" onClick={onSkip} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} className="absolute bottom-6 left-1/2 z-30 -translate-x-1/2 rounded-full bg-white/90 px-4 py-2 text-small font-semibold text-slate-800 shadow-lg ring-1 ring-black/5 backdrop-blur hover:bg-white">
-            Skip intro →
-          </motion.button>
         )}
       </AnimatePresence>
     </>

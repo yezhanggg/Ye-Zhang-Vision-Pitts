@@ -16,6 +16,10 @@ const GRID = '#e7e5e4';
 const INK = '#334155';
 const MUTED = '#64748b';
 
+/** How rings and bars come in: a quick spin and draw, a gentle settle. Reduced motion (lite) shows them at once. */
+export const DRAW = { type: 'spring', stiffness: 120, damping: 20, mass: 0.9 } as const;
+export const SPIN = { type: 'spring', stiffness: 70, damping: 16, mass: 1 } as const;
+
 export const fmtK = (v: number) => (Math.abs(v) >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : Math.abs(v) >= 10_000 ? `${Math.round(v / 1000)}k` : Math.round(v).toLocaleString('en-US'));
 
 function Caption({ children }: { children: ReactNode }) {
@@ -93,10 +97,11 @@ export interface StackRow {
 }
 /** 100% stacked bars, one per row, with a 2px gap between segments and direct labels on the larger ones. */
 export function StackedBar({ parts, rows, caption }: { parts: { id: string; label: string; color: string }[]; rows: StackRow[]; caption?: ReactNode }) {
+  const lite = useApp((s) => s.lite);
   return (
     <div>
       <div className="space-y-1.5">
-        {rows.map((r) => {
+        {rows.map((r, ri) => {
           const total = r.values.reduce<number>((s, v) => s + (v ?? 0), 0);
           return (
             <div key={r.label} className="grid grid-cols-[88px_1fr] items-center gap-2 text-small">
@@ -108,9 +113,9 @@ export function StackedBar({ parts, rows, caption }: { parts: { id: string; labe
                     if (v == null || v <= 0) return null;
                     const w = (v / total) * 100;
                     return (
-                      <div key={p.id} className="flex items-center justify-center overflow-hidden text-[11px] font-semibold text-white" style={{ width: `${w}%`, background: p.color }} title={`${p.label}: ${Math.round(v * 100)}%`}>
+                      <motion.div key={p.id} className="flex shrink-0 items-center justify-center overflow-hidden whitespace-nowrap text-[11px] font-semibold text-white" style={{ background: p.color }} initial={lite ? false : { width: '0%', opacity: 0.4 }} animate={{ width: `${w}%`, opacity: 1 }} transition={{ ...DRAW, delay: lite ? 0 : ri * 0.07 + i * 0.03 }} title={`${p.label}: ${Math.round(v * 100)}%`}>
                         {w >= 12 && `${Math.round(v * 100)}%`}
-                      </div>
+                      </motion.div>
                     );
                   })
                 ) : (
@@ -130,6 +135,7 @@ export function StackedBar({ parts, rows, caption }: { parts: { id: string; labe
 // ------------------------------------------------------------------ donut
 /** One share as a donut (two to four parts), with the headline share in the middle. */
 export function Donut({ parts, center, sub }: { parts: { label: string; value: number | null; color: string }[]; center: string; sub?: string }) {
+  const lite = useApp((s) => s.lite);
   const r = 34, c = 2 * Math.PI * r;
   const known = parts.filter((p) => p.value != null && p.value > 0) as { label: string; value: number; color: string }[];
   const total = known.reduce((s, p) => s + p.value, 0);
@@ -138,13 +144,15 @@ export function Donut({ parts, center, sub }: { parts: { label: string; value: n
     <div className="flex items-center gap-4">
       <svg width="92" height="92" viewBox="0 0 92 92" role="img" aria-label={parts.map((p) => `${p.label} ${p.value == null ? '—' : `${Math.round(p.value * 100)}%`}`).join(', ')}>
         <circle cx="46" cy="46" r={r} fill="none" stroke={GRID} strokeWidth="12" />
-        {total > 0 &&
-          known.map((p) => {
-            const len = (p.value / total) * c;
-            const el = <circle key={p.label} cx="46" cy="46" r={r} fill="none" stroke={p.color} strokeWidth="12" strokeDasharray={`${Math.max(0, len - 2)} ${c - Math.max(0, len - 2)}`} strokeDashoffset={-offset} transform="rotate(-90 46 46)" />;
-            offset += len;
-            return el;
-          })}
+        <motion.g style={{ originX: '46px', originY: '46px' }} initial={lite ? false : { rotate: -200, opacity: 0.3 }} animate={{ rotate: 0, opacity: 1 }} transition={SPIN}>
+          {total > 0 &&
+            known.map((p, i) => {
+              const len = Math.max(0, (p.value / total) * c - 2);
+              const el = <motion.circle key={p.label} cx="46" cy="46" r={r} fill="none" stroke={p.color} strokeWidth="12" strokeDashoffset={-offset} transform="rotate(-90 46 46)" initial={lite ? false : { strokeDasharray: `0 ${c}` }} animate={{ strokeDasharray: `${len} ${c - len}` }} transition={{ ...DRAW, delay: lite ? 0 : 0.08 + i * 0.08 }} />;
+              offset += len + 2;
+              return el;
+            })}
+        </motion.g>
         <text x="46" y="44" textAnchor="middle" fontSize="15" fontWeight="700" fill="#0f172a">
           {center}
         </text>

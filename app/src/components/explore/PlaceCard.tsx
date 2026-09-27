@@ -87,7 +87,7 @@ export default function PlaceCard({ selected, fc, variable = null, values = null
           </>
         )}
         <p className="text-caption text-slate-600">
-          {variable && variable.source === 'analysis' ? EXPLORE_UI.analysisOnly : EXPLORE_UI.footer} ·{' '}
+          {variable && variable.source === 'analysis' ? EXPLORE_UI.analysisOnly : variable ? EXPLORE_UI.sourceOf(variable.source) : EXPLORE_UI.footer} ·{' '}
           <button onClick={() => set({ sourcesOpen: true, detailsTab: 'sources' })} className="font-semibold text-violet-700 hover:underline">
             {EXPLORE_UI.sourcesLink}
           </button>

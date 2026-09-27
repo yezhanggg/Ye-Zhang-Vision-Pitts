@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { MapPinned, MousePointerClick, X } from 'lucide-react';
 import type { ExpressionSpecification } from 'maplibre-gl';
@@ -22,7 +22,8 @@ import Rail, { RailSection } from '../Rail';
 import TourNotice from '../tour/TourNotice';
 import { useTour } from '../../lib/tour';
 import ChatBox from './ChatBox';
-import DataLegend, { ZoningLegend } from './DataLegend';
+import DataLegend, { LandUseLegend, ZoningLegend } from './DataLegend';
+import { LAND_OPACITY, landUsePaint, useLandUseClasses, useLandUseLayer } from '../../lib/explore/landUseMap';
 import DataPanel from './DataPanel';
 import DataTooltip, { ZoningTooltip } from './DataTooltip';
 import { useZoningLayer, zoningFC, zoningPaint } from '../../lib/explore/zoning';
@@ -92,6 +93,17 @@ export default function ExploreView() {
   const setBrowse = useApp((s) => s.setBrowse);
   const set = useApp((s) => s.set);
   const zoningOn = useZoningLayer((s) => s.on);
+  const landOn = useLandUseLayer((s) => s.on);
+  // The legend is pinned to the bottom-left corner; the Explore panel keeps clear of it (and folds away on its own).
+  const [legendH, setLegendH] = useState(0);
+  const legendRo = useRef<ResizeObserver | null>(null);
+  const legendRef = useCallback((el: HTMLDivElement | null) => {
+    legendRo.current?.disconnect();
+    if (!el) return setLegendH(0);
+    const ro = new ResizeObserver(([e]) => setLegendH(Math.round(e.contentRect.height)));
+    ro.observe(el);
+    legendRo.current = ro;
+  }, []);
   const [zoningHover, setZoningHover] = useState<string | null>(null);
   // The globe → Pittsburgh flight plays once after the landing page's Open button (not on deep links, not with reduced motion).
   const [intro] = useState(() => useApp.getState().introNonce > 0 && !useApp.getState().introDone && !readSkip() && !lite);
@@ -104,6 +116,8 @@ export default function ExploreView() {
   const open = layers[layerId];
   const cityOnly = layers.city && level !== 'muni';
   const browseGeo = useGeo(level, cityOnly);
+  const landClasses = useLandUseClasses(level, cityOnly, landOn && open);
+  const landPaint = useMemo(() => landUsePaint(landClasses), [landClasses]);
   const cityGeo = useGeo('city');
   const variable = open && browse.variable ? variableById.get(browse.variable) ?? null : null;
   const analysis = isAnalysis(variable) ? variable : null;
@@ -146,8 +160,13 @@ export default function ExploreView() {
         interactive: true,
         zoomTo: true,
         tooltip: (gid) => <DataTooltip geoid={gid} props={browseIndex.get(gid) ?? null} variable={variable} estimate={values?.get(gid)} />,
-        onSelect: (geoid) => setBrowse({ selected: { level, geoid } }),
+        // A second click on the selected place clears it.
+        onSelect: (geoid) => setBrowse({ selected: useApp.getState().browse.selected?.geoid === geoid ? null : { level, geoid } }),
       });
+    }
+    // The land-use map colors the open boundary's own shapes by their main use, over the variable fill.
+    if (landOn && open) {
+      out.push({ id: 'landuse', data: browseGeo.data, idField: 'GEOID', line: { color: '#ffffff', width: 0.6, opacity: 0.7 }, fill: { paint: landPaint, opacity: LAND_OPACITY } });
     }
     // The zoning map sits over the boundary fill (its own hover tooltip); clicks still reach the boundary below.
     if (zoningOn) {
@@ -155,7 +174,7 @@ export default function ExploreView() {
     }
     if (cityOnly) out.push({ id: 'city', data: cityGeo.data, idField: 'GEOID', line: lineFor('city', false), selectedId: null });
     return out;
-  }, [open, layerId, level, cityOnly, browseGeo.data, cityGeo.data, selected, fillPaint, browseIndex, variable, values, setBrowse, zoningOn]);
+  }, [open, layerId, level, cityOnly, browseGeo.data, cityGeo.data, selected, fillPaint, browseIndex, variable, values, setBrowse, zoningOn, landOn, landPaint]);
 
   const chat = useMemo<ChatScope>(() => ({ level, cityOnly, fc: browseGeo.data, selected: selected?.geoid ?? null, variable, values, weights }), [level, cityOnly, browseGeo.data, selected, variable, values, weights]);
   const panelKey = selected ? `place:${selected.level}:${selected.geoid}:${variable?.id ?? ''}` : variable ? `var:${variable.id}` : 'overview';
@@ -208,7 +227,7 @@ export default function ExploreView() {
         }}
       />
       {phase === 'done' && (
-        <Rail float title={EXPLORE_UI.intro.kicker}>
+        <Rail float title={EXPLORE_UI.intro.kicker} reserveBottom={legendH ? legendH + 8 : 0}>
           <RailSection id="layers" title={EXPLORE_UI.layers} sub={EXPLORE_UI.layersSub}>
             <BoundaryPanel />
           </RailSection>
@@ -246,9 +265,10 @@ export default function ExploreView() {
         )}
       </AnimatePresence>
       <AnimatePresence>
-        {phase === 'done' && ((variable && values) || zoningOn) && (
-          <motion.div key="legend" initial={lite ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className={cx('absolute bottom-3 z-20 flex items-end gap-2 transition-[left] duration-200', left ? 'left-[364px] xl:left-[384px]' : 'left-3')}>
+        {phase === 'done' && ((variable && values) || zoningOn || (landOn && open)) && (
+          <motion.div key="legend" ref={legendRef} initial={lite ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute bottom-3 left-3 z-20 flex items-end gap-2">
             {variable && values && <DataLegend variable={variable} level={level} values={values} breaks={breaks} ext={ext} hoverId={hoverId} />}
+            {landOn && open && <LandUseLegend classes={landClasses} hoverId={hoverId} />}
             {zoningOn && <ZoningLegend hoverCode={zoningHover} />}
           </motion.div>
         )}

@@ -87,7 +87,7 @@ describe('Homewood North', () => {
     const r = rec(HOMEWOOD_NORTH, 'market_led');
     expect(r.stanceTest.passed).toBe(false);
     expect(r.stanceTest.sentence).toContain('No unsubsidized product is supported here');
-    expect(r.stanceTest.sentence).toContain('sale median since 2023 $45,000');
+    expect(r.stanceTest.sentence).toContain('sale median since 2023 (13 sales) $45,000');
     expectArithmetic(r);
   });
   it('Transit-first fails: 35% and 618 departures, 0.34 miles', () => {
@@ -131,7 +131,7 @@ describe('Squirrel Hill North', () => {
     expect(r.notServedWhy).toContain('$110,400');
     expect(r.servedBands).toEqual(['gt100']);
     expect(r.headline).toBe('Townhome (2-bedroom, for sale) at the $766,066 sale median; serves households above 100% AMI');
-    expect(r.types[0].because).toContain('$766,066 − $207,850 = $558,216 above the city median');
+    expect(r.types[0].because).toContain('$766,066 − $255,000 = $511,066 above the city median');
     expect(r.types[0].because).not.toContain('small families');
     expect(r.lines[3]).toContain('Types the market pays for here');
     expectArithmetic(r);
@@ -251,5 +251,14 @@ describe('underEachStance', () => {
     expect(rows[1].leadType).toBe('townhome');
     expect(rows[1].fitTop).toBe('townhome');
     expect(rows[1].word).toBe('agrees');
+  });
+});
+
+describe('home value for the market tests', () => {
+  it('uses the sale median only with at least 10 sales, else the ACS value against the ACS city median', async () => {
+    const { homeValue } = await import('./recommend');
+    const p = (sale_n: number) => ({ market: { sale_median: 295000, sale_n, value_acs: 173000 } }) as never;
+    expect(homeValue(p(4), 207850, 255000)).toMatchObject({ value: 173000, city: 207850, kind: 'ACS median home value' });
+    expect(homeValue(p(12), 207850, 255000)).toMatchObject({ value: 295000, city: 255000 });
   });
 });

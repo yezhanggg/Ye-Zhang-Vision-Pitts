@@ -6,7 +6,7 @@ import TourLayer from './tour/TourLayer';
 import { sectionOf, useApp, type AnalysisMode } from '../lib/store';
 import { cx } from '../lib/format';
 import { UI } from '../lib/copy';
-import { SPRING_TAB } from './primitives';
+import { SPRING_TAB, SlideBg, useSlide } from './primitives';
 
 type Section = ReturnType<typeof sectionOf>;
 const SUBTABS: { id: AnalysisMode; label: string }[] = [
@@ -16,13 +16,14 @@ const SUBTABS: { id: AnalysisMode; label: string }[] = [
 ];
 
 function Pill<T extends string>({ items, value, onPick, ariaLabel, layoutId, size = 'md', tour }: { items: { id: T; label: string }[]; value: T; onPick: (id: T) => void; ariaLabel: string; layoutId: string; size?: 'md' | 'sm'; tour?: string }) {
+  const [ref, box] = useSlide<HTMLElement>(value);
   return (
-    <nav aria-label={ariaLabel} data-tour={tour} className={cx('pointer-events-auto flex rounded-xl bg-white/95 shadow-lg ring-1 ring-black/5 backdrop-blur', size === 'md' ? 'p-1' : 'p-0.5')}>
+    <nav ref={ref} aria-label={ariaLabel} data-tour={tour} data-pill={layoutId} className={cx('pointer-events-auto relative flex rounded-xl bg-white/95 shadow-lg ring-1 ring-black/5 backdrop-blur', size === 'md' ? 'p-1' : 'p-0.5')}>
+      <SlideBg box={box} className="rounded-lg bg-stone-100 ring-1 ring-black/5" />
       {items.map((t) => {
         const on = value === t.id;
         return (
-          <button key={t.id} onClick={() => onPick(t.id)} aria-current={on ? 'page' : undefined} className={cx('relative rounded-lg font-semibold transition-colors', size === 'md' ? 'px-4 py-1.5 text-body' : 'px-3 py-1 text-small', on ? 'text-slate-900' : 'text-slate-600 hover:text-slate-900')}>
-            {on && <motion.span layoutId={layoutId} className="absolute inset-0 rounded-lg bg-stone-100 ring-1 ring-black/5" transition={{ type: 'spring', stiffness: 380, damping: 32 }} />}
+          <button key={t.id} onClick={() => onPick(t.id)} aria-current={on ? 'page' : undefined} data-slide-on={on} className={cx('relative rounded-lg font-semibold transition-colors', size === 'md' ? 'px-4 py-1.5 text-body' : 'px-3 py-1 text-small', on ? 'text-slate-900' : 'text-slate-600 hover:text-slate-900')}>
             <span className="relative">{t.label}</span>
           </button>
         );

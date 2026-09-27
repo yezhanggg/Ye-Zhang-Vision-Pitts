@@ -269,6 +269,11 @@ const SwapIcon = () => (
   </svg>
 );
 
+/** The weighted scoring ranks every type; the written rules above decide which types are suggested, so the two can
+ *  differ (the scoring only orders types inside the suggested set). */
+const SCORING_CAVEAT =
+  "On the weighted scoring ranks, which only order types and can differ from the rules above:";
+
 export default function CompareTractsView({
   active = true,
 }: {
@@ -464,7 +469,9 @@ export default function CompareTractsView({
       ? "the market test fails or cannot run"
       : focus === "transit_first"
         ? "no under-served renters at this level, or frequent transit too far"
-        : "no under-served renters at this level";
+        : focus === "climate_resilient"
+          ? "too much FEMA flood-zone land or frequent transit too far, or no under-served renters at this level"
+          : "no under-served renters at this level";
   const tipOf = (id: string) => (
     <SuggestTip id={id} rec={suggestions.get(id)} />
   );
@@ -476,7 +483,7 @@ export default function CompareTractsView({
   // Export: the comparison report (PDF via print) and the At-a-glance rows as CSV.
   const exportInput = (): CompareReportInput | null => {
     if (!ta || !tb) return null;
-    const g = glanceRows(A.p, B.p, hudTable, level);
+    const g = glanceRows(A.p, B.p, hudTable, level, ta.GEOID, tb.GEOID);
     const subsidyShort = (x: number) =>
       x >= 0.75
         ? "fully eligible"
@@ -497,7 +504,7 @@ export default function CompareTractsView({
       glance: g.rows,
       fits: g.fits ? { rent: g.fits.rent, formula: g.fits.formula } : null,
       ami: g.ami,
-      takeaway: ok ? `On the scoring ranks: ${takeaway}` : takeaway,
+      takeaway: ok ? `${SCORING_CAVEAT} ${takeaway}` : takeaway,
       why,
       basis: ok ? basisLabel : null,
       factors: pair
@@ -524,13 +531,14 @@ export default function CompareTractsView({
         <div className="scroll-quiet min-h-0 flex-1 overflow-y-auto">
           <div className="w-full px-4 pb-12 pt-3 sm:px-5">
             <header className="mb-3">
-              <h1 className="font-display text-title font-bold text-slate-900">
-                Compare places
-              </h1>
-              <p className="text-small text-slate-600">
-                Two places side by side: the same measures, the same focus, what
-                differs.
-              </p>
+              <div className="flex flex-wrap items-baseline gap-x-3">
+                <h1 className="font-display text-title font-bold text-slate-900">
+                  Compare places
+                </h1>
+                <p className="text-small text-slate-600">
+                  Two places side by side, same measures, same focus.
+                </p>
+              </div>
               <div
                 className="mt-3 flex flex-wrap items-end gap-x-6 gap-y-3 rounded-xl bg-white px-4 py-3 shadow-sm ring-1 ring-stone-200/80"
                 data-tour="compare"
@@ -804,7 +812,7 @@ export default function CompareTractsView({
                       <>
                         {ok && (
                           <span className="text-slate-500">
-                            On the scoring ranks:{" "}
+                            {SCORING_CAVEAT}{" "}
                           </span>
                         )}
                         {takeaway}

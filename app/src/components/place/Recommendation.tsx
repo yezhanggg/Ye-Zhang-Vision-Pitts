@@ -24,7 +24,7 @@ export default function Recommendation({ t, r, ra, weights, rules, needs, stance
           <FitOrder t={t} r={r} ra={ra} weights={weights} />
         </div>
         {stanceRows && stanceRows.length > 0 && <StanceTable rows={stanceRows} current={currentStance} onPick={onPickStance} />}
-        <SourceLine>{source ?? <>Rules · docs/assumptions.md §11 and the About page print every threshold · Fit order · lib/scoring under the stance’s published weights (config/scoring.json) · Nothing here is observed data.</>}</SourceLine>
+        <SourceLine>{source ?? <>Rules · docs/assumptions.md §11 and Project Details &amp; Sources › Calculations print every threshold · Fit order · lib/scoring under the stance’s published weights (config/scoring.json) · Nothing here is observed data.</>}</SourceLine>
       </div>
     </section>
   );

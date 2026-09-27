@@ -42,11 +42,12 @@ const R: PolicyResults = {
   bonus: { before: ['a'], after: ['a', 'b'], changed: ['b'] },
   gaps: {
     top: [
-      { id: 'c', asking: 2000, fits: 1242, gap: 758, cost: 758 * 12 * 40 },
-      { id: 'a', asking: 1500, fits: 1242, gap: 258, cost: 258 * 12 * 40 },
+      { id: 'c', asking: 2000, fits: 1242, gap: 758, cost: 758 * 12 * 40, burdened: 100, need: 75800 },
+      { id: 'a', asking: 1500, fits: 1242, gap: 258, cost: 258 * 12 * 40, burdened: 50, need: 12900 },
     ],
     total: (758 + 258) * 12 * 40,
     withGap: 2,
+    withRent: 3,
   },
   transit: { before: ['a', 'b'], after: ['a', 'b', 'd'], changed: ['d'] },
   homes: 40,
@@ -136,7 +137,7 @@ describe('report and facts', () => {
   });
   it('writes facts the answer can be checked against', () => {
     const f = equityFacts({ ami: 50, def, median: 258, available: 2, n: 4, ranked, levers, nameOf, tractOf: (id) => `Tract ${id}` });
-    expect(f).toContain('City median over the 4 ranked city tracts: $258/mo');
+    expect(f).toContain('City median over the 2 ranked city tracts with a value: $258/mo');
     expect(f).toContain('1. Gamma (Tract c): $758/mo');
     expect(f).not.toContain('3. Beta');
     expect(f).toContain('Density bonus (switched on): Tracts where a small apartment is by right: 1 → 2');

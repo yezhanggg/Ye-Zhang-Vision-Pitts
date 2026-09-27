@@ -7,7 +7,7 @@ import { tractById } from '../../lib/data';
 import { cx } from '../../lib/format';
 import { hud, placeById } from '../../lib/place/data';
 import { fmtDollars } from '../../lib/place/format';
-import { usableAsking } from '../../lib/equity/measures';
+import { amiWords, usableAsking } from '../../lib/equity/measures';
 import { bonusAffordableHomes, gapCost, rent60TwoBedroom, BONUS_AFFORDABLE_SHARE } from '../../lib/equity/policy';
 import { RESIDENTIAL_FAMILIES, statusFromShares } from '../../lib/equity/zoning';
 import { LEAVE_OUT, type LeverId, type LeverSummary, type PolicyResults } from '../../lib/equity/export';
@@ -24,13 +24,13 @@ const DOES: Record<LeverId, string> = {
   adu: 'Lets a homeowner add a backyard or basement apartment without a hearing in every residential district.',
   bonus: 'Where small apartment buildings need a hearing today, allow them by right if some homes stay affordable.',
   voucher: 'Pays the difference between what listings ask and what a household can afford, for a set number of 2-bedroom homes.',
-  transit: 'Extends frequent bus or T service so places within a mile of a frequent stop today count as served.',
+  transit: 'Counts a place as served by transit when a frequent stop is within 1 mile, instead of your Place-tab distance. It changes the standard, not the bus network.'
 };
 
 const ASSUME: Partial<Record<LeverId, string>> = {
   bonus: `A ${Math.round(BONUS_AFFORDABLE_SHARE * 100)}% set-aside at 60% AMI is this tool's example, not a city rule. HUD sets 60% limits at 1.2 × the 50% limits.`,
   voucher: "A gross subsidy estimate, not a program budget: no administration, no tenant income changes, rents held at today's asking level.",
-  transit: "New frequent service reaches every tract within 1 mile of today's frequent stops; no cost or route is estimated.",
+  transit: 'No new stops or routes are modeled: each tract keeps its distance to today\'s frequent stops, so tracts more than 1 mile away never pass.',
 };
 
 function Line({ label, value }: { label: string; value: ReactNode }) {
@@ -80,11 +80,11 @@ function Details({ l, r, selectedId }: { l: LeverSummary; r: PolicyResults; sele
       )}
       {l.id === 'voucher' && (
         <ol className="space-y-px text-caption text-slate-700">
-          <li className="text-slate-500">Each: (asking − {r.fits == null ? 'fits' : fmtDollars(r.fits)}) × 12 × {r.homes} homes</li>
+          <li className="text-slate-500">Tracts where the gap meets the most burdened renters (gap × renters ≤50% AMI paying over 30%). Each: (asking − {r.fits == null ? 'fits' : fmtDollars(r.fits)}) × 12 × {r.homes} homes</li>
           {r.gaps.top.map((g) => (
             <li key={g.id} className="flex justify-between gap-2">
               <span className="truncate">
-                {nameOf(g.id)} <span className="text-slate-500">{tractById.get(g.id)?.name.replace('Tract ', '')}</span>
+                {nameOf(g.id)} <span className="text-slate-500">{g.burdened != null ? `${g.burdened.toLocaleString('en-US')} burdened` : tractById.get(g.id)?.name.replace('Tract ', '')}</span>
               </span>
               <span className="shrink-0 tnum">
                 {fmtDollars(g.gap)} × 12 × {r.homes} = {fmtDollars(g.cost)}
@@ -96,7 +96,7 @@ function Details({ l, r, selectedId }: { l: LeverSummary; r: PolicyResults; sele
             <span className="tnum">{fmtDollars(r.gaps.total)} a year</span>
           </li>
           <li className="text-slate-500">
-            {r.gaps.withGap} of {r.n} tracts have a gap at {r.ami}% AMI.
+            {r.gaps.withGap} of {r.gaps.withRent} tracts with a reliable asking rent have a gap at {amiWords(r.ami)}.
           </li>
         </ol>
       )}
@@ -199,10 +199,12 @@ export default function PolicyPopover({ levers, results, selectedId, onToggle }:
         aria-expanded={open}
         aria-haspopup="dialog"
         data-testid="policy-popover-button"
-        className={cx('-my-1 flex h-5 items-center gap-1 whitespace-nowrap rounded-full px-2 text-[11px] font-semibold normal-case tracking-normal ring-1 transition-colors', open ? 'bg-violet-100 text-violet-800 ring-violet-300' : 'bg-violet-50 text-violet-700 ring-violet-200 hover:bg-violet-100 hover:text-violet-900')}
+        title="What these do: the policy simulator's rules, arithmetic and reach"
+        aria-label="What these do"
+        className={cx('flex h-6 items-center gap-1 whitespace-nowrap rounded-full px-1.5 text-[11px] font-semibold normal-case tracking-normal ring-1 transition-colors min-[2100px]:px-2', open ? 'bg-violet-100 text-violet-800 ring-violet-300' : 'bg-violet-50 text-violet-700 ring-violet-200 hover:bg-violet-100 hover:text-violet-900')}
       >
-        <Info className="h-3 w-3" />
-        What these do
+        <Info className="h-3.5 w-3.5 min-[2100px]:h-3 min-[2100px]:w-3" />
+        <span className="max-[2099px]:hidden">What these do</span>
       </button>
       {open && (
         <section role="dialog" aria-label="Policy simulator" className={cx('absolute top-full z-50 mt-2 flex w-[420px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl bg-white font-normal normal-case tracking-normal shadow-xl ring-1 ring-stone-200', alignRight ? 'right-0' : 'left-0')} style={{ maxHeight: '70vh' }}>

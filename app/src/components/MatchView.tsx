@@ -449,7 +449,7 @@ export default function MatchView() {
           padding={padding}
           pin={pin}
           elevationReadout
-          onSelect={select}
+          onSelect={(id) => select(useApp.getState().selectedId === id ? null : id)}
           idleOrbit
           initialView={view ?? undefined}
           tooltip={(id) => <SuggestTooltip id={id} rec={suggestions.get(id)} />}

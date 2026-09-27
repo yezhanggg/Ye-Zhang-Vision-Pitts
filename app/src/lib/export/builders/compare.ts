@@ -20,6 +20,10 @@ export interface GlanceLike {
   b: number | null;
   fmt: (v: number) => string;
   na?: string;
+  floorZero?: boolean;
+  neutral?: boolean;
+  unit?: string;
+  csvScale?: number;
 }
 
 export interface CompareSide {
@@ -59,10 +63,15 @@ export interface CompareReportInput {
 }
 
 const NA = 'not available';
+/** "50% AMI", or "market rate (100% AMI)". */
+const fitsWords = (ami: number) => (ami === 100 ? 'market rate (100% AMI)' : `${ami}% AMI`);
 
 export const glanceMark = (r: GlanceLike): 'A' | 'B' | null => {
-  if (r.a == null || r.b == null || r.fmt(r.a) === r.fmt(r.b)) return null;
-  return r.a > r.b === r.higherFlagged ? 'A' : 'B';
+  if (r.neutral || r.a == null || r.b == null) return null;
+  const a = r.floorZero ? Math.max(0, r.a) : r.a,
+    b = r.floorZero ? Math.max(0, r.b) : r.b;
+  if (r.fmt(a) === r.fmt(b)) return null;
+  return a > b === r.higherFlagged ? 'A' : 'B';
 };
 
 /** Units for the CSV, from the row's label. */
@@ -124,7 +133,7 @@ export function buildCompareReport(i: CompareReportInput): Report {
   blocks.push({ kind: 'heading', text: '1. At a glance' });
   const rows: (string | number)[][] = [];
   i.glance.forEach((r, idx) => {
-    if (idx === 3) rows.push([`2-bedroom rent that fits at ${i.ami}% AMI`, i.fits ? `${fmtDollars(i.fits.rent)}/mo` : NA, i.fits ? `${fmtDollars(i.fits.rent)}/mo` : NA, 'same in both (HUD metro limit)']);
+    if (idx === 3) rows.push([`2-bedroom rent that fits at ${fitsWords(i.ami)}`, i.fits ? `${fmtDollars(i.fits.rent)}/mo` : NA, i.fits ? `${fmtDollars(i.fits.rent)}/mo` : NA, 'same in both (HUD metro limit)']);
     const m = glanceMark(r);
     rows.push([r.label, r.a == null ? r.na ?? NA : r.fmt(r.a), r.b == null ? r.na ?? NA : r.fmt(r.b), m ? `${m} · ${markWord(r)}` : '—', r.dir]);
   });
@@ -209,9 +218,10 @@ export function glanceCsvRows(i: Pick<CompareReportInput, 'a' | 'b' | 'glance' |
   const base = { a_name: i.a.name, b_name: i.b.name, a_geoid: i.a.geoid, b_geoid: i.b.geoid };
   const out: Record<string, unknown>[] = [];
   i.glance.forEach((r, idx) => {
-    if (idx === 3) out.push({ measure: `2-bedroom rent that fits at ${i.ami}% AMI`, direction: 'same in both (HUD metro limit)', a: i.fits?.rent ?? null, b: i.fits?.rent ?? null, unit: 'USD/month', marked: '', ...base });
+    if (idx === 3) out.push({ measure: `2-bedroom rent that fits at ${fitsWords(i.ami)}`, direction: 'same in both (HUD metro limit)', a: i.fits?.rent ?? null, b: i.fits?.rent ?? null, unit: 'USD/month', marked: '', ...base });
     const m = glanceMark(r);
-    out.push({ measure: r.label, direction: r.dir, a: round(r.a), b: round(r.b), unit: glanceUnit(r.label), marked: m ? `${m} (${markWord(r)})` : '', ...base });
+    const k = r.csvScale ?? 1;
+    out.push({ measure: r.label, direction: r.dir, a: round(r.a == null ? null : r.a * k), b: round(r.b == null ? null : r.b * k), unit: r.unit ?? glanceUnit(r.label), marked: m ? `${m} (${markWord(r)})` : '', ...base });
   });
   return out;
 }

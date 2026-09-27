@@ -205,3 +205,11 @@ Hazelwood (hero, watch list) · Garfield · Middle Hill · Homewood North · Low
 | Default summary | Empty until a place or a variable is chosen: one line on where to click. The city-at-a-glance panel was removed | Ye's request. | Ye |
 | Flat when far | The map lies flat once the view is zoomed out far enough to fit the city limits plus 5 miles (`app/src/lib/farView.ts`), checked when a move ends, with 0.25 zoom levels of slack before the tilt returns | Ye's request. | Ye |
 | Start page | Three doors: Open, Details (Overview, Data & method, Limitations, What comes next), About (the author: background, education, experience, UPenn email, LinkedIn) | Ye's request. About is written from Ye's LinkedIn profile as read on 2026-09-27. | Ye |
+
+### 10d. Land use and zoning mix (Sun 2026-09-27, afternoon)
+
+| Choice | Value | Rationale | Revisit by |
+|---|---|---|---|
+| Land-use measure | Share of parcel lot area by assessed class, county-wide at every level; vacant lots and parcels as counts | Same classifier the Place card uses, so the two never disagree; area reads better than parcel counts for land. | Ye |
+| Zoning mix | Seven family groups, city tracts and block groups only | Zoning data exists only for the city. | Ye |
+| Use | Information only: Explore variables, place summary, Place card fold, Compare places rows, question-box facts | Nothing enters a score. | Ye |

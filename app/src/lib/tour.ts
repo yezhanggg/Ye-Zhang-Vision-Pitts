@@ -140,7 +140,7 @@ export const STEPS: TourStep[] = [
   {
     id: 'compare',
     part: 'analysis',
-    target: 'compare',
+    target: 'subtabs',
     placement: 'bottom',
     title: 'Compare places',
     text: 'Pick two places and read them side by side: the same measures, the same focus, and what differs.',
@@ -149,7 +149,7 @@ export const STEPS: TourStep[] = [
   {
     id: 'equity',
     part: 'analysis',
-    target: 'equity-bar',
+    target: 'subtabs',
     placement: 'bottom',
     title: 'Equity & policy',
     text: 'Map one need at a time, such as the rent gap or the distance to frequent transit, for the income level you care about.',

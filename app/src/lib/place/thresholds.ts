@@ -17,6 +17,8 @@ export const THRESHOLDS = {
   /** Market-led requires asking 2BR ≥ SAFMR and the sale median (ACS value when sales are null) ≥ the city median. */
   market_asking_at_least_safmr: true,
   market_value_at_least_city_median: true,
+  /** A tract's sale median is used only with at least this many sales since 2023; otherwise the ACS median value. */
+  min_sales: 10,
   /** A for-sale home is within reach when its price is at most this many times the band's income limit (a rule of thumb, not underwriting). */
   own_price_to_income: 3,
   /** Lot pattern supports ADUs and 2–4 conversions at this share of units in 2–4 unit buildings … */

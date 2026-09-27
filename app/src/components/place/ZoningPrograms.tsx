@@ -7,7 +7,7 @@ import { scoring } from '../../lib/data';
 import type { PlaceMeasures, Typology, ZoningStatus } from '../../lib/place/types';
 import { Block, NA, SourceLine, Table } from './shared';
 
-const STATUS_TEXT: Record<ZoningStatus, string> = { yes: 'by right', conditional: 'conditional use', no: 'not permitted', unknown: 'unknown' };
+const STATUS_TEXT: Record<ZoningStatus, string> = { yes: 'by right', conditional: 'conditional use', no: 'not by right on most of the land', unknown: 'unknown' };
 const STATUS_TONE: Record<ZoningStatus, string> = { yes: 'text-emerald-800', conditional: 'text-amber-900', no: 'text-rose-800', unknown: 'text-slate-500' };
 const TYPES: Typology[] = ['adu', 'duplex_triplex', 'townhome', 'small_apartment', 'senior'];
 const typeLabel = (k: Typology) => scoring.typologies.find((t) => t.id === k)?.label ?? k;

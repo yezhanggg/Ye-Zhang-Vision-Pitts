@@ -53,9 +53,9 @@ export function explainMeasure({ def, ami, values, nameOf }: ExplainInput): stri
     case 'rent_gap': {
       const pos = count((v) => v > 0);
       const posMed = median(xs.filter((v) => v > 0));
-      if (!pos) return [`Listings for a 2-bedroom already fit a ${ami}% AMI household in all ${int(avail)} tracts with a reliable asking rent.${missingNote(missing, 'reliable asking rent')}`];
+      if (!pos) return [`Listings for a 2-bedroom already fit ${ami === 100 ? 'a median-income' : `${ami === 80 ? 'an' : 'a'} ${ami}% AMI`} household in all ${int(avail)} tracts with a reliable asking rent.${missingNote(missing, 'reliable asking rent')}`];
       return [
-        `Listings ask more than a ${ami}% AMI household can pay in ${int(pos)} of ${int(avail)} tracts with a reliable asking rent.${missingNote(missing, 'reliable asking rent')}`,
+        `Listings ask more than ${ami === 100 ? 'a median-income' : `${ami === 80 ? 'an' : 'a'} ${ami}% AMI`} household can pay in ${int(pos)} of ${int(avail)} tracts with a reliable asking rent.${missingNote(missing, 'reliable asking rent')}`,
         med > 0
           ? `The median gap is ${perMonth(med)}${posMed != null && pos < avail ? `; where there is a gap, it is typically ${perMonth(posMed)}` : ''}.`
           : `In the median tract listings already fit${posMed != null ? `; where there is a gap, it is typically ${perMonth(posMed)}` : ''}.`,

@@ -52,6 +52,9 @@ export const EXPLORE_UI = {
   unitBadge: { count: 'count', usd: '$', share: '%', years: 'year', age: 'yrs', pct: '0–100', score: '/100', class: 'class', flag: 'yes/no', rate: 'rate', ratio: '×' } as Record<Unit, string>,
   clear: 'Clear',
   footer: 'Source: American Community Survey 2020–2024, 5-year estimates',
+  sourceOf: (source?: string) =>
+    source === 'parcels' ? 'Source: Allegheny County property assessments (2026), share of parcel land' : source === 'zoning' ? 'Source: City of Pittsburgh zoning districts (WPRDC); unverified by-right reading' : 'Source: American Community Survey 2020–2024, 5-year estimates',
+  zoningCityOnly: 'City of Pittsburgh only',
   sourcesLink: 'All sources →',
   notBuilt: 'Data browser not built. Run scripts/07_build_acs_levels.py, then the app export, to bundle the census variables.',
   clickForDetails: 'Click for a summary',
@@ -95,6 +98,8 @@ export const EXPLORE_UI = {
     race: 'Race and ethnicity',
     burden: 'Housing cost burden',
     commute: 'How people get to work',
+    landUse: 'Land use',
+    zoning: 'Zoning',
     incomeRent: 'Income and rent over time',
     analysis: 'What the matchmaker says',
     rents: 'Asking rents',

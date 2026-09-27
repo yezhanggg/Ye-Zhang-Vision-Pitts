@@ -20,9 +20,9 @@ import { rankOf, topBottom } from './summary';
 import type { UnitFC, UnitProps, ValueMap, VariableDef } from './types';
 
 /** Figures listed for every nearby place. */
-export const NEAR_VARS = ['pop', 'med_hh_income', 'med_gross_rent', 'med_home_value', 'renter_share', 'rent_burden30_share', 'poverty_share', 'vacancy_share'];
+export const NEAR_VARS = ['pop', 'med_hh_income', 'med_gross_rent', 'med_home_value', 'renter_share', 'rent_burden30_share', 'poverty_share', 'vacancy_share', 'lu_vacant'];
 /** Figures listed for the selected place, the city and the county. */
-export const PLACE_VARS = [...NEAR_VARS, 'households', 'median_age', 'median_year_built', 'sfd_share', 'units_2_4_share', 'units_5_19_share', 'units_20plus_share', 'bachelors_share', 'unemployment_rate', 'transit_share', 'no_vehicle_share', 'white_nh_share', 'black_nh_share', 'asian_nh_share', 'hispanic_share'];
+export const PLACE_VARS = [...NEAR_VARS, 'households', 'median_age', 'median_year_built', 'sfd_share', 'units_2_4_share', 'units_5_19_share', 'units_20plus_share', 'bachelors_share', 'unemployment_rate', 'transit_share', 'no_vehicle_share', 'white_nh_share', 'black_nh_share', 'asian_nh_share', 'hispanic_share', 'lu_residential', 'lu_commercial', 'lu_institutional', 'vacant_lots', 'zoned_single', 'zoned_multi', 'zoned_mixed'];
 export const RADIUS_MILES = 3;
 /** Eight nearby places are enough to compare with, and every one of them is paid for in tokens. */
 const NEAR_CAP = 8;

@@ -4,6 +4,7 @@
 // lib/place/planStore (session only).
 import { useId } from 'react';
 import { cx } from '../../lib/format';
+import { SlideBg, useSlide } from '../primitives';
 import { useApp } from '../../lib/store';
 import { hud } from '../../lib/place/data';
 import {
@@ -30,14 +31,16 @@ export function openPlanningDetails() {
 }
 
 function Segmented<T extends string | number>({ label, options, value, onChange, text, cols, template }: { label: string; options: T[]; value: T; onChange: (v: T) => void; text: (v: T) => string; cols?: number; template?: string }) {
+  const [slideRef, box] = useSlide(value);
   return (
     <div>
       <div className="mb-1 text-caption font-medium text-slate-600">{label}</div>
-      <div className="grid gap-0.5 rounded-lg bg-stone-100 p-0.5" style={{ gridTemplateColumns: template ?? `repeat(${cols ?? options.length}, minmax(0, 1fr))` }} role="radiogroup" aria-label={label}>
+      <div ref={slideRef} className="relative grid gap-0.5 rounded-lg bg-stone-100 p-0.5" style={{ gridTemplateColumns: template ?? `repeat(${cols ?? options.length}, minmax(0, 1fr))` }} role="radiogroup" aria-label={label}>
+        <SlideBg box={box} className="rounded-md bg-white shadow-sm ring-1 ring-stone-200" />
         {options.map((o) => {
           const on = o === value;
           return (
-            <button key={String(o)} type="button" role="radio" aria-checked={on} onClick={() => onChange(o)} className={cx('rounded-md px-1.5 py-1 text-small font-medium transition', on ? 'bg-white text-slate-900 shadow-sm ring-1 ring-stone-200' : 'text-slate-600 hover:text-slate-900')}>
+            <button key={String(o)} type="button" role="radio" aria-checked={on} data-slide-on={on} onClick={() => onChange(o)} className={cx('relative rounded-md px-1.5 py-1 text-small font-medium transition-colors', on ? 'text-slate-900' : 'text-slate-600 hover:text-slate-900')}>
               {text(o)}
             </button>
           );

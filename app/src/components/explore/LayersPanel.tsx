@@ -3,6 +3,7 @@ import { BOUNDARY_ROWS, EXPLORE_UI, SETTING_ROWS } from '../../lib/explore/copy'
 import { cx } from '../../lib/format';
 import { Segmented } from '../primitives';
 import { hasZoning, useZoningLayer } from '../../lib/explore/zoning';
+import { setZoningMap, useLandUseLayer } from '../../lib/explore/landUseMap';
 
 /** Accessible toggle: a button with aria-pressed, a small track and knob, label and caption. */
 export function Switch({ on, onChange, label, caption, id, disabled }: { on: boolean; onChange: (on: boolean) => void; label: string; caption?: string; id?: string; disabled?: boolean }) {
@@ -49,15 +50,25 @@ export function BoundaryPanel() {
   );
 }
 
-/** The city zoning map: district polygons colored by family, drawn over whichever boundary is open. */
+/** The two ground maps drawn over whichever boundary is open: city zoning districts, and each area's main land use. */
 function ZoningSwitch() {
-  const on = useZoningLayer((s) => s.on);
-  const set = useZoningLayer((s) => s.set);
   return (
     <div role="group" aria-label="Map layers" className="space-y-1.5 border-t border-stone-200/80 pt-2">
-      <Switch id="layer-zoning" on={on} disabled={!hasZoning} label="Zoning districts" caption={hasZoning ? 'City of Pittsburgh zoning map (WPRDC), colored by district family' : 'Zoning map not built yet'} onChange={set} />
+      <ZoningMapSwitch />
+      <LandUseMapSwitch />
     </div>
   );
+}
+
+export function ZoningMapSwitch({ id = 'layer-zoning' }: { id?: string }) {
+  const on = useZoningLayer((s) => s.on);
+  return <Switch id={id} on={on} disabled={!hasZoning} label="Zoning districts" caption={hasZoning ? 'City of Pittsburgh zoning map (WPRDC), colored by district family' : 'Zoning map not built yet'} onChange={setZoningMap} />;
+}
+
+export function LandUseMapSwitch({ id = 'layer-landuse' }: { id?: string }) {
+  const on = useLandUseLayer((s) => s.on);
+  const set = useLandUseLayer((s) => s.set);
+  return <Switch id={id} on={on} label="Land-use map" caption="Each area colored by its main land use (county property assessments, 2026)" onChange={set} />;
 }
 
 /** How the map looks: buildings, terrain and hill shading, plus the flat-view shortcut. */

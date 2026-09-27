@@ -80,10 +80,17 @@ export interface UiState {
   right: boolean;
   sections: Record<SectionId, SectionState>;
 }
-/** v2: every section starts collapsed (a clean first view); the new key drops layouts saved under the old all-open default. */
-const UI_KEY = 'visionpitts.ui.v2';
-/** Every section collapsed: the panel opens as a short list of headings and the map stays clear. */
-export const defaultUi = (): UiState => ({ left: true, right: true, sections: Object.fromEntries(SECTION_IDS.map((id) => [id, 'collapsed'])) as Record<SectionId, SectionState> });
+/** v3: Explore opens with Boundary and Data showing their choices; the new key drops layouts saved under v2. */
+const UI_KEY = 'visionpitts.ui.v3';
+/** Sections that start open. None: the Explore panel opens with Boundary, Data and Settings folded, one click each. */
+const OPEN_BY_DEFAULT: SectionId[] = [];
+/** Explore's own sections, folded again on every fresh open of the tool. */
+export const EXPLORE_SECTIONS: SectionId[] = ['layers', 'data', 'settings'];
+export const defaultUi = (): UiState => ({
+  left: true,
+  right: true,
+  sections: Object.fromEntries(SECTION_IDS.map((id) => [id, OPEN_BY_DEFAULT.includes(id) ? 'open' : 'collapsed'])) as Record<SectionId, SectionState>,
+});
 /** Layout preferences persist per browser; never in the URL. Anything unreadable falls back to the defaults. */
 function readUi(): UiState {
   const d = defaultUi();
@@ -146,7 +153,7 @@ try {
 export const defaultLayers = (_lite = liteDefault): Layers => ({ buildings: true, terrain: false, hillshade: false, tracts: true, bg: false, zcta: false, muni: false, county: false, city: true });
 export const defaultBrowse = (): Browse => ({ level: 'tract', variable: null, selected: null });
 
-export type DetailsTab = 'overview' | 'sources' | 'limits' | 'next';
+export type DetailsTab = 'overview' | 'sources' | 'calc' | 'limits' | 'next';
 
 export interface AppState {
   /** Landing page first; deep links (any hash with a mode) open the app directly. */

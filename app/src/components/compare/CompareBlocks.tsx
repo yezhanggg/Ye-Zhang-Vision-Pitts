@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { tractLabel, typologyById } from "../../lib/data";
 import { cx } from "../../lib/format";
-import { ceilingRent } from "../../lib/place/afford";
+import { bundledValues } from "../../lib/explore/catalog";
 import { bedroomsWord } from "../../lib/place/bands";
 import {
   capitalize,
@@ -18,9 +18,12 @@ import type { HudTable, PlaceMeasures, Stance } from "../../lib/place/types";
 import type { WhyRow } from "../../lib/place/whyDiffer";
 import {
   accessOf,
+  amiWords,
   burdenedLe50,
+  fits2br,
   rentGap,
   usableAsking,
+  type AmiPct,
 } from "../../lib/equity/measures";
 import type { TractProps } from "../../lib/types";
 import { Dot, readableColor } from "../primitives";
@@ -104,6 +107,13 @@ export interface GlanceRow {
   fmt: (v: number) => string;
   /** Text when a side's value is missing. */
   na?: string;
+  /** Values at or below 0 count as 0 when marking a side (a negative rent gap means the market already fits). */
+  floorZero?: boolean;
+  /** Never mark a side: the row has no better or worse direction. */
+  neutral?: boolean;
+  /** CSV: the unit, and a multiplier from the stored value (land shares are 0–1, exported as percent). */
+  unit?: string;
+  csvScale?: number;
 }
 
 const money = (v: number) =>
@@ -117,8 +127,11 @@ const renterLe50 = (p: PlaceMeasures | null) => {
 
 /** Which side a row marks (more need, or better access), or null when equal or missing. */
 export const glanceFlag = (r: GlanceRow): "a" | "b" | null => {
-  if (r.a == null || r.b == null || r.fmt(r.a) === r.fmt(r.b)) return null;
-  return r.a > r.b === r.higherFlagged ? "a" : "b";
+  if (r.neutral || r.a == null || r.b == null) return null;
+  const a = r.floorZero ? Math.max(0, r.a) : r.a,
+    b = r.floorZero ? Math.max(0, r.b) : r.b;
+  if (r.fmt(a) === r.fmt(b)) return null;
+  return a > b === r.higherFlagged ? "a" : "b";
 };
 
 /** The At-a-glance rows (real values, A and B) and the 2-bedroom rent that fits; shared with the comparison export. */
@@ -127,9 +140,16 @@ export function glanceRows(
   Bp: PlaceMeasures | null,
   hud: HudTable | null,
   level: PlanLevel,
+  /** Tract GEOIDs of A and B, for the land-use and zoning rows (county parcels, city zoning). */
+  ga: string | null = null,
+  gb: string | null = null,
 ) {
-  const ami = amiOf(level);
-  const fits = hud ? ceilingRent(hud, ami, 2) : null;
+  // Market rate reads as a household at the area median income (100% AMI), as on Equity & policy.
+  const ami: AmiPct = level === "market" ? 100 : amiOf(level);
+  const land = (g: string | null, id: string) =>
+    g ? (bundledValues("tract")[g]?.[id]?.[0] ?? null) : null;
+  const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
+  const fits = fits2br(hud, ami);
   const base: GlanceRow[] = [
     {
       label: `Renter households at or below 50% AMI`,
@@ -160,10 +180,11 @@ export function glanceRows(
       na: "too few listings",
     },
     {
-      label: `Rent gap at ${ami}% AMI (asking − fits)`,
-      dir: "bigger = more need",
+      label: `Rent gap at ${amiWords(ami)} (asking − fits)`,
+      dir: "bigger = more need; utilities not included",
       kind: "need",
       higherFlagged: true,
+      floorZero: true,
       a: rentGap(Ap, hud, ami),
       b: rentGap(Bp, hud, ami),
       fmt: (v) => `${money(v)}/mo`,
@@ -205,6 +226,40 @@ export function glanceRows(
       b: accessOf(Bp)?.services_halfmi ?? null,
       fmt: (v) => v.toFixed(1),
     },
+    {
+      label: "Vacant land",
+      dir: "more = more room to build",
+      kind: "access",
+      higherFlagged: true,
+      a: land(ga, "lu_vacant"),
+      b: land(gb, "lu_vacant"),
+      fmt: pct,
+      unit: "% of parcel land",
+      csvScale: 100,
+    },
+    {
+      label: "Residential land",
+      dir: "share of parcel land",
+      kind: "access",
+      higherFlagged: true,
+      neutral: true,
+      a: land(ga, "lu_residential"),
+      b: land(gb, "lu_residential"),
+      fmt: pct,
+      unit: "% of parcel land",
+      csvScale: 100,
+    },
+    {
+      label: "Zoned multi-unit",
+      dir: "more = more homes allowed",
+      kind: "access",
+      higherFlagged: true,
+      a: land(ga, "zoned_multi"),
+      b: land(gb, "zoned_multi"),
+      fmt: pct,
+      unit: "% of zoned land",
+      csvScale: 100,
+    },
   ];
   const rows = base.map((r) => ({
     ...r,
@@ -224,6 +279,7 @@ const GROUPS: { label: string; idx: (number | "fits")[] }[] = [
   { label: "Affordability", idx: [0, 1, 2, "fits", 3] },
   { label: "Access", idx: [4, 6, 7] },
   { label: "Risk", idx: [5] },
+  { label: "Land and zoning", idx: [8, 9, 10] },
 ];
 
 function Value({
@@ -288,7 +344,14 @@ export function AtAGlance({
   hud: HudTable | null;
   level: PlanLevel;
 }) {
-  const { ami, fits, rows } = glanceRows(A.p, B.p, hud, level);
+  const { ami, fits, rows } = glanceRows(
+    A.p,
+    B.p,
+    hud,
+    level,
+    A.t?.GEOID ?? null,
+    B.t?.GEOID ?? null,
+  );
   const fitsText = fits ? `${fmtDollars(fits.rent)}/mo` : "not available";
 
   const line = (i: number | "fits") => {
@@ -296,7 +359,7 @@ export function AtAGlance({
       return (
         <div key="fits" className={cx(GLANCE_GRID, "min-h-[30px]")}>
           <Measure
-            label={`2-bedroom rent that fits at ${ami}% AMI`}
+            label={`2-bedroom rent that fits at ${amiWords(ami)}`}
             note="same in both, HUD limit"
             title={fits ? fits.formula : "HUD table not loaded"}
           />
@@ -343,7 +406,8 @@ export function AtAGlance({
       <p className="mt-2 text-[11px] leading-snug text-slate-500">
         Shading marks the place with more need, better access or less flood
         land, in that place's color. Sources: CHAS 2018–22, Dewey listings, HUD
-        FY2026, PRT GTFS, FEMA NFHL, LODES 2023, OpenStreetMap.
+        FY2026, PRT GTFS, FEMA NFHL, LODES 2023, OpenStreetMap, county property
+        assessments 2026, city zoning districts.
       </p>
     </div>
   );
@@ -435,7 +499,12 @@ function getsCells(s: SideInfo, level: PlanLevel): GetsCells {
     ) : (
       dash
     ),
-    rent: rec.price ? (
+    rent: marketLed && lead ? (
+      <span className="text-slate-800">
+        {capitalize(rec.headline.match(/\) (at the .+?|at market (?:rents|prices));/)?.[1] ?? "market rate")}
+        {note("market rate, no HUD ceiling")}
+      </span>
+    ) : rec.price ? (
       <span title={rec.price.formula}>
         <span className="font-medium tnum text-slate-900">
           {fmtDollars(rec.price.rent)}/mo

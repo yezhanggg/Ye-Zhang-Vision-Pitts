@@ -3,7 +3,7 @@
 import type { CsvColumn } from '../export/csv';
 import type { Report, ReportBlock } from '../export/report';
 import type { HudTable } from '../place/types';
-import { MEASURES, measureValue, type AmiPct, type MeasureDef, type MeasureId } from './measures';
+import { MEASURES, amiWords, measureValue, type AmiPct, type MeasureDef, type MeasureId } from './measures';
 import { BONUS_AFFORDABLE_SHARE, type AduResult, type GapCost, type Row } from './policy';
 import { RESIDENTIAL_FAMILIES, SMALL_APT_CONDITIONAL_FAMILIES } from './zoning';
 
@@ -13,7 +13,7 @@ export const LEVER_NAME: Record<LeverId, string> = {
   adu: 'ADU by right',
   bonus: 'Density bonus',
   voucher: 'Rent-gap subsidy',
-  transit: 'Transit extension',
+  transit: 'Wider transit standard',
 };
 
 interface Flip {
@@ -26,7 +26,7 @@ export interface PolicyResults {
   n: number;
   adu: AduResult;
   bonus: Flip;
-  gaps: { top: GapCost[]; total: number; withGap: number };
+  gaps: { top: GapCost[]; total: number; withGap: number; withRent: number };
   transit: Flip;
   /** Subsidy inputs. */
   homes: number;
@@ -84,8 +84,8 @@ export function leverSummaries(r: PolicyResults, on: Record<LeverId, boolean>): 
       id: 'voucher',
       name: LEVER_NAME.voucher,
       on: on.voucher,
-      rule: `yearly cost = max(0, asking − fits) × 12 × ${r.homes} homes, in the ${r.gaps.top.length} largest-gap tracts; fits = 2-bedroom rent at ${r.ami}% AMI = ${r.fits == null ? 'not available' : $(r.fits)}.`,
-      measure: `Yearly subsidy, ${r.homes} homes in each of the ${r.gaps.top.length} largest-gap tracts`,
+      rule: `yearly cost = max(0, asking − fits) × 12 × ${r.homes} homes, in the ${r.gaps.top.length} tracts with the largest gap × burdened renters ≤50% AMI; fits = 2-bedroom rent at ${amiWords(r.ami)} = ${r.fits == null ? 'not available' : $(r.fits)}.`,
+      measure: `Yearly subsidy, ${r.homes} homes in each of the ${r.gaps.top.length} tracts where the gap meets the most burdened renters`,
       before: '$0',
       after: $(r.gaps.total),
       headline: `$0 → ${compactDollars(r.gaps.total)} a year`,
@@ -136,7 +136,7 @@ export function measureColumns(ami: AmiPct, levers: LeverSummary[]): CsvColumn[]
     { key: 'geoid', label: 'GEOID' },
     { key: 'neighborhood', label: 'Neighborhood' },
     { key: 'tract', label: 'Tract' },
-    { key: 'rent_gap', label: `Rent gap at ${ami}% AMI ($ per month)` },
+    { key: 'rent_gap', label: `Rent gap at ${amiWords(ami)} ($ per month)` },
     { key: 'burdened', label: 'Burdened renters at or below 50% AMI (households)' },
     { key: 'jobs', label: 'Jobs within 1 mile' },
     { key: 'school', label: 'Miles to a public school' },
@@ -216,7 +216,7 @@ export function buildEquityReport(x: EquityReportInput): Report {
     {
       kind: 'kv',
       rows: [
-        ['Income level', `${x.ami}% of area median income${x.marketAs80 ? ' (the Place tab is on market rate, read here as 80%)' : ''}`],
+        ['Income level', x.ami === 100 ? 'Market rate: a household at the area median income (100% AMI)' : `${x.ami}% of area median income${x.marketAs80 ? ' (the Place tab is on market rate, read here as 80%)' : ''}`],
         ['Measure', x.def.title],
         ['Units', x.def.unit],
         ['City median', x.def.fmt(x.median)],
@@ -254,7 +254,7 @@ export function buildEquityReport(x: EquityReportInput): Report {
   blocks.push({ kind: 'callout', text: `What these levers leave out: ${LEAVE_OUT.join(' ')}` });
   return {
     title: 'Equity & policy',
-    subtitle: `${x.def.title} · ${x.ami}% AMI · ${x.n} city tracts with at least 25 households`,
+    subtitle: `${x.def.title} · ${amiWords(x.ami)} · ${x.n} city tracts with at least 25 households`,
     blocks,
     sources: [...new Set(MEASURES.map((m) => `${m.title}: ${m.source}`))].concat('Zoning: City of Pittsburgh zoning districts with an unverified reading of Title 9 by-right rules'),
     footer: x.footer,
@@ -280,8 +280,8 @@ export interface EquityFactsInput {
 /** Plain lines appended to the question box's facts, so answers can cite this tab's numbers (and are checked against them). */
 export function equityFacts(x: EquityFactsInput): string {
   const out = ['EQUITY & POLICY TAB (computed by this tool from the tract data)'];
-  out.push(`Income level: ${x.ami}% of area median income. Measure on the map: ${x.def.title} (${x.def.unit}). ${x.def.definition(x.ami)}`);
-  out.push(`City median over the ${x.n} ranked city tracts: ${x.def.fmt(x.median)}; ${x.available} of ${x.n} tracts have a value.`);
+  out.push(`Income level: ${x.ami === 100 ? 'market rate, a household at the area median income' : `${x.ami}% of area median income`}. Measure on the map: ${x.def.title} (${x.def.unit}). ${x.def.definition(x.ami)}`);
+  out.push(`City median over the ${x.available} ranked city tracts with a value: ${x.def.fmt(x.median)}; ${x.available} of ${x.n} tracts have a value.`);
   const top = x.ranked.filter((r) => r.value != null).slice(0, 10);
   out.push(`Most need first (${x.def.higherIsNeed ? 'highest' : 'lowest'} value first), top ${top.length}:`);
   top.forEach((r, i) => out.push(`${i + 1}. ${x.nameOf(r.id)} (${x.tractOf(r.id)}): ${x.def.fmt(r.value)}`));
@@ -299,7 +299,7 @@ export function equityFacts(x: EquityFactsInput): string {
 /** Three questions that fit the current measure, the selected tract and the levers switched on. */
 export function equityPrompts(def: MeasureDef, ami: AmiPct, levers: LeverSummary[], selectedName: string | null): string[] {
   const first: Record<MeasureId, string> = {
-    rent_gap: `Which neighborhoods have the largest rent gap at ${ami}% AMI?`,
+    rent_gap: `Which neighborhoods have the largest rent gap at ${ami === 100 ? 'market rate' : `${ami}% AMI`}?`,
     burdened: 'Which neighborhoods have the most cost-burdened renters?',
     jobs: 'Which neighborhoods have the fewest jobs within a mile?',
     school: 'Which neighborhoods are farthest from a public school?',

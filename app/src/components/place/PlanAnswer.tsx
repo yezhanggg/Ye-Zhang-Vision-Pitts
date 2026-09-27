@@ -8,6 +8,7 @@ import { ChevronRight } from "lucide-react";
 import { typologyById } from "../../lib/data";
 import { DECIDE } from "../../lib/place/copy";
 import { limitFor } from "../../lib/place/afford";
+import { bedroomsWord } from "../../lib/place/bands";
 import { fmtDollars, fmtHouseholds, fmtPct100d1, isNum, roundHalfEven } from "../../lib/place/format";
 import {
   AGE_LABEL,
@@ -53,6 +54,8 @@ function shortWhy(rec: Recommendation, level: PlanLevel, marketRule: boolean): s
     const d = rec.headline.match(/nearest frequent stop ([\d.]+ miles)/)?.[1];
     return d ? `Nearest frequent stop is ${d} away, beyond your distance.` : "Fails the transit test.";
   }
+  // At market rate the reason may be the focus's own test (flood, transit, displacement), not the market test.
+  if (marketRule && !/^(No unsubsidized|Market test incomplete)/.test(rec.headline)) return `${rec.headline}.`;
   if (marketRule) return rec.stanceTest.passed === null ? "Market test cannot run: asking rent or home value missing." : "Market test fails: the market does not pay for new homes here.";
   if (!rec.band.available) return `No renters ${levelPhrase(level)} here pay over 30% of income.`;
   if (!rec.tenants.available) return `CHAS counts no households of this size and age ${levelPhrase(level)}.`;
@@ -79,6 +82,12 @@ export default function PlanAnswer({
   const others = rec.types.slice(1);
   const atMarket = level === "market";
   const marketRule = rec.stance === "market_led" || atMarket;
+  // Market-led at a HUD level: the product is market-rate, so the card shows its price and who that price serves,
+  // not the HUD rent and the under-served tenants (those stay in the details as "not served").
+  const marketLedView = rec.stance === "market_led" && !atMarket;
+  // The price the rules wrote into the headline: "at the $1,895 asked for a 2-bedroom" or "at the $295,000 sale median".
+  const productPrice = marketLedView && lead ? (rec.headline.match(/\) (at the .+?|at market (?:rents|prices));/)?.[1] ?? null) : null;
+  const servesWords = marketLedView ? (rec.headline.split("; serves ")[1] ?? null) : null;
   const price = rec.price;
   const two = rec.twoBedroom;
   const m = rec.market;
@@ -146,7 +155,9 @@ export default function PlanAnswer({
                   {typologyById.get(lead.typology)?.label ?? TYPOLOGY_LABEL[lead.typology]}
                 </div>
                 <div className="text-small text-slate-700">
-                  {cap(sizeHomeWord(eff).replace(/^a /, ""))} homes · {whoShort} · {marketRule ? "market rent" : LEVEL_LABEL[level]}
+                  {marketLedView
+                    ? `${cap(bedroomsWord(lead.bedrooms).replace(/^a /, ""))}${lead.typology === "townhome" ? " for sale" : " homes"} · market rate`
+                    : `${cap(sizeHomeWord(eff).replace(/^a /, ""))} homes · ${whoShort} · ${marketRule ? "market rent" : LEVEL_LABEL[level]}`}
                 </div>
               </>
             ) : (
@@ -172,8 +183,10 @@ export default function PlanAnswer({
       <dl className="divide-y divide-stone-100 border-t border-stone-200/70 bg-white py-0.5">
         {!bare && (
           <>
-            <Row k="Rent that fits">
-              {atMarket ? (
+            <Row k={marketLedView && lead ? "Price" : "Rent that fits"}>
+              {marketLedView && lead ? (
+                productPrice ? <>{cap(productPrice)} · market rate, no HUD ceiling</> : <>market rate</>
+              ) : atMarket ? (
                 mr.rent != null ? (
                   <>
                     <B>{fmtDollars(mr.rent)}/mo</B> market asks · no HUD ceiling
@@ -190,7 +203,9 @@ export default function PlanAnswer({
               )}
             </Row>
             <Row k="Who it serves">
-              {rec.tenants.available ? (
+              {marketLedView && lead ? (
+                <>households {servesWords ?? "the market price reaches"}; not the {fmtHouseholds(tenantTotal)} {tenantWords} {levelShort(level)}</>
+              ) : rec.tenants.available ? (
                 <>
                   <B>{fmtHouseholds(tenantTotal)}</B> {tenantWords} {levelShort(level)}
                   {autoType ? " (the largest group here)" : ""}
@@ -218,7 +233,7 @@ export default function PlanAnswer({
                   </>
                 ) : (
                   <>
-                    asks <B>{fmtDollars(m.askingUsed)}</B> · gap <B>{fmtDollars(m.askingUsed - two.rent)}/mo</B> over {fmtDollars(two.rent)}
+                    asks <B>{fmtDollars(m.askingUsed)}</B> · gap <B>{fmtDollars(m.askingUsed - two.rent)}/mo</B> over {fmtDollars(two.rent)} (utilities not included, so the real gap is larger)
                     {price && price.bedrooms !== 2 ? " (2-bedroom)" : ""}
                     {m.verdict === "needs_subsidy" ? " · needs subsidy" : ""}
                   </>

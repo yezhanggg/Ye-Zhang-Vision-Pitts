@@ -86,12 +86,14 @@ export interface PromptInputProps {
   bare?: boolean;
   /** A shorter box with smaller text (the chat docked at the bottom of a column). */
   small?: boolean;
+  /** Sits on a grey field: the scroll fades match it. */
+  grey?: boolean;
   /** Told when the text area opens or closes, so a parent box can follow. */
   onOpenChange?: (open: boolean) => void;
 }
 
 export const PromptInput = forwardRef<HTMLDivElement, PromptInputProps>(function PromptInput(
-  { onSubmit, onKey, placeholder = 'Ask anything', className, defaultValue = '', value: controlled, onChange, busy = false, footer, voice = true, closedWidth = 320, openWidth = 440, bare = false, small = false, onOpenChange },
+  { onSubmit, onKey, placeholder = 'Ask anything', className, defaultValue = '', value: controlled, onChange, busy = false, footer, voice = true, closedWidth = 320, openWidth = 440, bare = false, small = false, grey = false, onOpenChange },
   ref,
 ) {
   const [expanded, setExpanded] = useState(false);
@@ -347,8 +349,8 @@ export const PromptInput = forwardRef<HTMLDivElement, PromptInputProps>(function
             recording && 'pointer-events-none',
           )}
         />
-        <div ref={topFade} style={{ opacity: 0 }} className="pointer-events-none absolute left-4 right-12 top-0 z-[2] h-8 bg-gradient-to-b from-white via-white/90 to-transparent" />
-        <div ref={bottomFade} style={{ opacity: 0, top: textHeight - 32 }} className="pointer-events-none absolute left-4 right-12 z-[2] h-8 bg-gradient-to-t from-white via-white/90 to-transparent" />
+        <div ref={topFade} style={{ opacity: 0 }} className={cx('pointer-events-none absolute left-4 right-12 top-0 z-[2] h-8 bg-gradient-to-b to-transparent', grey ? 'from-stone-100 via-stone-100/90' : 'from-white via-white/90')} />
+        <div ref={bottomFade} style={{ opacity: 0, top: textHeight - 32 }} className={cx('pointer-events-none absolute left-4 right-12 z-[2] h-8 bg-gradient-to-t to-transparent', grey ? 'from-stone-100 via-stone-100/90' : 'from-white via-white/90')} />
 
         <button
           type="button"

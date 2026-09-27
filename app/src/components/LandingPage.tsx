@@ -4,7 +4,7 @@ import { scoring } from '../lib/data';
 import { allResults } from '../lib/derived';
 import { buildPaint } from '../lib/paint';
 import { HERO_VIEW } from '../lib/mapStyle';
-import { presetWeights, useApp } from '../lib/store';
+import { EXPLORE_SECTIONS, presetWeights, useApp } from '../lib/store';
 import { useTour } from '../lib/tour';
 import MapView from './MapView';
 import { AboutModal } from './LandingModals';
@@ -41,6 +41,9 @@ export default function LandingPage() {
     const s = useApp.getState();
     // A fresh visit starts clean: nothing selected, nothing painted, the summary folded away and the tip back.
     useTour.getState().reset();
+    // A fresh open: the Explore panel shows, with Boundary, Data and Settings folded.
+    const ui = { ...s.ui, left: true, sections: { ...s.ui.sections, ...Object.fromEntries(EXPLORE_SECTIONS.map((id) => [id, 'collapsed' as const])) } };
+    s.setUi(ui);
     useApp.setState({ view: 'app', mode: 'explore', introNonce: s.introNonce + 1, introDone: false, hintClosed: false, browsePanel: false, browse: { level: s.browse.level, variable: null, selected: null } });
   };
 
@@ -63,10 +66,10 @@ export default function LandingPage() {
 
       {/* the three doors */}
       <div className="scroll-quiet flex min-h-0 flex-col overflow-y-auto border-l border-stone-200/70 px-6 py-6 md:px-12 md:py-10">
-        <div className="my-auto space-y-3 py-10">
+        <div className="mt-auto space-y-3 pb-6 pt-10">
           <Tile primary title="Open VisionPitts" sub="Browse the census, then match housing types to places." onClick={enter} />
-          <Tile title="Details" sub="What the project has, its data and method, its limits and what comes next." onClick={() => set({ sourcesOpen: true, detailsTab: 'overview' })} />
-          <Tile title="About" sub="Who built this, and how to get in touch." onClick={() => setAbout(true)} />
+          <Tile title="Project Details & Sources" sub="What the project has, its data and method, its limits and what comes next." onClick={() => set({ sourcesOpen: true, detailsTab: 'overview' })} />
+          <Tile title="About Author" sub="Who built this, and how to get in touch." onClick={() => setAbout(true)} />
         </div>
 
         <div className="text-caption text-slate-500">© 2026 Ye Zhang · VisionPitts · AI Horizons 2026 · AI for Housing Hackathon</div>

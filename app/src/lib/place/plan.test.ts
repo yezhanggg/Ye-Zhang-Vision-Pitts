@@ -139,13 +139,26 @@ describe('recommend with planning inputs (Hazelwood)', () => {
   });
 
   it('market rate: no HUD ceiling, the market-led test decides, CHAS >80% types serve', () => {
-    const r = recommend(HAZELWOOD, hud, 'anti_displacement', { ...base, level: 'market', size: 3, age: 'any' });
+    const r = recommend(HAZELWOOD, hud, 'transit_first', { ...base, level: 'market', size: 3, age: 'any' });
     expect(r.price).toBeNull();
     expect(r.marketRent.rent).toBe(1150);
     expect(r.servedBands).toEqual(['b80_100', 'gt100']);
     expect(r.tenants.types[0]).toMatchObject({ type: 'small_family', count: HAZELWOOD.types.gt80.small_family });
     expect(r.stanceTest.sentence).toMatch(/Market test|No unsubsidized product/);
     expect(r.types.map((t) => t.typology)).not.toContain('senior');
+  });
+
+  it('market rate under Anti-displacement: no market-rate homes where displacement risk is high (Hazelwood 0.72)', () => {
+    const r = recommend(HAZELWOOD, hud, 'anti_displacement', { ...base, level: 'market', size: 3, age: 'any' });
+    expect(r.types).toEqual([]);
+    expect(r.stanceTest.passed).toBe(false);
+    expect(r.headline).toBe('No market-rate homes where displacement risk is high');
+  });
+
+  it('at ≤50% the market sentence says when listings reach the top of the level but not the ≤30% band', () => {
+    const r = recommend(HAZELWOOD, hud, 'anti_displacement', { ...base, level: 50, size: 'auto', age: 'any' });
+    expect(r.market.verdict).toBe('market_reaches');
+    expect(r.market.sentence).toContain('not the ≤30% band, whose 2-bedroom ceiling is $745');
   });
 
   it('size changes the price; transit distance still applies', () => {

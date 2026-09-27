@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import maplibregl, {
   type ExpressionSpecification,
   type GeoJSONSource,
@@ -88,6 +88,23 @@ export interface OverlayLayer {
   zoomTo?: boolean;
   onSelect?: (id: string) => void;
   tooltip?: (id: string) => ReactNode;
+}
+
+/** How much the rest of the map darkens around a selected place. */
+const SPOTLIGHT_DIM = 0.3;
+type Ring = number[][];
+const ringArea = (r: Ring) => {
+  let a = 0;
+  for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += (r[j][0] - r[i][0]) * (r[j][1] + r[i][1]);
+  return a / 2;
+};
+/** A world-sized ring with the selected shape's outer rings as holes, wound opposite to the outer ring. */
+export function spotlightRings(geometry: { type: string; coordinates: unknown }): Ring[] {
+  const outer: Ring = [[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]];
+  const polys = geometry.type === "Polygon" ? [geometry.coordinates as Ring[]] : geometry.type === "MultiPolygon" ? (geometry.coordinates as Ring[][]) : [];
+  const sign = Math.sign(ringArea(outer));
+  const holes = polys.map((p) => p[0]).filter((r) => r && r.length > 3).map((r) => (Math.sign(ringArea(r)) === sign ? [...r].reverse() : r));
+  return [outer, ...holes];
 }
 
 export type IntroPhase = "spin" | "fly" | "done";
@@ -1394,6 +1411,21 @@ export default function MapView(props: Props) {
   // ------------------------------------------------------------ intro: globe spin, then fly to Pittsburgh
   function runIntro(map: MLMap) {
     live.current.onIntroPhase?.("spin");
+    // The intro never holds the map hostage: the first drag, scroll, pinch or tap ends it at once, lands on
+    // Pittsburgh and hands the map over (the same as "Skip intro").
+    const el = map.getCanvasContainer();
+    const takeOver = () => {
+      el.removeEventListener("pointerdown", takeOver);
+      el.removeEventListener("wheel", takeOver);
+      el.removeEventListener("touchstart", takeOver);
+      if (st.introDone) return;
+      finishIntro(map);
+      map.stop();
+      map.jumpTo(PGH_VIEW);
+    };
+    el.addEventListener("pointerdown", takeOver, { passive: true });
+    el.addEventListener("wheel", takeOver, { passive: true });
+    el.addEventListener("touchstart", takeOver, { passive: true });
     map.easeTo({ center: [-96, 38], duration: 2200, easing: (t) => t });
     map.once("moveend", () => {
       if (st.introDone) return;
@@ -1412,11 +1444,66 @@ export default function MapView(props: Props) {
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready || !props.skipSignal || st.introDone) return;
+    finishIntro(map);
     map.stop();
     map.jumpTo(PGH_VIEW);
-    finishIntro(map);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.skipSignal, ready]);
+
+  // ------------------------------------------------------------ selection spotlight: the rest of the map dims a little
+  // The selected place (an interactive overlay's selection, else the selected city tract) keeps its colors; a light
+  // shade with a hole cut for it covers everything else, under the labels.
+  const selGeom = useMemo(() => {
+    for (const o of props.overlays ?? []) {
+      if (!o.interactive || !o.selectedId) continue;
+      const f = (o.data.features as { properties?: Record<string, unknown>; geometry?: unknown }[]).find((x) => String(x.properties?.[o.idField]) === o.selectedId);
+      if (f?.geometry) return { key: `${o.id}:${o.selectedId}`, geometry: f.geometry as { type: string; coordinates: unknown } };
+    }
+    if (props.selectedId && props.baseTracts !== false) {
+      const f = tractsFC.features.find((x) => x.properties.GEOID === props.selectedId);
+      if (f?.geometry) return { key: `tract:${props.selectedId}`, geometry: f.geometry as { type: string; coordinates: unknown } };
+    }
+    return null;
+  }, [props.overlays, props.selectedId, props.baseTracts]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    if (!map.getSource("sel-dim")) {
+      map.addSource("sel-dim", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+      map.addLayer(
+        { id: "sel-dim", type: "fill", source: "sel-dim", paint: { "fill-color": "#0f172a", "fill-opacity": 0, "fill-opacity-transition": { duration: props.lite ? 0 : 450, delay: 0 } } },
+        st.firstSymbol,
+      );
+    }
+    // A white glow and a violet line around the hole, so even a dark-colored place reads clearly against the shade.
+    if (!map.getLayer("sel-halo")) {
+      map.addLayer(
+        { id: "sel-halo", type: "line", source: "sel-dim", paint: { "line-color": "#ffffff", "line-width": 6, "line-blur": 1.5, "line-opacity": 0, "line-opacity-transition": { duration: props.lite ? 0 : 450, delay: 0 } } },
+        st.firstSymbol,
+      );
+      map.addLayer(
+        { id: "sel-edge", type: "line", source: "sel-dim", paint: { "line-color": VIOLET, "line-width": 2.5, "line-opacity": 0, "line-opacity-transition": { duration: props.lite ? 0 : 450, delay: 0 } } },
+        st.firstSymbol,
+      );
+    }
+    // Keep the shade and its border above every fill and line added since, and under the labels.
+    for (const id of ["sel-dim", "sel-halo", "sel-edge"]) {
+      if (st.firstSymbol && map.getLayer(st.firstSymbol)) map.moveLayer(id, st.firstSymbol);
+      else map.moveLayer(id);
+    }
+    const src = map.getSource("sel-dim") as maplibregl.GeoJSONSource;
+    if (!selGeom) {
+      map.setPaintProperty("sel-dim", "fill-opacity", 0);
+      map.setPaintProperty("sel-halo", "line-opacity", 0);
+      map.setPaintProperty("sel-edge", "line-opacity", 0);
+      return;
+    }
+    src.setData({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: spotlightRings(selGeom.geometry) } } as never);
+    map.setPaintProperty("sel-dim", "fill-opacity", SPOTLIGHT_DIM);
+    map.setPaintProperty("sel-halo", "line-opacity", 0.95);
+    map.setPaintProperty("sel-edge", "line-opacity", 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selGeom?.key, ready, props.overlays]);
 
   // ------------------------------------------------------------ selection: outline, camera, buildings grow
   useEffect(() => {
@@ -1591,7 +1678,15 @@ export default function MapView(props: Props) {
       else want = null;
       setFlat(held);
     };
+    // A move that ends because another one started fires 'moveend' from inside that new move; starting a camera
+    // change right there breaks the map library. So look on the next frame, and only once the map is still.
+    let raf = 0;
     const settle = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(settleNow);
+    };
+    const settleNow = () => {
+      if (map.isMoving() || map.isEasing()) return;
       const box = map.getContainer().getBoundingClientRect();
       const threshold = farZoom(box.width, box.height);
       if (threshold != null) far = isFar(map.getZoom(), threshold, far);
@@ -1625,6 +1720,7 @@ export default function MapView(props: Props) {
     map.on("pitchstart", byHand);
     settle();
     return () => {
+      cancelAnimationFrame(raf);
       map.off("moveend", settle);
       map.off("pitchstart", byHand);
       node.removeEventListener("mouseenter", enter);
@@ -1651,27 +1747,21 @@ export default function MapView(props: Props) {
     )
       return;
     cueDone.current = cue.nonce;
-    if (cue.kind === "orbit") {
-      const bearing = map.getBearing() + (cue.turn ?? 90);
-      if (props.lite) map.jumpTo({ bearing });
-      else
-        map.easeTo({
-          bearing,
-          duration: cue.duration,
-          easing: (t) => t,
-          essential: true,
-        });
-      return;
-    }
-    if (!cue.view) return;
-    if (props.lite) map.jumpTo(cue.view);
-    else
-      map.easeTo({
-        ...cue.view,
-        duration: cue.duration,
-        easing: easeInOutCubic,
-        essential: true,
-      });
+    // Stop whatever is moving, then start the tour's move on the next frame (never from inside another move).
+    map.stop();
+    const lite = !!props.lite;
+    const raf = requestAnimationFrame(() => {
+      if (cue.kind === "orbit") {
+        const bearing = map.getBearing() + (cue.turn ?? 90);
+        if (lite) map.jumpTo({ bearing });
+        else map.easeTo({ bearing, duration: cue.duration, easing: (t) => t, essential: true });
+        return;
+      }
+      if (!cue.view) return;
+      if (lite) map.jumpTo(cue.view);
+      else map.easeTo({ ...cue.view, duration: cue.duration, easing: easeInOutCubic, essential: true });
+    });
+    return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.cue, ready]);
 

@@ -19,7 +19,9 @@ Measures (plan section 2):
   transit  PRT GTFS: a frequent stop has >= 64 departures on the representative Wednesday (about one every 15 minutes
            over a 16-hour service day). Distances are straight lines in EPSG:2272 from 2020 block internal points,
            weighted by 2020 block population.
-  flood    HAND inundation share (terrain screen) and the FEMA NFHL Special Flood Hazard Area share (Tier 2).
+  flood    HAND inundation share (terrain screen) and the FEMA NFHL Special Flood Hazard Area share of tract land (Tier 2):
+           TIGER/Line 2023 AREAWATER (rivers, ponds) is removed from the tract polygon first, because the SFHA covers the
+           rivers themselves and would otherwise inflate river tracts.
   zoning   WPRDC zoning district land shares and the unverified by-right table in config/zoning_rules.json (Tier 2).
   land use county assessment class/use per parcel -> residential / commercial / industrial / vacant / institutional /
            other shares of parcel land (LOTAREA) and of parcels, plus vacant lots (Tier 2).
@@ -96,6 +98,8 @@ FEMA_LAYER = "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServe
 FEMA_WHERE = "DFIRM_ID='42003C' AND SFHA_TF='T'"
 FEMA_PAGE = 500  # polygons per request; larger GeoJSON pages make the service return HTTP 500
 FEMA_MERGED = FEMA_DIR / "nfhl28_42003C_sfha.geojson"
+AREAWATER_ZIP = RAW / "crosswalks" / "tiger" / "tl_2023_42003_areawater.zip"  # vintage of the cb_2023 tract polygons
+AREAWATER_URL = "https://www2.census.gov/geo/tiger/TIGER2023/AREAWATER/tl_2023_42003_areawater.zip"
 
 ZONING_DIR = RAW / "benchmark" / "zoning"
 ZONING_GEOJSON = ZONING_DIR / "zoning.geojson"
@@ -647,17 +651,36 @@ def fema_download(refresh: bool = False) -> gpd.GeoDataFrame:
     return gpd.GeoDataFrame.from_features(feats, crs=CRS_WGS84)
 
 
-def fema_share(tracts: gpd.GeoDataFrame, sfha: gpd.GeoDataFrame) -> pd.DataFrame:
-    """Share (%) of each tract polygon (land and water, EPSG:2272) inside the SFHA union, and the zone with most area."""
+def areawater_download(refresh: bool = False) -> gpd.GeoDataFrame:
+    """TIGER/Line 2023 AREAWATER polygons for Allegheny County (42003), cached as the Census zip under data/raw."""
+    if refresh or not AREAWATER_ZIP.exists():
+        AREAWATER_ZIP.parent.mkdir(parents=True, exist_ok=True)
+        r = requests.get(AREAWATER_URL, timeout=300)
+        r.raise_for_status()
+        AREAWATER_ZIP.write_bytes(r.content)
+    return gpd.read_file(AREAWATER_ZIP)
+
+
+def fema_share(tracts: gpd.GeoDataFrame, sfha: gpd.GeoDataFrame, water: gpd.GeoDataFrame | None = None) -> pd.DataFrame:
+    """Share (%) of each tract's land inside the SFHA union, and the zone with the most land area (EPSG:2272).
+
+    Land = tract polygon minus the `water` polygons (TIGER AREAWATER): fema_sfha_pct = area(SFHA n land) / area(land)
+    x 100. The SFHA covers the rivers, so counting water would inflate river tracts. With no `water`, the whole polygon
+    is used. A tract with no land area gets None.
+    """
     t = tracts[["GEOID", "geometry"]].to_crs(CRS_PA_SOUTH).copy()
     t["GEOID"] = t["GEOID"].astype(str)
+    if water is not None and len(water):
+        w = water.to_crs(CRS_PA_SOUTH).geometry.make_valid().union_all()
+        t["geometry"] = t.geometry.difference(w)
     s = sfha[["FLD_ZONE", "geometry"]].to_crs(CRS_PA_SOUTH).copy()
     s["geometry"] = s.geometry.make_valid()
     union = s.geometry.union_all()
-    inter = t.geometry.intersection(union).area
+    land = t.geometry.area.values
+    inter = t.geometry.intersection(union).area.values
     out = pd.DataFrame(index=pd.Index(t["GEOID"], name="GEOID"))
-    out["fema_sfha_pct"] = (inter.values / t.geometry.area.values) * 100
-    ov = gpd.overlay(t, s, how="intersection", keep_geom_type=False)
+    out["fema_sfha_pct"] = np.where(land > 0, inter / np.where(land > 0, land, 1) * 100, np.nan)
+    ov = gpd.overlay(t[~t.geometry.is_empty], s, how="intersection", keep_geom_type=False)
     ov["a"] = ov.geometry.area
     zone = ov.groupby(["GEOID", "FLD_ZONE"])["a"].sum().reset_index().sort_values("a", ascending=False)
     zone = zone[zone["a"] > 0].drop_duplicates("GEOID").set_index("GEOID")["FLD_ZONE"].to_dict()

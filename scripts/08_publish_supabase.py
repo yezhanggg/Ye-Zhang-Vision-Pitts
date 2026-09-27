@@ -29,7 +29,7 @@ from visionpitts import geo_levels as gl
 from visionpitts.config import PROCESSED, ROOT
 
 CATALOGUE_JSON = PROCESSED / "acs_variables.json"
-PARTS = ("variables", "geo", "values", "history", "version")
+PARTS = ("variables", "geo", "values", "history", "land", "version")
 TABLE_OF = {"variables": "acs_variables", "geo": "geo_units", "values": "acs_values", "history": "acs_history",
             "version": "dataset_versions"}
 HISTORY_LEVELS = ("tract", "zcta", "muni", "county", "city")
@@ -169,6 +169,12 @@ def main() -> None:
         payloads["acs_values"] = value_rows(args.levels)
     if "history" in args.only:
         payloads["acs_history"] = history_rows(args.levels)
+    if "land" in args.only:
+        # Land use and zoning (scripts/11_build_land_use.py): more acs_values rows, no margins.
+        from visionpitts import land_use
+        rows = [r for lv in args.levels if land_use.land_csv(lv).exists()
+                for r in land_use.long_rows(lv, pd.read_csv(land_use.land_csv(lv), dtype={"GEOID": str}).set_index("GEOID"))]
+        payloads["acs_values"] = payloads.get("acs_values", []) + rows
     counts = {t: len(rows) for t, rows in payloads.items()}
     for t in ("geo_units", "acs_values"):
         if t in payloads:

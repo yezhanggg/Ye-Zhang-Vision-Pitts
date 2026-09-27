@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DOCS = {
     "assumptions": ROOT / "docs" / "assumptions.md",
     "methods": ROOT / "docs" / "data" / "factor_methods.md",
-    "readme": ROOT / "README.md",
+    "technical": ROOT / "docs" / "TECHNICAL.md",
     "about": ROOT / "app" / "src" / "lib" / "about.ts",
 }
 WORDS = {5: "five", 6: "six", 7: "seven", 8: "eight", 9: "nine", 10: "ten"}
@@ -191,16 +191,16 @@ CLAIMS: list[tuple[str, str, str, tuple[str, ...]]] = [
     ("methods", "FMR", r"Fair Market Rent for the Pittsburgh HMFA, \$" + MONEY, ("fmr",)),
     ("methods", "income limits", r"median family income \$" + MONEY + r"; 50% of it for a family of four \$" + MONEY + r" \(30%: \$" + MONEY + r"; 80%: \$" + MONEY + r"\)",
      ("mfi", "ami50", "ami30", "ami80")),
-    # README.md
-    ("readme", "ranked count", r"(\d+) city tracts, of which (\d+) with 25\+ households are ranked", ("n_tracts", "n_ranked")),
-    ("readme", "factor count", r"# (\w+) scoring factors \+ confidence", ("n_factors_word",)),
-    ("readme", "factor count in brief", r"\*\*(\w+) factors\*\* \(scoring v(\d+\.\d+\.\d+)\)", ("n_factors_word", "version")),
-    ("readme", "senior wins under Balanced", r"senior housing tops (\d+) of (\d+) tracts", ("win_senior", "n_ranked")),
-    ("readme", "duplex wins under Balanced", r"tops (\d+) now that the 2–4 unit stock is measured", ("win_duplex",)),
-    ("readme", "close calls", r"under 5 points in (\d+) of (\d+) tracts", ("margin_lt05", "n_ranked")),
-    ("readme", "voucher suppression", r"vouchers are suppressed in (\d+) of the (\d+) ranked tracts", ("hcv_ranked", "n_ranked")),
-    ("readme", "flood confidence", r"low in the (\d+) tracts where more than half the land", ("flood_low",)),
-    ("readme", "fixture size", r"shared fixture of (\d+) scoring cases and (\d+) stability cases", ("fixture_cases", "fixture_stability")),
+    # docs/TECHNICAL.md (the technical README)
+    ("technical", "ranked count", r"(\d+) city tracts, of which (\d+) with 25\+ households are ranked", ("n_tracts", "n_ranked")),
+    ("technical", "factor count", r"# (\w+) scoring factors \+ confidence", ("n_factors_word",)),
+    ("technical", "factor count in brief", r"\*\*(\w+) factors\*\* \(scoring v(\d+\.\d+\.\d+)\)", ("n_factors_word", "version")),
+    ("technical", "senior wins under Balanced", r"senior housing tops (\d+) of (\d+) tracts", ("win_senior", "n_ranked")),
+    ("technical", "duplex wins under Balanced", r"tops (\d+) now that the 2–4 unit stock is measured", ("win_duplex",)),
+    ("technical", "close calls", r"under 5 points in (\d+) of (\d+) tracts", ("margin_lt05", "n_ranked")),
+    ("technical", "voucher suppression", r"vouchers are suppressed in (\d+) of the (\d+) ranked tracts", ("hcv_ranked", "n_ranked")),
+    ("technical", "flood confidence", r"low in the (\d+) tracts where more than half the land", ("flood_low",)),
+    ("technical", "fixture size", r"shared fixture of (\d+) scoring cases and (\d+) stability cases", ("fixture_cases", "fixture_stability")),
     # app/src/lib/about.ts
     ("about", "ranked count", r"(\d+) ranked of (\d+) city tracts", ("n_ranked", "n_tracts")),
     ("about", "factor count", r"from (\w+) public-data factors", ("n_factors_word",)),

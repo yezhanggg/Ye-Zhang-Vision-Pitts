@@ -19,11 +19,13 @@ interface Props {
   /** Smaller button for dense toolbars. */
   size?: 'sm' | 'md';
   label?: string;
+  /** Below 1600 px wide, show only the download icon (the label stays as the tooltip and accessible name). */
+  iconOnlyNarrow?: boolean;
 }
 
 const iconFor = (label: string) => (/csv|data/i.test(label) ? Sheet : FileText);
 
-export default function ExportMenu({ items, className, align = 'right', size = 'sm', label = 'Export' }: Props) {
+export default function ExportMenu({ items, className, align = 'right', size = 'sm', label = 'Export', iconOnlyNarrow = false }: Props) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<number | null>(null);
   const [active, setActive] = useState(0);
@@ -90,6 +92,8 @@ export default function ExportMenu({ items, className, align = 'right', size = '
         ref={btn}
         type="button"
         aria-haspopup="menu"
+        aria-label={iconOnlyNarrow ? label : undefined}
+        title={iconOnlyNarrow ? label : undefined}
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         onClick={() => {
@@ -110,7 +114,7 @@ export default function ExportMenu({ items, className, align = 'right', size = '
         )}
       >
         <Download aria-hidden className={size === 'sm' ? 'h-3.5 w-3.5' : 'h-4 w-4'} strokeWidth={2.2} />
-        {label}
+        {iconOnlyNarrow ? <span className="max-[1599px]:hidden">{label}</span> : label}
       </button>
       {open && (
         <div

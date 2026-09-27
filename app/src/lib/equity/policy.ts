@@ -4,7 +4,7 @@ import { recommend, type RecommendOptions } from '../place/recommend';
 import { transitTestMiles } from '../place/plan';
 import { isNum, roundHalfEven } from '../place/format';
 import type { HudTable, PlaceMeasures, ZoningStatus } from '../place/types';
-import { fitsRent2br, rentGap, type AmiPct } from './measures';
+import { burdenedLe50, fitsRent2br, rentGap, type AmiPct } from './measures';
 import { RESIDENTIAL_FAMILIES, SMALL_APT_CONDITIONAL_FAMILIES, statusFromShares, type SimType } from './zoning';
 
 export interface Row {
@@ -123,6 +123,10 @@ export interface GapCost {
   gap: number;
   /** max(0, gap) × 12 × homes */
   cost: number;
+  /** Renters ≤50% AMI paying over 30% of income (null when CHAS has no count). */
+  burdened: number | null;
+  /** max(0, gap) × burdened: how much gap meets how many households; the order the subsidy funds tracts in. */
+  need: number;
 }
 
 /** Annual gross subsidy to bring `homes` 2-bedroom homes from the asking rent down to what fits at `ami`. */
@@ -136,16 +140,22 @@ export function gapCost(id: string, p: PlaceMeasures, hud: HudTable | null, ami:
     fits,
     gap,
     cost: Math.max(0, gap) * 12 * Math.max(0, homes),
+    burdened: burdenedLe50(p),
+    need: Math.max(0, gap) * (burdenedLe50(p) ?? 0),
   };
 }
 
 export function largestGaps(rows: Row[], hud: HudTable | null, ami: AmiPct, homes: number, n = 10) {
-  const all = rows.map((r) => gapCost(r.id, r.p, hud, ami, homes)).filter((x): x is GapCost => !!x && x.gap > 0);
-  const top = all.sort((a, b) => b.gap - a.gap || a.id.localeCompare(b.id)).slice(0, n);
+  const known = rows.map((r) => gapCost(r.id, r.p, hud, ami, homes)).filter((x): x is GapCost => !!x);
+  const all = known.filter((x) => x.gap > 0);
+  // Funded where the gap meets the most burdened renters (gap × burdened ≤50% AMI), not simply where rents are highest.
+  const top = all.sort((a, b) => b.need - a.need || b.gap - a.gap || a.id.localeCompare(b.id)).slice(0, n);
   return {
     top,
     total: top.reduce((s, x) => s + x.cost, 0),
     withGap: all.length,
+    /** Tracts with a reliable asking rent (the denominator for withGap). */
+    withRent: known.length,
   };
 }
 

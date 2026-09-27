@@ -7,6 +7,7 @@ import { classCounts, isAnalysis, type AnalysisVar } from '../../lib/explore/ana
 import { isDiverging, themePalette } from '../../lib/explore/palettes';
 import { cx } from '../../lib/format';
 import { ZONING_CAVEAT, ZONING_FAMILIES, zoningByCode, zoningCodesPerFamily } from '../../lib/explore/zoning';
+import { LAND_CLASSES } from '../../lib/explore/landUseMap';
 
 /** Anchors a label so it never spills past the ramp ends. */
 const anchor = (pos: number) => (pos < 0.12 ? 'translate-x-0' : pos > 0.88 ? '-translate-x-full' : '-translate-x-1/2');
@@ -144,6 +145,27 @@ export default function DataLegend({ variable, level, values, breaks, ext, hover
         </div>
         {analysis && <div>{EXPLORE_UI.cityTractsOnly}</div>}
       </div>
+    </div>
+  );
+}
+
+/** Legend for the land-use map: the five classes, with how many areas each is the main use of. */
+export function LandUseLegend({ classes, hoverId }: { classes: Map<string, number | null>; hoverId: string | null }) {
+  const counts = LAND_CLASSES.map((_, i) => [...classes.values()].filter((c) => c === i).length);
+  const hovered = hoverId != null ? classes.get(hoverId) ?? null : null;
+  return (
+    <div className="w-64 rounded-xl bg-white/95 px-3.5 py-3 shadow-lg ring-1 ring-black/5 backdrop-blur">
+      <div className="text-small font-semibold text-slate-900">Main land use</div>
+      <div className="mt-1 space-y-0.5">
+        {LAND_CLASSES.map((c, i) => (
+          <div key={c.id} className={cx('flex items-center gap-1.5 text-caption text-slate-800', hovered === i && 'font-semibold')}>
+            <span className={cx('h-3 w-4 shrink-0 rounded-sm ring-1 ring-black/10', hovered === i && 'ring-2 ring-slate-900')} style={{ background: c.color }} />
+            <span className="min-w-0 flex-1 truncate">{c.label}</span>
+            <span className="tnum text-slate-500" title="Areas where this is the main use">{counts[i]}</span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-1 text-caption text-slate-600">Largest share of parcel land. County property assessments, 2026.</div>
     </div>
   );
 }

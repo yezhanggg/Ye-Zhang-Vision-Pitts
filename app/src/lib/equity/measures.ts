@@ -14,7 +14,12 @@ export interface PlaceAccess {
   services_halfmi: number | null;
 }
 
-export type AmiPct = 30 | 50 | 80;
+/** Income level: a share of area median income; 100 is "market rate", a household at the area median. */
+export type AmiPct = 30 | 50 | 80 | 100;
+/** HUD's family-size adjustment for 3 people (90% of the 4-person median), used for the market-rate reference. */
+export const HUD_3P_ADJ = 0.9;
+/** Words for an income level: "50% AMI", or "market rate (100% AMI)". */
+export const amiWords = (ami: AmiPct): string => (ami === 100 ? 'market rate (100% AMI)' : `${ami}% AMI`);
 export type MeasureId = 'rent_gap' | 'burdened' | 'jobs' | 'school' | 'transit' | 'services';
 
 export interface MeasureDef {
@@ -40,7 +45,7 @@ export const MEASURES: MeasureDef[] = [
     id: 'rent_gap',
     short: 'Rent gap',
     title: 'Rent gap for a 2-bedroom',
-    definition: (ami) => `What listings ask for a 2-bedroom, minus the rent a 3-person household at ${ami}% of area median income can pay (30% of income). Below $0 means the market already fits.`,
+    definition: (ami) => `What listings ask for a 2-bedroom, minus the rent a 3-person household ${ami === 100 ? 'at the area median income (market rate)' : `at ${ami}% of area median income`} can pay (30% of income). Below $0 means the market already fits. Listings usually exclude utilities and the rent that fits includes them, so the real gap is larger.`,
     unit: '$ per month',
     source: 'Asking rents: Dewey listings 2025–26 (high or medium confidence only) · Income limits: HUD FY2026, Pittsburgh HMFA',
     higherIsNeed: true,
@@ -109,7 +114,22 @@ export const measureById = new Map(MEASURES.map((m) => [m.id, m]));
 export const accessOf = (p: PlaceMeasures | null | undefined): PlaceAccess | null => (p as (PlaceMeasures & { access?: PlaceAccess | null }) | null | undefined)?.access ?? null;
 
 /** The 2-bedroom rent that fits at `ami` (30% of the 3-person limit, monthly). */
-export const fitsRent2br = (hud: HudTable | null, ami: AmiPct): number | null => (hud ? (ceilingRent(hud, ami, 2)?.rent ?? null) : null);
+export const fitsRent2br = (hud: HudTable | null, ami: AmiPct): number | null => fits2br(hud, ami)?.rent ?? null;
+
+/** The 2-bedroom rent that fits and its arithmetic. At market rate (100): the HUD median income × 0.9 (3 people). */
+export function fits2br(hud: HudTable | null, ami: AmiPct): { rent: number; formula: string } | null {
+  if (!hud) return null;
+  if (ami !== 100) {
+    const c = ceilingRent(hud, ami, 2);
+    return c ? { rent: c.rent, formula: c.formula } : null;
+  }
+  const med = hud.metro?.median;
+  if (!isNum(med)) return null;
+  const income = med * HUD_3P_ADJ;
+  const rent = Math.round(income / 40);
+  const $ = (v: number) => `$${Math.round(v).toLocaleString('en-US')}`;
+  return { rent, formula: `${$(med)} × 90% (3 people) × 30% ÷ 12 = ${$(rent)}` };
+}
 
 /** The asking 2-bedroom rent when its confidence is medium or better, else null (a low-confidence rent is not used). */
 export function usableAsking(p: PlaceMeasures | null | undefined): number | null {

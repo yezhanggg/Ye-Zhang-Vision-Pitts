@@ -169,6 +169,8 @@ interface Ctx {
   flood: FloodNote;
   market: MarketTest;
   cityMedian: number | null;
+  /** The city's sale median since 2023 (like with like against a tract's sale median). */
+  citySale: number | null;
   branch: Branch;
   /** "at or below 30% of area median income", or the chosen level's phrase. */
   phrase: string;
@@ -215,11 +217,12 @@ function marketRentClause(c: Ctx): string {
 }
 
 function saleClause(c: Ctx): string {
-  const m = c.p?.market;
-  const v = isNum(m?.sale_median) ? m!.sale_median! : isNum(m?.value_acs) ? m!.value_acs! : null;
-  const kind = isNum(m?.sale_median) ? 'sale median since 2023' : 'ACS median home value';
-  if (v == null || !isNum(c.cityMedian)) return 'for-sale rowhouse at market prices';
-  return `for-sale rowhouse: the ${kind} ${fmtDollars(v)} is ${fmtDollars(v)} − ${fmtDollars(c.cityMedian)} = ${fmtDollars(v - c.cityMedian)} above the city median`;
+  const hv = homeValue(c.p, c.cityMedian, c.citySale);
+  if (hv.value == null || !isNum(hv.city)) return 'for-sale rowhouse at market prices';
+  const d = hv.value - hv.city;
+  return d >= 0
+    ? `for-sale rowhouse: the ${hv.kind} ${fmtDollars(hv.value)} is ${fmtDollars(hv.value)} − ${fmtDollars(hv.city)} = ${fmtDollars(d)} above the city median`
+    : `for-sale rowhouse: the ${hv.kind} ${fmtDollars(hv.value)} is ${fmtDollars(hv.city)} − ${fmtDollars(hv.value)} = ${fmtDollars(-d)} below the city median`;
 }
 
 const townhomeLowBandReason = (c: Ctx) => `a for-sale rowhouse serves buyers, not renters ${c.phrase}; at that income it needs a subsidy this tool does not see${c.branch === 'high' ? ', and on an occupied lot it means demolition' : ''}`;
@@ -273,16 +276,27 @@ function notServedByMarket(p: PlaceMeasures, hud: HudTable, lead: Typology | nul
   return { bands, why };
 }
 
-function marketLedTest(p: PlaceMeasures, cityMedian: number | null, citySale: number | null = null): { passed: boolean | null; sentence: string } {
+/**
+ * The home value the market tests use, like with like: the tract's sale median since 2023 against the city's sale
+ * median when the tract has at least THRESHOLDS.min_sales sales; otherwise the ACS median value against the ACS city
+ * median (a median of a handful of sales is not a market signal).
+ */
+export function homeValue(p: PlaceMeasures, cityAcs: number | null, citySale: number | null): { value: number | null; city: number | null; kind: string } {
+  const m = p?.market;
+  const enough = isNum(m?.sale_median) && isNum(m?.sale_n) && m!.sale_n! >= THRESHOLDS.min_sales && isNum(citySale);
+  if (enough) return { value: m!.sale_median!, city: citySale, kind: `sale median since 2023 (${m!.sale_n} sales)` };
+  return { value: isNum(m?.value_acs) ? m!.value_acs! : null, city: cityAcs, kind: 'ACS median home value' };
+}
+
+function marketLedTest(p: PlaceMeasures, cityAcs: number | null, citySale: number | null = null): { passed: boolean | null; sentence: string } {
   const m = p?.market;
   const usable = isNum(m?.asking_2br) && confUsable(m?.asking_conf);
   const asking = usable ? m!.asking_2br! : null;
   const safmr = isNum(m?.safmr_2br) ? m!.safmr_2br! : null;
-  // Like with like: a tract's sale median against the city's sale median; the ACS value against the ACS city median.
-  const useSales = isNum(m?.sale_median) && isNum(citySale);
-  const value = useSales ? m!.sale_median! : isNum(m?.value_acs) ? m!.value_acs! : null;
-  const valueKind = useSales ? 'sale median since 2023' : 'ACS median home value';
-  cityMedian = useSales ? citySale! : cityMedian;
+  const hv = homeValue(p, cityAcs, citySale);
+  const value = hv.value;
+  const valueKind = hv.kind;
+  const cityMedian = hv.city;
   const rentPass = asking != null && safmr != null ? asking >= safmr : null;
   const valuePass = value != null && isNum(cityMedian) ? value >= cityMedian : null;
   const rentText =
@@ -390,7 +404,17 @@ export function recommend(p: PlaceMeasures, hud: HudTable, stance: Stance, opts:
     ? marketTest(twoBedroom.rent, m?.asking_2br ?? null, m?.asking_conf ?? null, m?.safmr_2br ?? null)
     : { verdict: 'unknown', gap: null, sentence: `HUD income limits ${NA}; the market test cannot run.`, askingUsed: null };
 
-  const c: Ctx = { p, band, tenants, lot, flood, market, cityMedian, branch, phrase, bandLabel: level ? LEVEL_LABEL[level] : BAND_LABEL[band] };
+  // A level spans every band at or below it, and the price is the level's top limit (the LIHTC convention). When the
+  // market reaches that price, say whether it also reaches the ≤30% band (its 2-bedroom ceiling is lower).
+  if (level && level !== 'market' && level > 30 && market.verdict === 'market_reaches' && market.askingUsed != null) {
+    const low = ceilingRent(hud, 30, 2);
+    if (low && market.askingUsed > low.rent)
+      market.sentence = market.sentence.replace(
+        /the market already reaches this band on turnover\.$/,
+        `the market reaches households near ${level}% AMI on turnover, not the ≤30% band, whose 2-bedroom ceiling is ${fmtDollars(low.rent)} (${fmtDollars(market.askingUsed)} − ${fmtDollars(low.rent)} = ${fmtDollars(market.askingUsed - low.rent)} short).`,
+      );
+  }
+  const c: Ctx = { p, band, tenants, lot, flood, market, cityMedian, citySale: hud?.city?.sale_median ?? null, branch, phrase, bandLabel: level ? LEVEL_LABEL[level] : BAND_LABEL[band] };
 
   // ---- stance rules
   let types: Typology[] = [];
@@ -398,7 +422,13 @@ export function recommend(p: PlaceMeasures, hud: HudTable, stance: Stance, opts:
   let stanceTest: { passed: boolean | null; sentence: string };
   let notServed: { bands: BandId[]; why: string };
 
-  if (atMarket) {
+  const highRiskAtMarket = atMarket && stance === 'anti_displacement' && branch === 'high';
+  if (highRiskAtMarket) {
+    // Anti-displacement never suggests market-rate homes where displacement risk is high.
+    const s = p?.displacement?.score;
+    stanceTest = { passed: false, sentence: `Displacement risk here is ${isNum(s) ? fmtScore(s) : NA}, at or above the ${THRESHOLDS.displacement_high} mark: Anti-displacement does not suggest market-rate homes here. Choose an income level at or below 50% AMI to see what it suggests.` };
+    notServed = { bands: [], why: 'market-rate homes are not suggested where displacement risk is high' };
+  } else if (atMarket) {
     // Market rate: no HUD ceiling; the suggestion follows what the market pays (the Market-led test), and under
     // Transit-first the transit test must pass too.
     const mt = marketLedTest(p, cityMedian, hud?.city?.sale_median ?? null);
@@ -413,6 +443,8 @@ export function recommend(p: PlaceMeasures, hud: HudTable, stance: Stance, opts:
     notServed = notServedByMarket(p, hud, types[0] ?? null);
   } else if (stance === 'anti_displacement') {
     stanceTest = antiDisplacementTest(p, branch, served, level ? `households ${LEVEL_LABEL[level]}` : undefined);
+    if (branch === 'high' && level === 80)
+      stanceTest = { ...stanceTest, sentence: `${stanceTest.sentence} The rule itself serves households ≤50% AMI; you chose ≤80%, so the price shown is the 80% limit.` };
     const additive: Typology[] = ['adu', 'duplex_triplex'];
     const newBuild: Typology[] = ['senior', 'small_apartment'];
     if (branch === 'high') {
@@ -474,7 +506,7 @@ export function recommend(p: PlaceMeasures, hud: HudTable, stance: Stance, opts:
     notServed = { bands: [], why: `nothing is suggested, because ${floodLimit.sentence.replace(/\.$/, '')}` };
   }
 
-  const recTypes: RecommendedType[] = types.map((t) => ({ typology: t, because: becauseFor(t, c, atMarket ? 'market_led' : stance), bedrooms: size ? tenants.bedrooms : stance === 'market_led' ? TYPOLOGY_BEDROOMS[t] : bedroomsFor(t, tenants) }));
+  const recTypes: RecommendedType[] = types.map((t) => ({ typology: t, because: becauseFor(t, c, atMarket ? 'market_led' : stance), bedrooms: stance === 'market_led' ? TYPOLOGY_BEDROOMS[t] : atMarket && t === 'townhome' ? (Math.max(TYPOLOGY_BEDROOMS.townhome, size ? tenants.bedrooms : 0) as Bedrooms) : size ? tenants.bedrooms : bedroomsFor(t, tenants) }));
   const lead = recTypes[0]?.typology ?? null;
   // A market-rate product serves whatever bands its price reaches, not the under-served band.
   if (stance === 'market_led' && !atMarket) served = lead ? BAND_ORDER.filter((b) => !notServed.bands.includes(b)) : [];
@@ -485,10 +517,17 @@ export function recommend(p: PlaceMeasures, hud: HudTable, stance: Stance, opts:
   else if (lead && atMarket) headline = `${capitalize(TYPOLOGY_LABEL[lead])} (${bedroomsWord(recTypes[0].bedrooms).replace(/^a /, '')}) at market rate; ${mRent.words}`;
   else if (lead && stance === 'market_led') {
     const priceWord = lead === 'townhome'
-      ? (isNum(m?.sale_median) ? `at the ${fmtDollars(m!.sale_median)} sale median` : isNum(m?.value_acs) ? `at the ${fmtDollars(m!.value_acs)} median home value` : 'at market prices')
+      ? (() => {
+          const hv = homeValue(p, cityMedian, hud?.city?.sale_median ?? null);
+          return hv.value == null ? 'at market prices' : hv.kind.startsWith('sale') ? `at the ${fmtDollars(hv.value)} sale median` : `at the ${fmtDollars(hv.value)} median home value`;
+        })()
       : (market.askingUsed != null ? `at the ${fmtDollars(market.askingUsed)} asked for a 2-bedroom` : 'at market rents');
     headline = `${capitalize(TYPOLOGY_LABEL[lead])} (${bedroomsWord(recTypes[0].bedrooms).replace(/^a /, '')}${lead === 'townhome' ? ', for sale' : ''}) ${priceWord}; serves ${bandsPhrase(served)}`;
   } else if (lead) headline = `${capitalize(TYPOLOGY_LABEL[lead])} (${bedroomsWord(recTypes[0].bedrooms).replace(/^a /, '')}) for ${level ? `households ${LEVEL_LABEL[level]}` : bandsPhrase(served)}${price ? ` at ${fmtDollars(price.rent)}${priceAlso ? `–${fmtDollars(priceAlso.rent)}` : ''} a month` : ''}`;
+  else if (highRiskAtMarket) headline = 'No market-rate homes where displacement risk is high';
+  else if (atMarket && stance === 'climate_resilient' && climateTest(p, opts.transitMiles).passed === false) headline = climateTest(p, opts.transitMiles).short;
+  else if (atMarket && stance === 'transit_first' && (isNum(opts.transitMiles) ? transitTestMiles(p, opts.transitMiles) : transitTest(p)).passed === false)
+    headline = isNum(opts.transitMiles) ? `Fails the transit test (nearest frequent stop ${fmtMiles(p?.transit?.freq_dist_mi)}; you chose within ${opts.transitMiles.toFixed(2)} miles)` : `Fails the transit test (${fmtShare(p?.transit?.freq_share_qmi)} within a quarter mile; ${fmtCount(p?.transit?.departures_qmi)} departures)`;
   else if (marketRule) headline = stanceTest.passed === null ? 'Market test incomplete (asking rent or home value not available)' : 'No unsubsidized product is supported here';
   else if (noNeed) headline = noHousehold && target.available ? `No renter households of this size and age ${phrase} on the evidence` : level ? `No under-served renters ${phrase} on the evidence (CHAS counts none paying more than 30% of income)` : 'No under-served band on the evidence (CHAS counts no cost-burdened renters here)';
   else if (stance === 'climate_resilient') headline = climateTest(p, opts.transitMiles).short;

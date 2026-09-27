@@ -64,8 +64,11 @@ const BY_ID: Record<string, ThemeId> = {
   wfh_share: 'transit', an_transit_departures: 'transit', an_transit_freq: 'transit',
   // Environment
   an_flood_fema: 'flood', an_flood_screen: 'flood', an_veg_cover: 'green',
-  // Land use (parcels)
-  an_land_res: 'landRes', an_land_com: 'landCom', an_land_ind: 'landInd', an_land_vacant: 'landVacant', an_land_vacant_lots: 'landVacant',
+  // Land use (county parcels) and zoning (city)
+  lu_residential: 'landRes', lu_commercial: 'landCom', lu_industrial: 'landInd', lu_institutional: 'stock', lu_vacant: 'landVacant',
+  vacant_lots: 'landVacant', parcels: 'stock',
+  zoned_single: 'landRes', zoned_2_3: 'landRes', zoned_multi: 'landRes', zoned_mixed: 'landCom', zoned_industrial: 'landInd',
+  zoned_parks_hillside: 'green', zoned_planned: 'stock',
   // Education and work
   bachelors_share: 'edu', lfpr: 'edu',
 };
@@ -73,7 +76,7 @@ const BY_ID: Record<string, ThemeId> = {
 /** Fallback by catalogue group, for variables added later. */
 const BY_GROUP: Record<string, ThemeId> = {
   population: 'people', race: 'people', income: 'money', work_edu: 'edu', stock: 'stock', tenure: 'stock', cost: 'rent',
-  commute: 'transit', an_ami: 'ami', an_rents: 'rent', an_inputs: 'stock', an_land: 'landVacant',
+  commute: 'transit', an_ami: 'ami', an_rents: 'rent', an_inputs: 'stock', land: 'landVacant', zoning: 'landRes',
 };
 
 export function themeOf(variable: Pick<VariableDef, 'id' | 'group'> | null | undefined): ThemeId {

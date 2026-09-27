@@ -114,8 +114,13 @@ SOURCES: list[dict] = [
          caveats="Condo and multi-building parcels share one record."),
     dict(id="wprdc_assessments", name="Allegheny County property assessments (WPRDC)",
          url="https://data.wprdc.org/dataset/property-assessments", vintage="2026", geography="parcel",
-         method="Only STORIES and YEARBLT are read, for building heights and age. No owner, sale or value fields are used.",
-         caveats="Stories are recorded for the main dwelling only; commercial and exempt parcels are often blank."),
+         method="STORIES and YEARBLT for building heights and age; CLASSDESC, USEDESC and LOTAREA for land use: every parcel "
+                "is placed at its representative point in a tract, block group, ZIP code and municipality, classed as residential, "
+                "commercial, industrial, institutional, vacant or other, and summed by lot area (scripts/11_build_land_use.py). "
+                "No owner fields are read.",
+         caveats="Land use is the assessed class and use, not what is on the ground today; lot area is as recorded (some parcels "
+                 "carry none, and those areas fall back to parcel counts). ZIP codes that cross the county line count only their "
+                 "Allegheny County parcels. Information only, never scored."),
     dict(id="dewey_listings", name="RentHub rental listings via Dewey Data, Pennsylvania (scraped asking rents; licensed)",
          url="https://www.deweydata.io/", vintage="scrapes 2014-01 to 2026-08 (layer uses 2019-2026)",
          geography="listing point -> 2020 tract",
@@ -221,11 +226,19 @@ SOURCES: list[dict] = [
          url="https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28", vintage="effective NFHL as served 2026-09-27",
          geography="flood zone polygon",
          method="Layer 28 queried with DFIRM_ID='42003C' AND SFHA_TF='T', paged by the service's maxRecordCount and cached as "
-                "GeoJSON under data/raw/benchmark/fema/. Share of each tract polygon's area (land and water, EPSG:2272) inside "
-                "the SFHA union; the zone with the most area is named. Headline word: none / minor < 5% / moderate 5-15% / "
+                "GeoJSON under data/raw/benchmark/fema/. Share of each tract's land (tract polygon minus TIGER/Line 2023 "
+                "AREAWATER, EPSG:2272) inside the SFHA union; the zone with the most land area is named. Headline word: none / minor < 5% / moderate 5-15% / "
                 "high > 15%.",
-         caveats="Regulatory 1%-annual-chance zones only; river water inside the tract polygon counts toward the share. The "
-                 "scored flood factor still uses the HAND terrain screen and is unchanged."),
+         caveats="Regulatory 1%-annual-chance zones only. Rivers are excluded (the SFHA covers them, and counting them "
+                 "inflated river tracts such as the CBD and Hazelwood); TIGER water polygons are generalized, so a thin "
+                 "strip of bank can still fall on either side. The scored flood factor still uses the HAND terrain screen "
+                 "and is unchanged."),
+    dict(id="tiger_areawater", name="TIGER/Line 2023 area hydrography (AREAWATER), Allegheny County",
+         url="https://www2.census.gov/geo/tiger/TIGER2023/AREAWATER/tl_2023_42003_areawater.zip",
+         vintage="2023 (matches the cb_2023 tract polygons)", geography="water polygon",
+         method="Rivers, streams and ponds as polygons; their union (made valid, EPSG:2272) is subtracted from each tract "
+                "polygon so the FEMA SFHA share is a share of land only.",
+         caveats="Census hydrography is generalized; used only as the water mask for the flood-zone share."),
     dict(id="parcel_sales", name="Allegheny County property assessments: sales, use and class fields (WPRDC), with parcel boundaries",
          url="https://data.wprdc.org/dataset/property-assessments", vintage="2026-09 extract", geography="parcel -> tract",
          method="Parcels placed in tracts by the representative point of their polygon (cached in data/interim). Per tract: "
@@ -303,6 +316,7 @@ RAW_FILES = {
     "gtfs_frequent": ["benchmark/gtfs/prt_gtfs.zip", "crosswalks/tiger/tl_2020_42_tabblock20.zip"],
     "zoning_wprdc": ["benchmark/zoning/zoning.geojson"],
     "fema_nfhl": ["benchmark/fema/nfhl28_42003C_sfha.geojson"],
+    "tiger_areawater": ["crosswalks/tiger/tl_2023_42003_areawater.zip"],
     "lodes_wac": ["benchmark/access/pa_wac_S000_JT00_2023.csv.gz", "crosswalks/tiger/tl_2020_42_tabblock20.zip"],
     "nces_schools": ["benchmark/access/ccd_directory_pa_2024.json"],
     "osm_services": ["benchmark/access/osm_services_overpass.json"],

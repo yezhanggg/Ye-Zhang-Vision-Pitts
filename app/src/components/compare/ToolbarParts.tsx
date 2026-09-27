@@ -2,6 +2,7 @@
 // pickers, the focus and the income level line up at one height.
 import type { ReactNode } from "react";
 import { cx } from "../../lib/format";
+import { SlideBg, useSlide } from "../primitives";
 
 export function StepLabel({ n, children }: { n: number; children: ReactNode }) {
   return (
@@ -19,18 +20,27 @@ export function ToolSeg<T extends string>({
   value,
   options,
   onChange,
+  compact = false,
 }: {
+  /** 32 px tall with smaller text (the one-row Equity & policy bar). */
+  compact?: boolean;
   label: string;
   value: T;
   options: { value: T; label: string; title?: string }[];
   onChange: (v: T) => void;
 }) {
+  const [ref, box] = useSlide(value);
   return (
     <div
+      ref={ref}
       role="radiogroup"
       aria-label={label}
-      className="inline-flex h-10 items-stretch gap-0.5 rounded-lg bg-stone-100 p-1 ring-1 ring-stone-200/70"
+      className={cx(
+        "relative inline-flex items-stretch gap-0.5 rounded-lg bg-stone-100 p-1 ring-1 ring-stone-200/70",
+        compact ? "h-8" : "h-10",
+      )}
     >
+      <SlideBg box={box} className="rounded-md bg-white shadow-sm ring-1 ring-violet-300" />
       {options.map((o) => {
         const on = o.value === value;
         return (
@@ -39,12 +49,14 @@ export function ToolSeg<T extends string>({
             type="button"
             role="radio"
             aria-checked={on}
+            data-slide-on={on}
             title={o.title}
             onClick={() => onChange(o.value)}
             className={cx(
-              "whitespace-nowrap rounded-md px-3 text-small font-semibold transition-colors",
+              "relative whitespace-nowrap rounded-md font-semibold transition-colors",
+              compact ? "px-2 text-caption" : "px-3 text-small",
               on
-                ? "bg-white text-violet-800 shadow-sm ring-1 ring-violet-300"
+                ? "text-violet-800"
                 : "text-slate-600 hover:bg-white/60 hover:text-slate-900",
             )}
           >

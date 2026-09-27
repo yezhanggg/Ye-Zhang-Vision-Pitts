@@ -109,7 +109,13 @@ def main() -> None:
         sfha = step("FEMA NFHL download", pm.fema_download, failures, args.refresh)
         if sfha is not None:
             print(f"    {len(sfha)} SFHA polygons")
-            fem = step("FEMA SFHA share", pm.fema_share, failures, tracts, sfha)
+            fem = None
+            water = step("TIGER 2023 AREAWATER download", pm.areawater_download, failures, args.refresh)
+            if water is None:
+                failures["FEMA SFHA share"] = "skipped: no AREAWATER layer, so the land-only share cannot be computed"
+            else:
+                print(f"    {len(water)} water polygons removed from tract land")
+                fem = step("FEMA SFHA share (land only)", pm.fema_share, failures, tracts, sfha, water)
             if fem is not None:
                 parts.append(fem)
         prc = step("parcels (sales since 2023, 2-4 family, vacant, land use)", pm.parcels, failures, tracts, nbrs, args.refresh)
