@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { verifyNumbers } from './explain';
+import { pickProvider, verifyNumbers } from './explain';
 
 const payload = {
   tract: { geoid: '42003562300', name: 'Tract 5623', neighborhood: 'Hazelwood', watch_list: true, residential: true },
@@ -24,5 +24,19 @@ describe('verifyNumbers', () => {
     const r = verifyNumbers(t, payload);
     expect(r.ok).toBe(false);
     expect(r.unmatched).toEqual(['590']);
+  });
+});
+
+describe('pickProvider', () => {
+  it('uses DeepSeek when its key is set, Claude otherwise, and nothing without a key', () => {
+    expect(pickProvider({})).toBeNull();
+    expect(pickProvider({ ANTHROPIC_API_KEY: 'a' })).toMatchObject({ id: 'anthropic', label: 'Claude', model: 'claude-sonnet-5' });
+    expect(pickProvider({ DEEPSEEK_API_KEY: 'd' })).toMatchObject({ id: 'deepseek', label: 'DeepSeek', model: 'deepseek-flash' });
+    expect(pickProvider({ DEEPSEEK_API_KEY: 'd', ANTHROPIC_API_KEY: 'a' })?.id).toBe('deepseek');
+  });
+  it('honours EXPLAIN_PROVIDER and EXPLAIN_MODEL', () => {
+    expect(pickProvider({ DEEPSEEK_API_KEY: 'd', ANTHROPIC_API_KEY: 'a', EXPLAIN_PROVIDER: 'anthropic' })?.id).toBe('anthropic');
+    expect(pickProvider({ ANTHROPIC_API_KEY: 'a', EXPLAIN_PROVIDER: 'deepseek' })).toBeNull();
+    expect(pickProvider({ DEEPSEEK_API_KEY: 'd', EXPLAIN_MODEL: 'deepseek-v4-pro' })?.model).toBe('deepseek-v4-pro');
   });
 });

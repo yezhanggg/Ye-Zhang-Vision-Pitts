@@ -48,7 +48,7 @@ export const LIMITS: { title: string; items: string[] }[] = [
   {
     title: 'Future implementation',
     items: [
-      'Hosted on Vercel with the Claude explanation service on, and a Supabase store so saved scenarios can be shared by link and revisited.',
+      'Hosted on Vercel with the AI explanation service on, and a Supabase store so saved scenarios can be shared by link and revisited.',
       'Score all 394 Allegheny County tracts, not only the 128 city tracts (Explore already browses every municipality, county tract and ZIP code).',
       'Zoning gate per tract from the City’s district layer: allowed by right, needs approval, not allowed, for each of the five types.',
       'HUD income limits so “≤50% AMI” reads as a dollar figure for a family of four; FEMA flood layer to validate the screening model.',

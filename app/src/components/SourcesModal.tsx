@@ -257,7 +257,7 @@ export default function SourcesModal() {
               </section>
               <section className="text-small text-slate-700">
                 <h3 className="mb-1 text-body font-semibold text-slate-900">How AI is used</h3>
-                The language model never computes scores or queries data. Code computes every number. When a Claude-written explanation appears, it was generated from the computed values only, and every number in the text was checked against those values before display; otherwise a template sentence built from the same values is shown.
+                The language model never computes scores or queries data. Code computes every number. When an AI-written explanation appears (DeepSeek or Claude, whichever this deployment is configured with), it was generated from the computed values only, and every number in the text was checked against those values before display; otherwise a template sentence built from the same values is shown.
               </section>
               {meta.built_at && <p className="text-caption text-slate-500">Data built {meta.built_at.slice(0, 19).replace('T', ' ')} UTC · scoring config v{scoring.version}</p>}
             </div>

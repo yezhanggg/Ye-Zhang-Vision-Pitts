@@ -5,7 +5,8 @@ import { useMemo } from 'react';
 import { FMR_2BR, askingRents, scoring, tractById } from '../../lib/data';
 import { stabilityFor, tLabel, useAllResults } from '../../lib/derived';
 import { matchPreset, useApp, type Level } from '../../lib/store';
-import { CITY_GEOID, COUNTY_GEOID, LEVEL_LABEL, RELIABILITY, hasHistoryFor, historyFor, referenceSeries, reference, rentAreaFor, rentAreas, variableById, xwDominant, history } from '../../lib/explore/catalog';
+import { CITY_GEOID, COUNTY_GEOID, LEVEL_LABEL, RELIABILITY, hasHistoryFor, referenceSeries, reference, rentAreaFor, rentAreas, variableById, xwDominant, history } from '../../lib/explore/catalog';
+import { useSeries } from '../../lib/explore/remote';
 import { estimates, fmtMoe, fmtTick, fmtValue, reliability } from '../../lib/explore/bins';
 import { EXPLORE_UI } from '../../lib/explore/copy';
 import { analysisConf, fmtAnalysis, isAnalysis } from '../../lib/explore/analysisVars';
@@ -83,7 +84,7 @@ function Section({ title, sub, children, open = true }: { title: string; sub?: s
 /** Three-line chart of one variable: this place with its margin band, the city and the county. */
 function HistoryLine({ level, geoid, varId, label }: { level: Level; geoid: string; varId: string; label: string }) {
   const v = variableById.get(varId);
-  const mine = historyFor(level, geoid, varId);
+  const mine = useSeries(level, geoid, varId);
   const ref = referenceSeries(varId);
   if (!v || !mine) return null;
   const series = [
@@ -275,6 +276,7 @@ export function VariableDetail({ level, geoid, variable, values, unit }: { level
   const setBrowse = useApp((s) => s.setBrowse);
   const many = LEVEL_LABEL[level].many;
   const analysis = isAnalysis(variable) ? variable : null;
+  const series = useSeries(analysis ? null : level, geoid, analysis ? null : variable.id);
   const own: Estimate | null = values?.data.get(geoid) ?? (analysis ? null : unit?.[variable.id] ?? null);
   const value = est(own);
   const peers = useMemo(() => (values ? estimates(values.data) : []), [values]);
@@ -316,7 +318,7 @@ export function VariableDetail({ level, geoid, variable, values, unit }: { level
           <BarCompare rows={[{ label: C.thisPlace, value, moe: own?.moe ?? null, color: SERIES.place }, { label: 'City', value: est(ref.city), moe: ref.city?.moe ?? null, color: SERIES.city }, { label: 'County', value: est(ref.county), moe: ref.county?.moe ?? null, color: SERIES.county }]} fmt={fmt} />
         </Section>
       )}
-      {!analysis && hasHistoryFor(variable.id) && historyFor(level, geoid, variable.id) && (
+      {!analysis && series && (
         <Section title="2014–2024" sub="ACS 5-year estimates by end year">
           <HistoryLine level={level} geoid={geoid} varId={variable.id} label={variable.label} />
         </Section>

@@ -4,7 +4,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { tractById } from '../data';
 import { restGet, supabase } from '../supabase';
-import { bundledGeo, bundledValues, isCountyWide, levelMeta, reference, unitValues, valuesFor } from './catalog';
+import { bundledGeo, bundledValues, historyFor, isCountyWide, levelMeta, reference, unitValues, valuesFor } from './catalog';
+import type { Series } from './summary';
 import type { DataSource, Estimate, GeoLevel, Loaded, Scope, UnitFC, UnitFeature, ValueMap } from './types';
 
 let unavailable = false;
@@ -125,6 +126,44 @@ export function loadUnit(level: GeoLevel, geoid: string): Promise<Record<string,
   return p;
 }
 
+const historyPromises = new Map<string, Promise<Record<string, Series> | null>>();
+const historyResults = new Map<string, Record<string, Series>>();
+interface HistoryRow {
+  year: number;
+  var: string;
+  est: number | null;
+  moe: number | null;
+}
+/** Every variable's 2014–2024 series for one unit from the acs_history table (units or variables outside the bundle). */
+export function loadHistoryUnit(level: GeoLevel, geoid: string): Promise<Record<string, Series> | null> {
+  const key = `${level}:${geoid}`;
+  let p = historyPromises.get(key);
+  if (!p) {
+    p = (async () => {
+      if (!remoteEnabled()) return null;
+      try {
+        const rows = await restGet<HistoryRow>('acs_history', { level: `eq.${level}`, geoid: `eq.${geoid}`, select: 'year,var,est,moe', order: 'var,year' });
+        if (!rows.length) return null;
+        const years = [...new Set(rows.map((r) => r.year))].sort((a, b) => a - b);
+        const out: Record<string, Series> = {};
+        for (const r of rows) {
+          const s = (out[r.var] ??= { years, est: years.map(() => null), moe: years.map(() => null) });
+          const i = years.indexOf(r.year);
+          s.est[i] = r.est;
+          if (s.moe) s.moe[i] = r.moe;
+        }
+        historyResults.set(key, out);
+        return out;
+      } catch {
+        markUnavailable();
+        return null;
+      }
+    })();
+    historyPromises.set(key, p);
+  }
+  return p;
+}
+
 // ------------------------------------------------------------------ hooks
 const online = <T,>(data: T): Loaded<T> => ({ data, source: 'supabase' as DataSource, scope: 'county' as Scope });
 /** Bundled data is the city subset, except for levels the bundle holds county-wide (municipalities). */
@@ -225,4 +264,28 @@ export function useUnit(level: GeoLevel | null, geoid: string | null): UnitState
 /** City and county values for a variable (complete in the bundle, so no request). */
 export function useReference(varId: string | null): { city: Estimate | null; county: Estimate | null } {
   return useMemo(() => reference(varId), [varId]);
+}
+
+/** One variable's 2014–2024 series for a unit: the bundle first, the acs_history table when the bundle has none. */
+export function useSeries(level: GeoLevel | null, geoid: string | null, varId: string | null): Series | null {
+  const key = level && geoid && varId ? `${level}:${geoid}:${varId}` : null;
+  const snapshot = (): Series | null => {
+    if (!level || !geoid || !varId) return null;
+    return historyFor(level, geoid, varId) ?? historyResults.get(`${level}:${geoid}`)?.[varId] ?? null;
+  };
+  const [state, setState] = useState<{ key: string | null; series: Series | null }>(() => ({ key, series: snapshot() }));
+  useEffect(() => {
+    let live = true;
+    const series = snapshot();
+    setState((prev) => (prev.key === key && prev.series === series ? prev : { key, series }));
+    if (series || !level || !geoid || !varId || !remoteEnabled()) return;
+    void loadHistoryUnit(level, geoid).then((all) => {
+      if (live && all?.[varId]) setState({ key, series: all[varId] });
+    });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return state.key === key ? state.series : snapshot();
 }

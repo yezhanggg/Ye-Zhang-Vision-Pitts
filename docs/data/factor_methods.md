@@ -113,7 +113,7 @@ None of this enters the score. It drives the market-pressure and bivariate map m
 
 ## 7. Asking rents: an information layer, never a factor (`asking_rents.py`, `scripts/06_build_asking_rents.py`)
 
-**Source.** Dewey Data rental listings for Pennsylvania (scrapes January 2014 to August 2026), a licensed academic dataset, plus Dewey's listing → property mapping, which restores `PROPERTY_ID` / `UNIT_ID` for rows scraped before mid-2023 (100% of 2019–2023 rows, 85–98% of 2014–2018 rows). The two caches in `data/raw/dewey_cache/` are git-ignored; only tract aggregates leave the pipeline. Dewey's terms allow publishing summary insights derived from the data but not the data itself (§3.2), restrict use to academic, non-commercial research (§1.12) and ask for attribution to Dewey Data Inc. and the data provider (§3.3).
+**Source.** RentHub rental listings for Pennsylvania, licensed through Dewey Data (scrapes January 2014 to August 2026; attribution: data by RentHub, licensed through Dewey Data Inc.), plus Dewey's listing → property mapping, which restores `PROPERTY_ID` / `UNIT_ID` for rows scraped before mid-2023 (100% of 2019–2023 rows, 85–98% of 2014–2018 rows). The two caches in `data/raw/dewey_cache/` are git-ignored; only tract aggregates leave the pipeline. Dewey's terms allow publishing summary insights derived from the data but not the data itself (§3.2), restrict use to academic, non-commercial research (§1.12) and ask for attribution to Dewey Data Inc. and the data provider (§3.3).
 
 **Pipeline.**
 1. 2,887,420 rows in the Allegheny bounding box → 2,623,804 inside a county 2020 tract by point-in-polygon (coordinates are 100% complete) → 2,615,854 with rent $300–$10,000 and 0–5 bedrooms.

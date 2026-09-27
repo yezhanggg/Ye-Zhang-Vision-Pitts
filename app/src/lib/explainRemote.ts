@@ -1,5 +1,6 @@
-// The "why" sentence. Starts as a template built from the computed values and swaps in a Claude-written version
-// from /api/explain when that service is configured and its number check passes. Never blocks the interface.
+// The "why" sentence. Starts as a template built from the computed values and swaps in an AI-written version
+// (DeepSeek or Claude, whichever the deployment is configured with) from /api/explain when that service answers
+// and its number check passes. Never blocks the interface.
 import { useEffect, useState } from 'react';
 import { scoring, typologyById, factorById, tractLabel } from './data';
 import { templateSummary, type TractResult } from './derived';
@@ -8,7 +9,9 @@ import type { TractProps, Weights } from './types';
 
 export interface Explanation {
   text: string;
-  source: 'template' | 'claude';
+  source: 'template' | 'ai';
+  /** Service that wrote the text ("DeepSeek", "Claude") and its model id. */
+  provider?: string;
   model?: string;
 }
 
@@ -38,13 +41,13 @@ export function useExplanation(t: TractProps, r: TractResult, weights: Weights, 
     const timer = setTimeout(() => {
       fetch('/api/explain', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: ctl.signal })
         .then((res) => (res.ok ? res.json() : null))
-        .then((j: { ok: boolean; reason?: string; text?: string; model?: string } | null) => {
+        .then((j: { ok: boolean; reason?: string; text?: string; model?: string; provider?: string } | null) => {
           if (!j) return;
           if (j.ok && j.text) {
-            const e: Explanation = { text: j.text, source: 'claude', model: j.model };
+            const e: Explanation = { text: j.text, source: 'ai', model: j.model, provider: j.provider };
             memo.set(key, e);
             setState(e);
-          } else if (j.reason === 'no_api_key') serviceDown = true;
+          } else if (j.reason === 'no_api_key' || /_(401|402|403)$/.test(j.reason ?? '')) serviceDown = true; // no key, bad key or no balance: stop asking this session
         })
         .catch(() => undefined);
     }, 400);

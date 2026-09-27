@@ -248,7 +248,7 @@ function AnswerCard({ t, r, weights }: { t: TractProps; r: TractResult; weights:
       <div className="mt-3">
         <StabilityBadge stability={stability} />
       </div>
-      <p className="mt-2 text-caption text-slate-600">{ex.source === 'claude' ? `${UI.whyAI} (${ex.model}).` : `${UI.whyAuto}.`}</p>
+      <p className="mt-2 text-caption text-slate-600">{ex.source === 'ai' ? `${UI.whyAI(ex.provider ?? 'an AI model')} (${ex.model}).` : `${UI.whyAuto}.`}</p>
     </div>
   );
 }

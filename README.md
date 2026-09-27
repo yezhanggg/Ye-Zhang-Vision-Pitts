@@ -56,7 +56,7 @@ uv run python scripts/09_build_acs_history.py   # Explore: the same variables fo
 uv run pytest                                   # 51 tests
 ```
 
-**Deploy (Vercel):** Root Directory `app`; env vars `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (public), `ANTHROPIC_API_KEY` (optional, AI explanation).
+**Deploy (Vercel):** Root Directory `app`; env vars `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (public), and optionally `DEEPSEEK_API_KEY` or `ANTHROPIC_API_KEY` for the AI explanation.
 
 ## How the data flows
 
@@ -75,17 +75,18 @@ The app paints the bundled city data at once, then swaps in county-wide rows fro
 
 ## Supabase at a glance
 
-Five tables, all read-only for the browser. Writes happen only from `scripts/08_publish_supabase.py` with the secret key. Migration `0002_muni_level.sql` adds the `muni` level and a `kind` column; apply it before publishing municipalities. The app never depends on it: every municipality, the ACS history and the rent aggregates ship inside the bundle.
+Six tables, all read-only for the browser. Writes happen only from `scripts/08_publish_supabase.py` with the secret key. Migrations `0002_muni_level.sql` (the `muni` level and a `kind` column) and `0003_acs_history.sql` (the history table) are applied. The app works without Supabase: every municipality, 14 history variables and the rent aggregates ship inside the bundle; Supabase adds the county units outside the city and the other 23 history variables.
 
 | Table | Rows | Columns | What it holds |
 |---|---|---|---|
 | `acs_variables` | 37 | `id, label, group, unit, description, table_id, sort` | The variable catalogue shown in the Data panel |
-| `geo_units` | 1,628 | `level, geoid, name, pgh_share, tract, geom` | Simplified GeoJSON per unit: 394 tracts, 1,062 block groups, 170 ZCTAs, county, city |
-| `acs_values` | 60,236 | `level, geoid, var, est, moe, cv` | One row per unit and variable: estimate, 90% margin of error, coefficient of variation |
+| `geo_units` | 1,757 | `level, geoid, name, kind, pgh_share, tract, geom` | Simplified GeoJSON per unit: 394 tracts, 1,062 block groups, 170 ZCTAs, 129 municipalities, county, city |
+| `acs_values` | 65,009 | `level, geoid, var, est, moe, cv` | One row per unit and variable: estimate, 90% margin of error, coefficient of variation |
+| `acs_history` | 282,088 | `level, geoid, year, var, est, moe, cv` | The same variables for every ACS 5-year end year 2014–2024 (tracts, ZCTAs, municipalities, county, city) |
 | `dataset_versions` | 1 | `built_at, acs_year, git_sha, counts` | Which build is loaded |
 | `scenarios` | 0 | `slug, owner, name, weights, fit_matrix, toggles, ...` | Reserved for saved scenarios (anonymous auth, owner-scoped); not wired yet |
 
-`level` is one of `tract`, `bg`, `zcta`, `county`, `city`. GEOIDs are strings: 11 digits for tracts, 12 for block groups, 5 for ZCTAs and the county (`42003`), 7 for the city (`4261000`).
+`level` is one of `tract`, `bg`, `zcta`, `muni`, `county`, `city` (`acs_history` has no `bg`). GEOIDs are strings: 11 digits for tracts, 12 for block groups, 5 for ZCTAs and the county (`42003`), 10 for municipalities, 7 for the city (`4261000`).
 
 The app makes two kinds of request, with the publishable key in the `apikey` and `Authorization: Bearer` headers, paging 1,000 rows at a time:
 
@@ -113,7 +114,7 @@ All scoring data is public. Full registry with links, retrieval dates and checks
 | Municipal boundaries | Census cartographic county subdivisions 2023 (129 cities, boroughs and townships outside Pittsburgh) | municipality |
 | Boundaries, names | Census TIGER and cartographic files · WPRDC neighborhoods | 2020 geography |
 | 3D buildings | Overture footprints · WPRDC assessments (stories only) | demo tracts |
-| Asking rents (info layer) | Dewey rental listings, **licensed**; only aggregates leave the pipeline (yearly 2BR medians and unit counts, hidden under 10 units) | tract, ZCTA, municipality, 2019–2026 |
+| Asking rents (info layer) | RentHub rental listings via Dewey Data, **licensed**; only aggregates leave the pipeline (yearly 2BR medians and unit counts, hidden under 10 units). Data by RentHub, licensed through Dewey Data Inc. | tract, ZCTA, municipality, 2019–2026 |
 | Basemap, terrain, search | OpenFreeMap · Mapterhorn · Photon · Census Geocoder | live |
 
 No individual-level data is used anywhere.
@@ -134,12 +135,12 @@ No individual-level data is used anywhere.
 - The 2014–2024 lines are overlapping five-year windows in each vintage's own dollars; values before 2020 for 19 city tracts were assembled from several 2010 tracts and are flagged as such.
 - Analysis layers and the matchmaker block exist for the 128 city tracts only; municipalities and ZIP codes get census description and, where listed, asking rents.
 - Not covered: zoning and buildability, infrastructure capacity, carbon, parcel feasibility, in-place rents.
-- The fit matrix is a judgment and is published for review in [docs/assumptions.md](docs/assumptions.md) rather than tuned.
+- The fit matrix is a judgment and is published for review in [docs/assumptions.md](docs/assumptions.md) rather than tuned. One visible consequence: under Balanced weights senior housing tops 40 of 114 tracts, because its row is short (0 on market strength) and strongly flood-averse, so it is rarely penalized; switch to Market-led or edit the row and the picture changes.
 
 ## AI use
 
-- **Claude Code** pair-programmed the pipeline, app, tests and docs during the sprint; commits carry co-author attribution.
-- **Claude** writes the optional explanation sentence on the live site from computed numbers only; any figure it cannot trace is rejected and a template sentence is shown instead.
+- **Claude Code** pair-programmed the pipeline, app, tests and docs during the sprint, with every change reviewed and run by the author; commits carry co-author attribution.
+- **DeepSeek** (`deepseek-flash`, thinking off) writes the optional "why this ranking" sentence in Analysis when `DEEPSEEK_API_KEY` is configured on the deployment; **Claude** (`claude-sonnet-5`) does when only `ANTHROPIC_API_KEY` is set. The model receives computed numbers only; any figure it cannot trace is rejected and a template sentence built from the same numbers is shown instead. Without a key or a balance (and in the offline file) the template sentence is always shown, and the interface names whichever model wrote the text.
 - No model computes, imputes or ranks anything. Scores come from `src/visionpitts/scoring.py` and its TypeScript mirror, checked against a shared 40-case fixture.
 
 ## Team and license

@@ -1,12 +1,14 @@
 """Step 8: publish the ACS levels to Supabase over PostgREST so every device reads the same county-wide data.
 
-Tables (supabase/migrations/0001_init.sql): acs_variables (37 rows), geo_units (394 + 1062 + 170 + 1 + 1),
-acs_values (one long row per level x geoid x variable) and dataset_versions (one row per publish). Rows are upserted
+Tables (supabase/migrations/): acs_variables (37 rows), geo_units (394 + 1062 + 170 + 129 + 1 + 1),
+acs_values (one long row per level x geoid x variable), acs_history (the same per end year 2014-2024, migration
+0003) and dataset_versions (one row per publish). Rows are upserted
 on their primary keys, so reruns are idempotent. Inputs are the step-7 outputs in data/processed/ plus the boundary
 files in data/raw/. Credentials: SUPABASE_URL and SUPABASE_SECRET_KEY from .env (loaded by visionpitts.config); the
 secret key stays on this machine and is never printed. --dry-run builds every payload and prints counts without
 touching the network.
-Run: uv run python scripts/08_publish_supabase.py [--dry-run] [--only variables geo values version] [--levels ...]
+Run: uv run python scripts/08_publish_supabase.py [--dry-run] [--only variables geo values history version]
+     [--levels ...]
 """
 import sys
 from pathlib import Path
@@ -27,8 +29,10 @@ from visionpitts import geo_levels as gl
 from visionpitts.config import PROCESSED, ROOT
 
 CATALOGUE_JSON = PROCESSED / "acs_variables.json"
-PARTS = ("variables", "geo", "values", "version")
-TABLE_OF = {"variables": "acs_variables", "geo": "geo_units", "values": "acs_values", "version": "dataset_versions"}
+PARTS = ("variables", "geo", "values", "history", "version")
+TABLE_OF = {"variables": "acs_variables", "geo": "geo_units", "values": "acs_values", "history": "acs_history",
+            "version": "dataset_versions"}
+HISTORY_LEVELS = ("tract", "zcta", "muni", "county", "city")
 BATCH = 500
 VAR_FIELDS = ("id", "label", "group", "unit", "description", "table_id", "sort")
 
@@ -62,6 +66,25 @@ def value_rows(levels: list[str]) -> list[dict]:
     return rows
 
 
+def history_rows(levels: list[str]) -> list[dict]:
+    """Long rows `level, geoid, year, var, est, moe, cv` from data/processed/acs_history_<level>.csv (step 9)."""
+    rows = []
+    for level in levels:
+        if level not in HISTORY_LEVELS:
+            continue
+        path = PROCESSED / f"acs_history_{level}.csv"
+        if not path.exists():
+            sys.exit(f"{path.relative_to(ROOT)} is missing: run scripts/09_build_acs_history.py first")
+        df = pd.read_csv(path, dtype={"GEOID": str})
+        for _, year_df in df.groupby("year"):
+            year = int(year_df["year"].iloc[0])
+            long = al.to_long(year_df.set_index("GEOID"), level)
+            long.insert(2, "year", year)
+            long = long.astype(object).where(long.notna(), None)
+            rows.extend(long.to_dict(orient="records"))
+    return rows
+
+
 def git_sha() -> str | None:
     try:
         out = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True)
@@ -87,11 +110,17 @@ class Client:
         for i in range(0, len(rows), batch):
             chunk = rows[i:i + batch]
             body = json.dumps(chunk, ensure_ascii=False).encode()
-            for attempt in range(3):
-                r = self.s.post(f"{self.base}/{table}", data=body, headers={"Prefer": prefer}, timeout=180)
+            for attempt in range(5):
+                try:
+                    r = self.s.post(f"{self.base}/{table}", data=body, headers={"Prefer": prefer}, timeout=180)
+                except requests.RequestException as e:  # dropped connection or TLS hiccup; upserts are idempotent
+                    if attempt < 4:
+                        time.sleep(2 ** attempt)
+                        continue
+                    raise RuntimeError(f"{table} rows {i}-{i + len(chunk)}: {type(e).__name__} after 5 tries") from e
                 if r.status_code < 300:
                     break
-                if r.status_code >= 500 and attempt < 2:
+                if r.status_code >= 500 and attempt < 4:
                     time.sleep(2 ** attempt)
                     continue
                 raise RuntimeError(f"{table} rows {i}-{i + len(chunk)}: HTTP {r.status_code} {r.text[:400]}")
@@ -138,6 +167,8 @@ def main() -> None:
         payloads["geo_units"] = geo_rows(args.levels)
     if "values" in args.only:
         payloads["acs_values"] = value_rows(args.levels)
+    if "history" in args.only:
+        payloads["acs_history"] = history_rows(args.levels)
     counts = {t: len(rows) for t, rows in payloads.items()}
     for t in ("geo_units", "acs_values"):
         if t in payloads:
@@ -166,7 +197,7 @@ def main() -> None:
 
     client = Client(url, key)
     print("publishing")
-    for t in ("acs_variables", "geo_units", "acs_values", "dataset_versions"):
+    for t in ("acs_variables", "geo_units", "acs_values", "acs_history", "dataset_versions"):
         if t in payloads:
             client.upsert(t, payloads[t], merge=(t != "dataset_versions"))
 
@@ -183,6 +214,17 @@ def main() -> None:
         print(f"  {lv:7} geo_units {g:5}  acs_values(pop) {v:5}  expected {total}")
         if total is not None and (g != total or v != total):
             problems.append(f"{lv}: geo {g}, values {v}, expected {total}")
+    if "acs_history" in payloads:
+        for lv in args.levels:
+            if lv not in HISTORY_LEVELS:
+                continue
+            rows_lv = payloads["acs_history"]
+            want = sum(1 for r in rows_lv if r["level"] == lv and r["var"] == "pop" and r["year"] == 2024)
+            params = {"select": "geoid", "level": f"eq.{lv}", "var": "eq.pop", "year": "eq.2024"}
+            h = client.count("acs_history", params)
+            print(f"  {lv:7} acs_history(pop, 2024) {h:5}  expected {want}")
+            if h != want:
+                problems.append(f"{lv}: history {h}, expected {want}")
     if problems:
         sys.exit("verification failed: " + "; ".join(problems))
     print("done")

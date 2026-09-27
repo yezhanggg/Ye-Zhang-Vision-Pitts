@@ -1,11 +1,14 @@
-// Vercel serverless function: a Claude-written explanation of numbers that were computed in code.
+// Vercel serverless function: an AI-written explanation of numbers that were computed in code.
 //
-// Rules (see README "AI tools used"):
+// Rules (see README "AI use"):
 //  1. The model receives only computed values (percentiles, scores, stability) and plain labels. It never sees raw data
 //     and never computes a score.
 //  2. Every number in the model's text must appear in the values it was given (in any of a few display formats).
 //     If any number cannot be traced, the endpoint returns ok:false and the app shows its template sentence instead.
-//  3. The API key lives in the Vercel environment (ANTHROPIC_API_KEY); the browser never sees it.
+//  3. The API key lives in the Vercel environment; the browser never sees it.
+//
+// Provider: DeepSeek when DEEPSEEK_API_KEY is set, otherwise Claude when ANTHROPIC_API_KEY is set.
+// EXPLAIN_PROVIDER=deepseek|anthropic forces one; EXPLAIN_MODEL overrides the model id of the provider in use.
 
 interface Payload {
   tract: { geoid: string; name: string; neighborhood: string | null; watch_list: boolean; residential: boolean };
@@ -17,35 +20,70 @@ interface Payload {
   stability: { share: number; draws: number } | null;
 }
 
-const MODEL = process.env.EXPLAIN_MODEL || 'claude-sonnet-5';
-const cache = new Map<string, { text: string; model: string }>();
+export interface Provider {
+  id: 'deepseek' | 'anthropic';
+  /** Name shown in the interface. */
+  label: string;
+  key: string;
+  model: string;
+}
+
+/** Which model service answers, from the environment. Null when no key is configured. */
+export function pickProvider(env: Record<string, string | undefined>): Provider | null {
+  const want = (env.EXPLAIN_PROVIDER ?? '').trim().toLowerCase();
+  const deepseek: Provider | null = env.DEEPSEEK_API_KEY ? { id: 'deepseek', label: 'DeepSeek', key: env.DEEPSEEK_API_KEY, model: env.EXPLAIN_MODEL || 'deepseek-flash' } : null;
+  const anthropic: Provider | null = env.ANTHROPIC_API_KEY ? { id: 'anthropic', label: 'Claude', key: env.ANTHROPIC_API_KEY, model: env.EXPLAIN_MODEL || 'claude-sonnet-5' } : null;
+  if (want === 'deepseek') return deepseek;
+  if (want === 'anthropic' || want === 'claude') return anthropic;
+  return deepseek ?? anthropic;
+}
+
+const MAX_TOKENS = 400;
+const TEMPERATURE = 0.2;
+
+/** One completion. Thinking is switched off on DeepSeek: the task is a short paraphrase, and reasoning tokens bill as output. */
+async function complete(p: Provider, system: string, prompt: string): Promise<{ ok: true; text: string } | { ok: false; status: number }> {
+  if (p.id === 'deepseek') {
+    const r = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${p.key}` },
+      body: JSON.stringify({ model: p.model, max_tokens: MAX_TOKENS, temperature: TEMPERATURE, thinking: { type: 'disabled' }, messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }] }),
+    });
+    if (!r.ok) return { ok: false, status: r.status };
+    const data = (await r.json()) as { choices?: { message?: { content?: string } }[] };
+    return { ok: true, text: (data.choices?.[0]?.message?.content ?? '').trim() };
+  }
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-api-key': p.key, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: p.model, max_tokens: MAX_TOKENS, temperature: TEMPERATURE, system, messages: [{ role: 'user', content: prompt }] }),
+  });
+  if (!r.ok) return { ok: false, status: r.status };
+  const data = (await r.json()) as { content?: { type: string; text?: string }[] };
+  return { ok: true, text: (data.content ?? []).map((c) => c.text ?? '').join('').trim() };
+}
+
+const cache = new Map<string, { text: string; model: string; provider: string }>();
 
 export default async function handler(req: { method?: string; body?: unknown }, res: { status: (n: number) => { json: (b: unknown) => void } }) {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, reason: 'POST only' });
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) return res.status(200).json({ ok: false, reason: 'no_api_key' });
+  const provider = pickProvider(process.env);
+  if (!provider) return res.status(200).json({ ok: false, reason: 'no_api_key' });
   let payload: Payload;
   try {
     payload = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body) as Payload;
   } catch {
     return res.status(400).json({ ok: false, reason: 'bad_json' });
   }
-  const cacheKey = JSON.stringify([payload.tract.geoid, payload.weights, payload.ranking.map((r) => r.score.toFixed(3))]);
+  const cacheKey = JSON.stringify([provider.id, provider.model, payload.tract.geoid, payload.weights, payload.ranking.map((r) => r.score.toFixed(3))]);
   const hit = cache.get(cacheKey);
   if (hit) return res.status(200).json({ ok: true, ...hit, cached: true });
 
-  const prompt = buildPrompt(payload);
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: MODEL, max_tokens: 400, temperature: 0.2, system: SYSTEM, messages: [{ role: 'user', content: prompt }] }),
-  });
-  if (!r.ok) return res.status(200).json({ ok: false, reason: `anthropic_${r.status}` });
-  const data = (await r.json()) as { content?: { type: string; text?: string }[] };
-  const text = (data.content ?? []).map((c) => c.text ?? '').join('').trim();
-  const check = verifyNumbers(text, payload);
-  if (!check.ok) return res.status(200).json({ ok: false, reason: 'number_check_failed', unmatched: check.unmatched, text });
-  const out = { text, model: MODEL };
+  const answer = await complete(provider, SYSTEM, buildPrompt(payload));
+  if (!answer.ok) return res.status(200).json({ ok: false, reason: `${provider.id}_${answer.status}` });
+  const check = verifyNumbers(answer.text, payload);
+  if (!check.ok) return res.status(200).json({ ok: false, reason: 'number_check_failed', unmatched: check.unmatched, text: answer.text });
+  const out = { text: answer.text, model: provider.model, provider: provider.label };
   cache.set(cacheKey, out);
   return res.status(200).json({ ok: true, ...out });
 }

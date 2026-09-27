@@ -98,7 +98,7 @@ SOURCES: list[dict] = [
          url="https://data.wprdc.org/dataset/property-assessments", vintage="2026", geography="parcel",
          method="Only STORIES and YEARBLT are read, for building heights and age. No owner, sale or value fields are used.",
          caveats="Stories are recorded for the main dwelling only; commercial and exempt parcels are often blank."),
-    dict(id="dewey_listings", name="Dewey Data rental listings, Pennsylvania (scraped asking rents; licensed)",
+    dict(id="dewey_listings", name="RentHub rental listings via Dewey Data, Pennsylvania (scraped asking rents; licensed)",
          url="https://www.deweydata.io/", vintage="scrapes 2014-01 to 2026-08 (layer uses 2019-2026)",
          geography="listing point -> 2020 tract",
          method="Point-in-polygon to tracts; rent $300-$10k, 0-5 BR; one observation per unit per scrape month (pre-2023 unit ids "
@@ -109,8 +109,8 @@ SOURCES: list[dict] = [
                 "Information only: never a scoring factor.",
          caveats="Licensed listing data, market-rate skew: asking (not contract) rents; professionally managed and turnover units "
                  "over-represented, subsidized and long-tenure units absent. Dewey terms (s.3.2) allow publishing summary insights "
-                 "but not the licensed rows, so raw files stay in data/raw and only tract aggregates are published; attribution to "
-                 "Dewey Data Inc. and the listing provider (s.3.3)."),
+                 "but not the licensed rows, so raw files stay in data/raw and only tract aggregates are published. "
+                 "Attribution (s.3.3): rental listing data by RentHub, licensed through Dewey Data Inc."),
     dict(id="acs_levels", name="ACS 5-year 2020–2024, Explore data browser (37 variables) for tracts, block groups, ZCTAs, "
                                "Allegheny County and the City of Pittsburgh",
          url="https://api.census.gov/data/2024/acs/acs5", vintage="2020–2024",
