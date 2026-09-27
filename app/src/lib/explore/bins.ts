@@ -82,6 +82,17 @@ export function fmtValue(v: number | null | undefined, unit: Unit): string {
       return String(Math.round(v));
     case 'age':
       return v.toFixed(1);
+    case 'pct':
+    case 'score':
+      return `${Math.round(v * 100)}`;
+    case 'flag':
+      return v ? 'Yes' : 'No';
+    case 'ratio':
+      return `${v.toFixed(2)}×`;
+    case 'rate':
+      return v >= 10 ? v.toFixed(0) : v >= 1 ? v.toFixed(1) : v.toFixed(2);
+    case 'class':
+      return String(Math.round(v));
   }
 }
 
@@ -99,6 +110,8 @@ export function fmtMoe(moe: number | null | undefined, unit: Unit): string {
       return String(Math.round(moe));
     case 'age':
       return moe.toFixed(1);
+    default:
+      return moe.toFixed(2);
   }
 }
 

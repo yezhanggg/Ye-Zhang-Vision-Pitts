@@ -81,14 +81,11 @@ export function ConfChip({ conf }: { conf: Conf | null | undefined }) {
   );
 }
 
-export function SectionTitle({ children, right, step, sub }: { children: ReactNode; right?: ReactNode; step?: number; sub?: ReactNode }) {
+export function SectionTitle({ children, right, sub }: { children: ReactNode; right?: ReactNode; sub?: ReactNode }) {
   return (
     <div className="mb-2">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="flex items-center gap-2 text-body font-semibold text-slate-900">
-          {step != null && <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-slate-900 text-caption font-bold text-white">{step}</span>}
-          {children}
-        </h3>
+        <h3 className="flex items-center gap-2 text-body font-semibold text-slate-900">{children}</h3>
         {right}
       </div>
       {sub && <p className="mt-0.5 text-small text-slate-600">{sub}</p>}
@@ -96,14 +93,20 @@ export function SectionTitle({ children, right, step, sub }: { children: ReactNo
   );
 }
 
-/** Animated disclosure for secondary detail. */
-export function Explainer({ title, children, defaultOpen = false, className, tone = 'plain', right }: { title: ReactNode; children: ReactNode; defaultOpen?: boolean; className?: string; tone?: 'plain' | 'card'; right?: ReactNode }) {
-  const [open, setOpen] = useState(defaultOpen);
+/** Animated disclosure for secondary detail. Uncontrolled by default; pass `open` + `onToggle` to drive it from state. */
+export function Explainer({ title, children, defaultOpen = false, className, tone = 'plain', right, open: controlled, onToggle }: { title: ReactNode; children: ReactNode; defaultOpen?: boolean; className?: string; tone?: 'plain' | 'card'; right?: ReactNode; open?: boolean; onToggle?: (open: boolean) => void }) {
+  const [inner, setInner] = useState(defaultOpen);
+  const open = controlled ?? inner;
   const id = useId();
+  const toggle = () => {
+    const next = !open;
+    if (controlled == null) setInner(next);
+    onToggle?.(next);
+  };
   return (
     <div className={cx(tone === 'card' && 'rounded-xl bg-white ring-1 ring-stone-200/80', className)}>
       <div className={cx('flex items-center justify-between gap-2', tone === 'card' && 'px-3 py-2.5')}>
-        <button type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen((o) => !o)} className={cx('group flex min-w-0 flex-1 items-center gap-1.5 text-left font-semibold', tone === 'card' ? 'text-body text-slate-900' : 'text-small text-violet-700 hover:text-violet-900')}>
+        <button type="button" aria-expanded={open} aria-controls={id} onClick={toggle} className={cx('group flex min-w-0 flex-1 items-center gap-1.5 text-left font-semibold', tone === 'card' ? 'text-body text-slate-900' : 'text-small text-violet-700 hover:text-violet-900')}>
           <motion.svg viewBox="0 0 16 16" className="h-3.5 w-3.5 shrink-0" initial={false} animate={{ rotate: open ? 90 : 0 }} transition={{ duration: 0.18 }}>
             <path d="M6 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </motion.svg>

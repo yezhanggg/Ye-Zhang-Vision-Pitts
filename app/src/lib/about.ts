@@ -41,7 +41,7 @@ export const LIMITS: { title: string; items: string[] }[] = [
     items: [
       'Zoning and what is buildable by right, parcel availability and site feasibility.',
       'Infrastructure capacity, embodied carbon and vehicle miles travelled.',
-      'Asking rents from listings, school quality, and access to jobs and services beyond transit frequency.',
+      'School quality, and access to jobs and services beyond transit frequency. Asking rents from listings are shown as information (licensed Dewey aggregates) and never scored.',
       'The fit matrix and the presets are value judgments. Under Balanced weights senior housing ranks first in 40 of 114 tracts, largely because its fit row is short and strongly flood-averse. That is documented for review, not tuned to look better.',
     ],
   },
@@ -49,7 +49,7 @@ export const LIMITS: { title: string; items: string[] }[] = [
     title: 'Future implementation',
     items: [
       'Hosted on Vercel with the Claude explanation service on, and a Supabase store so saved scenarios can be shared by link and revisited.',
-      'Expand from the City of Pittsburgh to all 394 Allegheny County tracts, with municipality search.',
+      'Score all 394 Allegheny County tracts, not only the 128 city tracts (Explore already browses every municipality, county tract and ZIP code).',
       'Zoning gate per tract from the City’s district layer: allowed by right, needs approval, not allowed, for each of the five types.',
       'HUD income limits so “≤50% AMI” reads as a dollar figure for a family of four; FEMA flood layer to validate the screening model.',
       'An access-to-opportunity factor (jobs, schools, everyday services) and policy toggles (density bonus, ADUs by right) as labeled value judgments with their own parity tests.',

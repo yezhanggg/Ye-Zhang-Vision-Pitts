@@ -41,5 +41,11 @@ await shot('07-sources', 1500);
 // Analysis > Match: the asking-rent information layer (licensed listings, never scored).
 await open(`#m=match&${W}&c=info.rent_growth_existing`, 'text=Start here');
 await shot('08-asking-rents', 4500);
+// Explore: the place summary for a tract (tiles, tenure, stock, cost burden, 2014-2024 lines, the matchmaker block).
+await open('#m=explore&L=buildings,terrain,tracts,city&u=tract:42003562300', 'text=Key figures');
+await shot('10-place-summary', 4500);
+// Explore: one variable for a municipality (rank, distribution, city/county bars, 2014-2024 line).
+await open('#m=explore&L=buildings,muni,city&g=muni&v=med_gross_rent&u=muni:4200366264', 'text=How this compares');
+await shot('11-municipality-detail', 4500);
 console.log('console errors:', errors.filter((e) => !/openfreemap|favicon|404|api\/explain|mapterhorn|Failed to fetch|AJAXError/.test(e)));
 await browser.close();

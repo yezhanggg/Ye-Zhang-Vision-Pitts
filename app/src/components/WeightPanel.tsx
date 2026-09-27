@@ -14,12 +14,13 @@ interface Props {
   accent?: string;
   title?: string;
   compact?: boolean;
-  steps?: [number, number];
+  /** The enclosing panel section already shows the title. */
+  hideTitle?: boolean;
   fineTuneOpen?: boolean;
 }
 
 /** Presets as radio cards plus collapsible sliders. Slider input is coalesced to one update per animation frame. */
-export default function WeightPanel({ weights, onChange, accent = '#7c3aed', title = UI.whatMatters, compact, steps, fineTuneOpen }: Props) {
+export default function WeightPanel({ weights, onChange, accent = '#7c3aed', title = UI.whatMatters, compact, hideTitle, fineTuneOpen }: Props) {
   const [local, setLocal] = useState(weights);
   const raf = useRef(0);
   const pending = useRef<Weights | null>(null);
@@ -44,7 +45,7 @@ export default function WeightPanel({ weights, onChange, accent = '#7c3aed', tit
   return (
     <>
       <section>
-        <SectionTitle step={steps?.[0]}>{title}</SectionTitle>
+        {!hideTitle && <SectionTitle>{title}</SectionTitle>}
         <div className="grid grid-cols-2 gap-2">
           {scoring.presets.map((p) => {
             const on = preset === p.id;
@@ -68,18 +69,15 @@ export default function WeightPanel({ weights, onChange, accent = '#7c3aed', tit
           </div>
         )}
       </section>
-      <section>
+      <section className="mt-3">
         <Explainer
           key={fineTuneOpen ? 'open' : 'closed'}
           defaultOpen={fineTuneOpen}
           tone="card"
           title={
-            <span className="flex items-center gap-2">
-              {steps && <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-slate-900 text-caption font-bold text-white">{steps[1]}</span>}
-              <span>
-                <span className="block">{UI.fineTune}</span>
-                <span className="block text-caption font-normal text-slate-600">How much each factor counts</span>
-              </span>
+            <span>
+              <span className="block">{UI.fineTune}</span>
+              <span className="block text-caption font-normal text-slate-600">How much each factor counts</span>
             </span>
           }
         >

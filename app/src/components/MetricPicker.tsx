@@ -14,11 +14,11 @@ const dec = (s: string): MapMetric => {
   return { kind: 'typology', id };
 };
 
-export default function MetricPicker({ value, onChange, step }: { value: MapMetric; onChange: (m: MapMetric) => void; step?: number }) {
+export default function MetricPicker({ value, onChange, hideTitle }: { value: MapMetric; onChange: (m: MapMetric) => void; hideTitle?: boolean }) {
   const main = value.kind === 'top' || value.kind === 'pick' ? value.kind : null;
   return (
     <section>
-      <SectionTitle step={step}>{UI.colorBy}</SectionTitle>
+      {!hideTitle && <SectionTitle>{UI.colorBy}</SectionTitle>}
       <Segmented full value={main} onChange={(v) => onChange({ kind: v })} options={[{ value: 'top', label: 'Best match' }, { value: 'pick', label: 'Which type wins' }]} />
       <label className="mt-2 block">
         <span className="sr-only">More layers</span>

@@ -30,7 +30,16 @@ export interface OverlayLayer {
   idField: string;
   /** Choropleth from a MapPaint, or a flat `color`; omitted → outline only (plus an invisible hit layer when interactive). */
   fill?: { paint?: MapPaint; color?: string; opacity?: number | ExpressionSpecification };
-  line: { color: string; width: number | ExpressionSpecification; dash?: number[]; opacity?: number };
+  line: {
+    color: string;
+    width: number | ExpressionSpecification;
+    dash?: number[];
+    opacity?: number;
+    /** A wider line drawn underneath (usually white) so the boundary reads over other lines, buildings and hills. */
+    casing?: { color: string; width: number | ExpressionSpecification; opacity?: number };
+    /** Name labels at the polygon's pole of inaccessibility, from `minzoom` on (skipped when the style has no glyphs). */
+    label?: { field: string; minzoom?: number; color?: string; size?: number };
+  };
   interactive?: boolean;
   selectedId?: string | null;
   /** Ease the camera to the selected feature when the selection changes. */
@@ -84,7 +93,7 @@ const ZOOM_FILL = ['interpolate', ['linear'], ['zoom'], 12, 0.62, 15, 0.35] as u
 const fmtFt = (v: number) => `${Math.round(v).toLocaleString('en-US')} ft`;
 const SCORE_BINS = scoring.bins.score;
 const TRACT_LAYERS = ['tract-fill', 'tract-line', 'tract-focus', 'tract-flip', 'tract-hover', 'tract-sel-glow', 'tract-sel'];
-const OVERLAY_SUFFIXES = ['-fill', '-line', '-hover', '-sel-glow', '-sel'] as const;
+const OVERLAY_SUFFIXES = ['-fill', '-casing', '-line', '-hover', '-sel-glow', '-sel', '-label'] as const;
 const DEFAULT_PAD = { top: 60, right: 60, bottom: 60, left: 60 };
 
 function tint(hex: string, amt: number) {
@@ -124,7 +133,10 @@ function linePaint(line: OverlayLayer['line']) {
   if (line.dash) p['line-dasharray'] = line.dash;
   return p;
 }
-const sameLine = (a: OverlayLayer['line'], b: OverlayLayer['line']) => a.color === b.color && a.width === b.width && a.opacity === b.opacity && String(a.dash ?? '') === String(b.dash ?? '');
+const sameLine = (a: OverlayLayer['line'], b: OverlayLayer['line']) =>
+  a.color === b.color && a.width === b.width && a.opacity === b.opacity && String(a.dash ?? '') === String(b.dash ?? '') && a.casing?.width === b.casing?.width && a.casing?.opacity === b.casing?.opacity && a.casing?.color === b.casing?.color && a.label?.minzoom === b.label?.minzoom && a.label?.color === b.label?.color;
+/** Casing or label layers must be added or removed, not repainted. */
+const lineStructureChanged = (a: OverlayLayer['line'], b: OverlayLayer['line']) => !!a.casing !== !!b.casing || (a.label?.field ?? null) !== (b.label?.field ?? null);
 
 const boundsCache = new WeakMap<OverlayFC, Map<string, Bounds | null>>();
 function featureBounds(data: OverlayFC, idField: string, id: string): Bounds | null {
@@ -168,6 +180,10 @@ export default function MapView(props: Props) {
     dem: null as DemConfig | null,
     firstSymbol: undefined as string | undefined,
     overlayAnchor: undefined as string | undefined,
+    /** Overlay lines and labels go here: above contours and 3D buildings, below the basemap labels. */
+    lineAnchor: undefined as string | undefined,
+    /** Font stack the basemap uses, or null when the style has no glyphs (fallback style): then no overlay labels. */
+    labelFont: null as string[] | null,
     overlays: new Map<string, OverlayRec>(),
     overlayOrder: '',
     hoverOverlay: null as string | null,
@@ -356,8 +372,11 @@ export default function MapView(props: Props) {
         firstSymbol,
       );
     }
-    // Overlays go under contours and buildings, like the tract layers.
+    // Overlay fills go under contours and buildings, like the tract layers; their lines and labels sit above them.
     st.overlayAnchor = ['contour-minor', 'osm-3d', 'focus-3d'].find((l) => map.getLayer(l)) ?? firstSymbol;
+    st.lineAnchor = firstSymbol;
+    const fontLayer = layers.find((l) => l.type === 'symbol' && Array.isArray((l as { layout?: Record<string, unknown> }).layout?.['text-font']));
+    st.labelFont = map.getStyle().glyphs && fontLayer ? ((fontLayer as { layout?: Record<string, unknown> }).layout?.['text-font'] as string[]) : null;
 
     // Interaction (tract layers)
     map.on('mousemove', 'tract-fill', (e) => {
@@ -481,12 +500,30 @@ export default function MapView(props: Props) {
   function addOverlay(map: MLMap, cfg: OverlayLayer) {
     const source = overlaySource(cfg.id);
     const anchor = st.overlayAnchor;
+    const lineAnchor = st.lineAnchor;
     map.addSource(source, { type: 'geojson', data: cfg.data as never, promoteId: cfg.idField });
     map.addLayer({ id: `${cfg.id}-fill`, type: 'fill', source, layout: { visibility: fillVisible(cfg) ? 'visible' : 'none' }, paint: { 'fill-color': fillColor(cfg) as never, 'fill-opacity': fillOpacityOf(cfg) as never, 'fill-opacity-transition': { duration: 300, delay: 0 } } }, anchor);
-    map.addLayer({ id: `${cfg.id}-line`, type: 'line', source, layout: { 'line-join': 'round' }, paint: linePaint(cfg.line) as never }, anchor);
-    map.addLayer({ id: `${cfg.id}-hover`, type: 'line', source, paint: { 'line-color': '#334155', 'line-width': ['case', ['boolean', ['feature-state', 'hover'], false], 2, 0] } }, anchor);
-    map.addLayer({ id: `${cfg.id}-sel-glow`, type: 'line', source, paint: { 'line-color': VIOLET, 'line-blur': 6, 'line-opacity': 0.45, 'line-width': ['case', ['boolean', ['feature-state', 'selected'], false], 12, 0] } }, anchor);
-    map.addLayer({ id: `${cfg.id}-sel`, type: 'line', source, paint: { 'line-color': VIOLET, 'line-width': ['case', ['boolean', ['feature-state', 'selected'], false], 3.2, 0] } }, anchor);
+    if (cfg.line.casing) {
+      map.addLayer({ id: `${cfg.id}-casing`, type: 'line', source, layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': cfg.line.casing.color, 'line-width': cfg.line.casing.width as never, 'line-opacity': cfg.line.casing.opacity ?? 0.85 } }, lineAnchor);
+    }
+    map.addLayer({ id: `${cfg.id}-line`, type: 'line', source, layout: { 'line-join': 'round' }, paint: linePaint(cfg.line) as never }, lineAnchor);
+    map.addLayer({ id: `${cfg.id}-hover`, type: 'line', source, paint: { 'line-color': '#334155', 'line-width': ['case', ['boolean', ['feature-state', 'hover'], false], 2, 0] } }, lineAnchor);
+    map.addLayer({ id: `${cfg.id}-sel-glow`, type: 'line', source, paint: { 'line-color': VIOLET, 'line-blur': 6, 'line-opacity': 0.45, 'line-width': ['case', ['boolean', ['feature-state', 'selected'], false], 12, 0] } }, lineAnchor);
+    map.addLayer({ id: `${cfg.id}-sel`, type: 'line', source, paint: { 'line-color': VIOLET, 'line-width': ['case', ['boolean', ['feature-state', 'selected'], false], 3.2, 0] } }, lineAnchor);
+    if (cfg.line.label && st.labelFont) {
+      const lb = cfg.line.label;
+      map.addLayer(
+        {
+          id: `${cfg.id}-label`,
+          type: 'symbol',
+          source,
+          minzoom: lb.minzoom ?? 11,
+          layout: { 'symbol-placement': 'point', 'text-field': ['get', lb.field], 'text-font': st.labelFont, 'text-size': lb.size ?? 12, 'text-letter-spacing': 0.03, 'text-padding': 6, 'text-max-width': 8 },
+          paint: { 'text-color': lb.color ?? '#0f172a', 'text-halo-color': '#ffffff', 'text-halo-width': 1.6, 'text-opacity': cfg.line.opacity ?? 1 },
+        },
+        lineAnchor,
+      );
+    }
     const rec: OverlayRec = {
       cfg,
       values: new Map(),
@@ -547,6 +584,11 @@ export default function MapView(props: Props) {
       addOverlay(map, cfg);
       return;
     }
+    if (lineStructureChanged(cfg.line, prev.line)) {
+      removeOverlay(map, rec);
+      addOverlay(map, cfg);
+      return;
+    }
     rec.cfg = cfg;
     const fillId = `${cfg.id}-fill`;
     let dataChanged = false;
@@ -565,6 +607,15 @@ export default function MapView(props: Props) {
       const lp = linePaint(cfg.line);
       for (const k of ['line-color', 'line-width', 'line-opacity']) map.setPaintProperty(`${cfg.id}-line`, k, lp[k] as never);
       map.setPaintProperty(`${cfg.id}-line`, 'line-dasharray', (cfg.line.dash ?? null) as never);
+      if (cfg.line.casing && map.getLayer(`${cfg.id}-casing`)) {
+        map.setPaintProperty(`${cfg.id}-casing`, 'line-color', cfg.line.casing.color as never);
+        map.setPaintProperty(`${cfg.id}-casing`, 'line-width', cfg.line.casing.width as never);
+        map.setPaintProperty(`${cfg.id}-casing`, 'line-opacity', (cfg.line.casing.opacity ?? 0.85) as never);
+      }
+      if (map.getLayer(`${cfg.id}-label`)) {
+        map.setPaintProperty(`${cfg.id}-label`, 'text-opacity', (cfg.line.opacity ?? 1) as never);
+        map.setPaintProperty(`${cfg.id}-label`, 'text-color', (cfg.line.label?.color ?? '#0f172a') as never);
+      }
     }
     if (!cfg.interactive && rec.hovered) clearOverlayHover(map, rec);
     applyOverlayValues(map, rec);
@@ -584,7 +635,7 @@ export default function MapView(props: Props) {
     }
     const order = next.map((o) => o.id).join('|');
     if (order !== st.overlayOrder) {
-      for (const cfg of next) for (const s of OVERLAY_SUFFIXES) if (map.getLayer(`${cfg.id}${s}`)) map.moveLayer(`${cfg.id}${s}`, st.overlayAnchor);
+      for (const cfg of next) for (const s of OVERLAY_SUFFIXES) if (map.getLayer(`${cfg.id}${s}`)) map.moveLayer(`${cfg.id}${s}`, s === '-fill' ? st.overlayAnchor : st.lineAnchor);
       st.overlayOrder = order;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

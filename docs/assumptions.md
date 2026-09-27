@@ -109,3 +109,15 @@ Hazelwood (hero, watch list) · Garfield · Middle Hill · Homewood North · Low
 | Table substitutions | Poverty from C17002 (not B17001); vehicles from B25044 (not B08201) | B17001 and B08201 are not published for block groups; the substitutes give the same shares wherever both exist. | |
 | Sentinels and rounding | Negative estimates → null; MOE −555555555 → 0; other negative MOEs → null; counts, dollars and years as integers, shares to 4 decimals, CV to 3 | Nothing is imputed; topcoded medians stay as published. | |
 | Simplification | EPSG:2272, 5 m for tracts and block groups, 10 m for ZCTAs, county and city; coordinates to 5 decimals | Keeps the bundle small enough for one file; fine for choropleths, not for parcel work. | |
+
+### 10a. Additions of Sat 2026-09-26 (evening): municipalities, history, Analysis layers
+
+| Choice | Value | Rationale | Revisit by |
+|---|---|---|---|
+| Municipality unit | Census county subdivisions 2023, the 129 units other than Pittsburgh, bundled in full | In Pennsylvania every municipality is a county subdivision; the Census places file lacks the 42 townships. Pittsburgh stays the `city` level. | |
+| History span | ACS 5-year end years 2014–2024, every year | Ye's choice; overlapping windows are stated on every chart, dollars stay nominal. | Ye |
+| Carrying 2010 tracts | Housing-unit block crosswalk; counts apportioned, medians HU-weighted; tracts with a dominant 2010 share below 0.9 flagged (19 city tracts) | Same crosswalk the factors use; nothing imputed. | Data teammate |
+| Bundled history | 14 variables, margins for 6, 483 KB; the full 37 stay in `data/processed/acs_history_*.csv` | Keeps the offline file under 6.5 MB. | |
+| Analysis layers in Explore | Factor percentiles, scores under the current priorities, pressure, watch list, asking rents, raw inputs, painted for city tracts only with the Analysis palettes | Same values, same colours as the Analysis section, so the two screens never disagree. | |
+| Asking-rent areas | Yearly 2BR medians and distinct units per tract, ZIP and municipality, same suppression as tracts (10 per cell, 20 pooled) | Licensed aggregates only. | Ye |
+| Layout | Floating, collapsible panels with per-browser persistence; no numbered steps | Ye's request; defaults keep every panel open so a first visit and the smoke tests see the full interface. | Ye |

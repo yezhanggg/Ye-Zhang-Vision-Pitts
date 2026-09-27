@@ -1,5 +1,6 @@
 import { useApp, type Level } from '../../lib/store';
-import { BROWSE_LEVELS, LEVEL_LABEL, LEVEL_LAYER, groups, hasBrowser, levelMeta, variablesByGroup } from '../../lib/explore/catalog';
+import { BROWSE_LEVELS, LEVEL_LABEL, LEVEL_LAYER, groups, hasBrowser, isCountyWide, levelMeta, variableById, variablesByGroup } from '../../lib/explore/catalog';
+import { isAnalysis, isAnalysisGroup } from '../../lib/explore/analysisVars';
 import { EXPLORE_UI, LAYER_ROWS, scopeText } from '../../lib/explore/copy';
 import type { Loaded, UnitFC, VariableDef } from '../../lib/explore/types';
 import { cx } from '../../lib/format';
@@ -21,7 +22,7 @@ function VarRow({ v, on, onPick }: { v: VariableDef; on: boolean; onPick: () => 
   );
 }
 
-/** Step 3: geography, scope, and the variable catalogue as radio rows grouped by topic. */
+/** Data: geography, scope, and the variable catalogue as radio rows grouped by topic. */
 export default function DataPanel({ geo }: { geo: Loaded<UnitFC> }) {
   const browse = useApp((s) => s.browse);
   const layers = useApp((s) => s.layers);
@@ -32,7 +33,7 @@ export default function DataPanel({ geo }: { geo: Loaded<UnitFC> }) {
   const layerId = LEVEL_LAYER[level];
   const meta = levelMeta(level);
   const n = geo.data.features.length;
-  const chip = scopeText(n, LEVEL_LABEL[level].many, geo.source === 'supabase');
+  const chip = scopeText(n, LEVEL_LABEL[level].many, geo.source === 'supabase', isCountyWide(level));
   const layerLabel = LAYER_ROWS.find((r) => r.id === layerId)?.label ?? layerId;
 
   const pickLevel = (l: Level) => {
@@ -40,13 +41,18 @@ export default function DataPanel({ geo }: { geo: Loaded<UnitFC> }) {
     setLayer(LEVEL_LAYER[l], true);
   };
   const pickVariable = (id: string) => {
+    if (isAnalysis(variableById.get(id))) {
+      setBrowse({ variable: id, level: 'tract' });
+      setLayer('tracts', true);
+      return;
+    }
     setBrowse({ variable: id });
     setLayer(layerId, true);
   };
 
   if (!hasBrowser) {
     return (
-      <RailSection title={EXPLORE_UI.data} step={3}>
+      <RailSection id="data" title={EXPLORE_UI.data}>
         <p className="rounded-xl bg-stone-100 px-3 py-2 text-small text-slate-700 ring-1 ring-stone-200">{EXPLORE_UI.notBuilt}</p>
       </RailSection>
     );
@@ -54,8 +60,9 @@ export default function DataPanel({ geo }: { geo: Loaded<UnitFC> }) {
 
   return (
     <RailSection
+      id="data"
       title={EXPLORE_UI.data}
-      step={3}
+      sub={EXPLORE_UI.dataSub}
       right={
         browse.variable ? (
           <button onClick={() => setBrowse({ variable: null })} className="text-small font-semibold text-violet-700 hover:underline">
@@ -89,7 +96,9 @@ export default function DataPanel({ geo }: { geo: Loaded<UnitFC> }) {
               title={
                 <span>
                   <span className="block">{g.label}</span>
-                  <span className="block text-caption font-normal text-slate-600">{vars.length} variables</span>
+                  <span className="block text-caption font-normal text-slate-600">
+                    {vars.length} variables{isAnalysisGroup(g.id) ? ' · city tracts only' : ''}
+                  </span>
                 </span>
               }
               right={contains ? <Dot color="#7c3aed" size={8} /> : undefined}

@@ -26,13 +26,15 @@ describe('parseHash', () => {
     expect(p.mode).toBe('explore');
     expect(p.lastAnalysis).toBeUndefined();
     // L lists the layers that are on; bg stays off here even though g=bg (the store turns it on via setBrowse, parseHash is pure).
-    expect(p.layers).toEqual({ buildings: false, terrain: false, tracts: true, bg: false, zcta: false, county: false, city: true });
+    expect(p.layers).toEqual({ buildings: false, terrain: false, tracts: true, bg: false, zcta: false, muni: false, county: false, city: true });
     expect(p.browse).toEqual({ level: 'bg', variable: 'pop', selected: null });
   });
 
   it('reads a selected unit', () => {
     const p = parseHash('m=explore&g=zcta&u=zcta:15207');
     expect(p.browse).toEqual({ level: 'zcta', variable: null, selected: { level: 'zcta', geoid: '15207' } });
+    const m = parseHash('m=explore&g=muni&u=muni:4200366576');
+    expect(m.browse).toEqual({ level: 'muni', variable: null, selected: { level: 'muni', geoid: '4200366576' } });
     expect(parseHash('m=explore&u=zcta:abc').browse).toBeUndefined();
     expect(parseHash('m=explore&u=state:15207').browse).toBeUndefined();
   });
@@ -54,7 +56,7 @@ describe('parseHash', () => {
     expect(p.lite).toBe(true);
     expect(p.layers?.terrain).toBe(false);
     const q = parseHash('m=explore&L=buildings,terrain,tracts&lite=1');
-    expect(q.layers).toEqual({ buildings: true, terrain: false, tracts: true, bg: false, zcta: false, county: false, city: false });
+    expect(q.layers).toEqual({ buildings: true, terrain: false, tracts: true, bg: false, zcta: false, muni: false, county: false, city: false });
   });
 
   it('accepts a leading # and an empty hash', () => {

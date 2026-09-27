@@ -17,12 +17,11 @@ export function Switch({ on, onChange, label, caption, id }: { on: boolean; onCh
   );
 }
 
-/** Seven map layers plus the Reduce-motion switch (which also turns terrain off). */
+/** The map layers as switches (Reduce motion lives in the top-right cluster of the shell). */
 export default function LayersPanel() {
   const layers = useApp((s) => s.layers);
   const lite = useApp((s) => s.lite);
   const setLayer = useApp((s) => s.setLayer);
-  const set = useApp((s) => s.set);
   return (
     <div className="space-y-1.5">
       {LAYER_ROWS.map((row) => {
@@ -30,7 +29,6 @@ export default function LayersPanel() {
         const caption = id === 'terrain' && lite ? `${row.caption} · ${EXPLORE_UI.terrainOffWhenLite}` : row.caption;
         return <Switch key={id} id={`layer-${id}`} on={!!layers[id]} label={row.label} caption={caption} onChange={(on) => setLayer(id, on)} />;
       })}
-      <Switch id="layer-lite" on={lite} label={EXPLORE_UI.reduceMotion.label} caption={EXPLORE_UI.reduceMotion.caption} onChange={(on) => (on ? set({ lite: true, layers: { ...layers, terrain: false } }) : set({ lite: false }))} />
     </div>
   );
 }

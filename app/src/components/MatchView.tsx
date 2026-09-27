@@ -10,6 +10,7 @@ import { useExplanation } from '../lib/explainRemote';
 import type { TractProps } from '../lib/types';
 import MapView from './MapView';
 import Rail, { RailSection } from './Rail';
+import PanelFrame from './PanelFrame';
 import TractSearch from './TractSearch';
 import WeightPanel from './WeightPanel';
 import MetricPicker from './MetricPicker';
@@ -177,17 +178,14 @@ function CitySummary({ results }: { results: Map<string, TractResult> }) {
       <div>
         <div className="text-small font-semibold text-violet-700">Start here</div>
         <h2 className="mt-1 font-display text-title font-bold text-slate-900">Pick a place to see which kind of housing fits it best, and why.</h2>
-        <ol className="mt-3 space-y-1.5 text-body text-slate-700">
-          <li>
-            <b className="text-slate-900">1.</b> Search an address or click the map.
-          </li>
-          <li>
-            <b className="text-slate-900">2.</b> Choose what matters most and watch the ranking change.
-          </li>
-          <li>
-            <b className="text-slate-900">3.</b> Compare two places, or two sets of priorities.
-          </li>
-        </ol>
+        <ul className="mt-3 space-y-1.5 text-body text-slate-700">
+          {['Search an address or click the map.', 'Choose what matters most and watch the ranking change.', 'Compare two places, or two sets of priorities.'].map((t) => (
+            <li key={t} className="flex gap-2.5">
+              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-violet-600" aria-hidden />
+              <span>{t}</span>
+            </li>
+          ))}
+        </ul>
       </div>
       <div>
         <div className="mb-1.5 text-small text-slate-700">Demo neighborhoods</div>
@@ -320,6 +318,7 @@ export default function MatchView() {
   const layers = useApp((s) => s.layers);
   const scenarios = useApp((s) => s.scenarios);
   const pin = useApp((s) => s.pin);
+  const ui = useApp((s) => s.ui);
   const { set, select, setWeights, saveScenario } = useApp.getState();
   const results = useAllResults(weights);
   const paint = usePaint(metric, results);
@@ -327,16 +326,35 @@ export default function MatchView() {
   const r = selectedId ? results.get(selectedId) ?? { scores: [], ranking: [], top: null, topScore: null } : null;
   const buildingColor = r?.top ? typologyById.get(r.top)?.color : null;
   const presetName = scoring.presets.find((p) => p.id === matchPreset(weights))?.label;
+  const padding = useMemo(() => ({ top: 90, bottom: 90, left: ui.left ? 420 : 70, right: ui.right ? 500 : 70 }), [ui.left, ui.right]);
 
   return (
-    <div className="flex h-full">
-      <Rail>
-        <RailSection title="Find a place" step={1}>
+    <div className="relative h-full">
+      <MapView
+        paint={paint}
+        selectedId={selectedId}
+        buildingColor={buildingColor}
+        lite={lite}
+        terrain={layers.terrain}
+        buildings={layers.buildings}
+        padding={padding}
+        pin={pin}
+        elevationReadout
+        onSelect={select}
+        idleOrbit
+        tooltip={(id) => <MapTooltip id={id} results={results} />}
+      />
+      <Rail float title={UI.matchTab}>
+        <RailSection id="place" title="Find a place">
           <TractSearch value={selectedId} onChange={select} label="Search an address, neighborhood or tract" />
         </RailSection>
-        <WeightPanel weights={weights} onChange={setWeights} steps={[2, 3]} />
-        <MetricPicker value={metric} onChange={(m) => set({ metric: m })} step={4} />
-        <RailSection title={UI.saveCompare} step={5} sub="Keep these priorities and see how the map changes under another set.">
+        <RailSection id="priorities" title={UI.whatMatters}>
+          <WeightPanel weights={weights} onChange={setWeights} hideTitle />
+        </RailSection>
+        <RailSection id="colorBy" title={UI.colorBy}>
+          <MetricPicker value={metric} onChange={(m) => set({ metric: m })} hideTitle />
+        </RailSection>
+        <RailSection id="save" title={UI.saveCompare} sub="Keep these priorities and see how the map changes under another set.">
           <button
             disabled={scenarios.length >= MAX_SCENARIOS}
             onClick={() => {
@@ -349,28 +367,10 @@ export default function MatchView() {
           </button>
         </RailSection>
       </Rail>
-      <main className="relative min-w-0 flex-1">
-        <MapView
-          paint={paint}
-          selectedId={selectedId}
-          buildingColor={buildingColor}
-          lite={lite}
-          terrain={layers.terrain}
-          buildings={layers.buildings}
-          padding={{ top: 90, bottom: 90, left: 70, right: 500 }}
-          pin={pin}
-          elevationReadout
-          onSelect={select}
-          idleOrbit
-          tooltip={(id) => <MapTooltip id={id} results={results} />}
-        />
-        <motion.div initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 30 }} className="scroll-quiet absolute bottom-3 right-3 top-3 z-20 w-[440px] overflow-y-auto rounded-2xl bg-white/95 shadow-[0_10px_40px_-10px_rgba(15,23,42,0.25)] ring-1 ring-black/5 backdrop-blur">
-          {t && r ? <TractDetail t={t} r={r} weights={weights} onClose={() => select(null)} /> : <CitySummary results={results} />}
-        </motion.div>
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="absolute bottom-3 left-3 z-20">
-          <Legend metric={metric} buildings={buildingColor} />
-        </motion.div>
-      </main>
+      <PanelFrame>{t && r ? <TractDetail t={t} r={r} weights={weights} onClose={() => select(null)} /> : <CitySummary results={results} />}</PanelFrame>
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={`absolute bottom-3 z-20 transition-[left] duration-200 ${ui.left ? 'left-[364px] xl:left-[384px]' : 'left-3'}`}>
+        <Legend metric={metric} buildings={buildingColor} />
+      </motion.div>
     </div>
   );
 }

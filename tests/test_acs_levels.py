@@ -63,6 +63,7 @@ def test_catalogue_json_shape():
 def test_geo_clause_per_level():
     assert al.geo_clause("tract") == {"for": "tract:*", "in": "state:42 county:003"}
     assert al.geo_clause("bg") == {"for": "block group:*", "in": "state:42 county:003 tract:*"}
+    assert al.geo_clause("muni") == {"for": "county subdivision:*", "in": "state:42 county:003"}
     assert al.geo_clause("county") == {"for": "county:003", "in": "state:42"}
     assert al.geo_clause("city") == {"for": "place:61000", "in": "state:42"}
     z = al.geo_clause("zcta", ["15201", "15203"])
@@ -79,6 +80,8 @@ def test_rows_to_frame_builds_geoids_of_the_right_width():
         "bg": (["B01003_001E", "B01003_001M", "state", "county", "tract", "block group"], ["10", "5", "42", "003", "562300", "1"],
                "420035623001"),
         "zcta": (["B01003_001E", "B01003_001M", "zip code tabulation area"], ["10", "5", "15207"], "15207"),
+        "muni": (["B01003_001E", "B01003_001M", "state", "county", "county subdivision"], ["10", "5", "42", "003", "66576"],
+                 "4200366576"),
         "county": (["B01003_001E", "B01003_001M", "state", "county"], ["10", "5", "42", "003"], "42003"),
         "city": (["B01003_001E", "B01003_001M", "state", "place"], ["10", "5", "42", "61000"], "4261000"),
     }
@@ -277,3 +280,14 @@ def test_to_fc_rounds_coordinates_and_keeps_props():
     fc4 = gl.to_fc(g, ["GEOID"], tolerance_m=5.0, nd=4)
     assert all(round(x, 4) == x for x, _ in fc4["features"][0]["geometry"]["coordinates"][0])
     assert fc4["features"][0]["properties"] == {"GEOID": "420035623001"}
+
+
+@pytest.mark.skipif(not gl.COUSUB_ZIP.exists(), reason="county subdivision file is a local raw download")
+def test_municipalities_are_the_129_units_other_than_pittsburgh():
+    m = gl.munis()
+    assert len(m) == gl.EXPECTED["county"]["muni"] == 129
+    assert gl.PITTSBURGH_MUNI_GEOID not in set(m["GEOID"])
+    assert m["GEOID"].str.len().eq(10).all() and m["GEOID"].is_monotonic_increasing
+    assert set(m["kind"]) <= {"borough", "township", "city", "municipality"}
+    assert "Mount Oliver borough" in set(m["name"])  # the enclave inside the city stays a municipality
+    assert (m["pgh_share"] <= 0.05).all()  # nothing outside Pittsburgh overlaps the city polygon materially

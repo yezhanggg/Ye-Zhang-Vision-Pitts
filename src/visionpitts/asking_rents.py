@@ -113,16 +113,21 @@ def keys(df: pd.DataFrame) -> tuple[pd.Series, pd.Series, pd.Series]:
 
 def site_key(df: pd.DataFrame) -> pd.Series:
     """Location rounded to SITE_DECIMALS (~10 m): the building identity that survives PROPERTY_ID re-keying."""
-    return "s" + df["LATITUDE"].round(SITE_DECIMALS).astype(str) + "," + df["LONGITUDE"].round(SITE_DECIMALS).astype(str)
+    lat, lon = df["LATITUDE"].round(SITE_DECIMALS).astype(str), df["LONGITUDE"].round(SITE_DECIMALS).astype(str)
+    return "s" + lat + "," + lon
 
 
-def unit_months(df: pd.DataFrame) -> pd.DataFrame:
-    """One row per unit per scrape month: median rent in the month, last beds / tract / property key / site seen."""
+def unit_months(df: pd.DataFrame, extra: tuple[str, ...] = ()) -> pd.DataFrame:
+    """One row per unit per scrape month: median rent in the month, last beds / tract / property key / site seen.
+
+    `extra` names further per-row keys to carry (last value seen), e.g. the ZIP code or municipality of the point.
+    """
     d = df.sort_values("ts")
-    g = (d.groupby(["ukey", "month"], sort=False, observed=True)
-         .agg(rent=("RENT_PRICE", "median"), beds=("BEDS", "last"), geoid=("GEOID", "last"), pkey=("pkey", "last"),
-              site=("site", "last"), keytype=("keytype", "last"))
-         .reset_index())
+    aggs = dict(rent=("RENT_PRICE", "median"), beds=("BEDS", "last"), geoid=("GEOID", "last"),
+                pkey=("pkey", "last"), site=("site", "last"), keytype=("keytype", "last"))
+    for k in extra:
+        aggs[k] = (k, "last")
+    g = d.groupby(["ukey", "month"], sort=False, observed=True).agg(**aggs).reset_index()
     g["year"] = g["month"].dt.year.astype(int)
     return g
 
@@ -175,7 +180,8 @@ def tract_table(um: pd.DataFrame, geoids) -> pd.DataFrame:
     d = um[um["year"].isin(YEARS) & um["geoid"].isin(idx)]
     b2 = d[d["beds"] == 2]
     for y in YEARS:
-        c2, ca, ci = _cell(b2[b2["year"] == y], idx), _cell(d[d["year"] == y], idx), _cell(d[d["year"] == y], idx, "ratio")
+        dy = d[d["year"] == y]
+        c2, ca, ci = _cell(b2[b2["year"] == y], idx), _cell(dy, idx), _cell(dy, idx, "ratio")
         out[f"rent_2br_{y}"] = _level(c2, MIN_UNITS_CELL)
         out[f"n_units_2br_{y}"] = _count(c2)
         out[f"n_months_2br_{y}"] = _count(c2, "months")
@@ -230,4 +236,40 @@ def trend(um: pd.DataFrame, city_geoids) -> dict:
                               "n_unit_months": len(sub)}
     for k, sub in (("county", b2), ("city", b2[city])):
         out["growth"][k] = {"all": _pooled(sub), "existing": _pooled(sub[sub["existing"]])}
+    return out
+
+
+AREA_YEARS = YEARS
+
+
+def area_table(um: pd.DataFrame, key: str, ids) -> pd.DataFrame:
+    """The tract table for another geography: `key` names the unit-month column holding that geography's id."""
+    return tract_table(um.assign(geoid=um[key]), ids)
+
+
+def _num(v):
+    if v is None or v is pd.NA or (isinstance(v, float) and np.isnan(v)):
+        return None
+    return float(v) if isinstance(v, (float, np.floating)) else int(v)
+
+
+def area_bundle(tables: dict[str, pd.DataFrame], years: list[int] = AREA_YEARS) -> dict:
+    """Compact per-area asking-rent series for the app (aggregates only, suppression already applied).
+
+    {years, levels: {level: {geoid: {rent_2br: [...], n_units: [...], level, n, growth_existing, growth_all, conf}}}}
+    """
+    out: dict = {"years": years, "levels": {}}
+    for level, tab in tables.items():
+        units: dict[str, dict] = {}
+        for geoid, r in tab.iterrows():
+            rent = [_num(r.get(f"rent_2br_{y}")) for y in years]
+            n = [int(r.get(f"n_units_2br_{y}", 0) or 0) for y in years]
+            level_rent = _num(r.get("rent_2br_2025_26"))
+            if level_rent is None and all(v is None for v in rent):
+                continue
+            units[str(geoid)] = {"rent_2br": rent, "n_units": n, "level": level_rent,
+                                 "n": int(r.get("n_units_2025_26", 0) or 0),
+                                 "growth_existing": _num(r.get("rent_2br_growth_existing")),
+                                 "growth_all": _num(r.get("rent_2br_growth_all")), "conf": r.get("asking_rents_conf")}
+        out["levels"][level] = units
     return out

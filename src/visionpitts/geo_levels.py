@@ -1,4 +1,4 @@
-"""Geometry for the five ACS levels: county-wide sets and the city subsets the app bundles.
+"""Geometry for the six ACS levels: county-wide sets and the subsets the app bundles (city, plus every municipality).
 
 Each loader returns a WGS84 GeoDataFrame with `GEOID`, `name`, `pgh_share` (share of the unit's area inside the
 Pittsburgh city polygon, computed in EPSG:2272) and, for block groups, the parent `tract`. `to_fc` turns one into
@@ -17,6 +17,7 @@ from visionpitts import geo
 from visionpitts.config import (
     CITY_PLACE_GEOID,
     CITY_SHARE_MIN,
+    COUNTY_FIPS,
     COUNTY_GEOID,
     CRS_PA_SOUTH,
     CRS_WGS84,
@@ -30,15 +31,17 @@ BGS_SHP = RAW / "boundaries" / "allegheny_bgs" / "allegheny_bgs.shp"
 COUNTY_SHP = RAW / "boundaries" / "allegheny_county" / "allegheny_county.shp"
 CITY_SHP = geo.CITY_SHP
 ZCTA_GEOJSON = RAW / "benchmark" / "flags" / "zcta2020_allegheny.geojson"
+COUSUB_ZIP = RAW / "benchmark" / "cousub" / "cb_2023_42_cousub_500k.zip"  # Census county subdivisions = PA municipalities
 CITY_TRACTS_PARQUET = INTERIM / "tracts_city.parquet"
+PITTSBURGH_MUNI_GEOID = COUNTY_GEOID + "61000"  # Pittsburgh's county-subdivision id; it is the `city` level, not a muni
 
 Scope = Literal["county", "city"]
 ZCTA_CITY_MIN = 0.01          # a ZCTA is "in the city" when at least 1% of its area is inside the city limits
 BG_CITY_MIN = CITY_SHARE_MIN  # block groups follow the tract rule (>= 50%)
-SIMPLIFY_M: dict[str, float] = {"tract": 5.0, "bg": 5.0, "zcta": 10.0, "county": 10.0, "city": 10.0}
+SIMPLIFY_M: dict[str, float] = {"tract": 5.0, "bg": 5.0, "zcta": 10.0, "muni": 10.0, "county": 10.0, "city": 10.0}
 EXPECTED: dict[str, dict[str, int]] = {
-    "county": {"tract": 394, "bg": 1062, "zcta": 170, "county": 1, "city": 1},
-    "city": {"tract": 128, "bg": 314, "zcta": 32, "county": 1, "city": 1},
+    "county": {"tract": 394, "bg": 1062, "zcta": 170, "muni": 129, "county": 1, "city": 1},
+    "city": {"tract": 128, "bg": 314, "zcta": 32, "muni": 129, "county": 1, "city": 1},
 }
 COUNTY_NAME = "Allegheny County"
 CITY_NAME = "City of Pittsburgh"
@@ -119,6 +122,21 @@ def zcta_ids() -> list[str]:
     return sorted(z["ZCTA5"].astype(str).str.zfill(5).unique().tolist())
 
 
+def munis(scope: Scope = "county") -> gpd.GeoDataFrame:
+    """The 129 Allegheny County municipalities other than Pittsburgh: Census county subdivisions (2023 cartographic
+    file), i.e. every city, borough, township and home-rule municipality. Pittsburgh is served by the `city` level.
+    Both scopes return all 129, so the app bundles the whole county and never needs Supabase for this level.
+    `kind` is the legal type from the Census name ("Ross township" -> "township")."""
+    m = gpd.read_file(f"zip://{COUSUB_ZIP}")
+    m = m[m["COUNTYFP"].astype(str) == COUNTY_FIPS].copy()
+    m["GEOID"] = m["GEOID"].astype(str)
+    m = m[m["GEOID"] != PITTSBURGH_MUNI_GEOID].copy()
+    m["name"] = m["NAMELSAD"].astype(str)
+    m["kind"] = m["NAMELSAD"].astype(str).str.split().str[-1].str.lower()
+    m["pgh_share"] = share_inside(m).round(4)
+    return _finish(m, ["GEOID", "name", "kind", "pgh_share"])
+
+
 def county() -> gpd.GeoDataFrame:
     c = gpd.read_file(COUNTY_SHP)
     c["GEOID"] = c["GEOID"].astype(str)
@@ -145,6 +163,8 @@ def units(level: str, scope: Scope = "county") -> gpd.GeoDataFrame:
         return block_groups(scope)
     if level == "zcta":
         return zctas(scope)
+    if level == "muni":
+        return munis(scope)
     if level == "county":
         return county()
     if level == "city":
@@ -153,7 +173,11 @@ def units(level: str, scope: Scope = "county") -> gpd.GeoDataFrame:
 
 
 def props_for(level: str) -> list[str]:
-    return ["GEOID", "name", "tract", "pgh_share"] if level == "bg" else ["GEOID", "name", "pgh_share"]
+    if level == "bg":
+        return ["GEOID", "name", "tract", "pgh_share"]
+    if level == "muni":
+        return ["GEOID", "name", "kind", "pgh_share"]
+    return ["GEOID", "name", "pgh_share"]
 
 
 # ------------------------------------------------------------------------------------------- geojson

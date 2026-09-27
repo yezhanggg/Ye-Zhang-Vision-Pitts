@@ -19,13 +19,13 @@ export type MapMetric =
 
 // ------------------------------------------------------------------ Explore: layers and the data browser
 /** Geographies the data browser can paint. County and city are single values shown as reference lines. */
-export type Level = 'tract' | 'bg' | 'zcta';
-export const LEVELS: Level[] = ['tract', 'bg', 'zcta'];
-export type LayerId = 'buildings' | 'terrain' | 'tracts' | 'bg' | 'zcta' | 'county' | 'city';
-export const LAYER_IDS: LayerId[] = ['buildings', 'terrain', 'tracts', 'bg', 'zcta', 'county', 'city'];
+export type Level = 'tract' | 'bg' | 'zcta' | 'muni';
+export const LEVELS: Level[] = ['tract', 'bg', 'zcta', 'muni'];
+export type LayerId = 'buildings' | 'terrain' | 'tracts' | 'bg' | 'zcta' | 'muni' | 'county' | 'city';
+export const LAYER_IDS: LayerId[] = ['buildings', 'terrain', 'tracts', 'bg', 'zcta', 'muni', 'county', 'city'];
 export type Layers = Record<LayerId, boolean>;
 /** The map layer that carries a browse level. */
-export const LAYER_FOR_LEVEL: Record<Level, LayerId> = { tract: 'tracts', bg: 'bg', zcta: 'zcta' };
+export const LAYER_FOR_LEVEL: Record<Level, LayerId> = { tract: 'tracts', bg: 'bg', zcta: 'zcta', muni: 'muni' };
 
 export interface Browse {
   level: Level;
@@ -33,6 +33,62 @@ export interface Browse {
   variable: string | null;
   /** Unit opened in the place card. */
   selected: { level: Level; geoid: string } | null;
+}
+
+// ------------------------------------------------------------------ layout: floating panels and their sections
+/** Collapsible sections of the left panel. Explore uses search/layers/data; the Analysis views use the rest. */
+export type SectionId = 'search' | 'layers' | 'data' | 'place' | 'priorities' | 'colorBy' | 'save' | 'compare';
+export type SectionState = 'open' | 'collapsed' | 'hidden';
+export const SECTION_IDS: SectionId[] = ['search', 'layers', 'data', 'place', 'priorities', 'colorBy', 'save', 'compare'];
+export const SECTION_LABELS: Record<SectionId, string> = {
+  search: 'Search',
+  layers: 'Layers',
+  data: 'Data',
+  place: 'Find a place',
+  priorities: 'What matters most',
+  colorBy: 'Color the map by',
+  save: 'Save & compare',
+  compare: 'Scenarios',
+};
+/** Sections each mode shows, in panel order (the Panels menu lists these). */
+export const SECTIONS_FOR_MODE: Record<Mode, SectionId[]> = {
+  explore: ['search', 'layers', 'data'],
+  match: ['place', 'priorities', 'colorBy', 'save'],
+  tracts: ['place', 'priorities', 'colorBy'],
+  scenarios: ['place', 'compare', 'priorities'],
+};
+export interface UiState {
+  /** Left panel shown (Explore, Match: floating card; compare views: docked column). */
+  left: boolean;
+  /** Right summary panel shown (Explore, Match). */
+  right: boolean;
+  sections: Record<SectionId, SectionState>;
+}
+const UI_KEY = 'visionpitts.ui';
+export const defaultUi = (): UiState => ({ left: true, right: true, sections: Object.fromEntries(SECTION_IDS.map((id) => [id, 'open'])) as Record<SectionId, SectionState> });
+/** Layout preferences persist per browser; never in the URL. Anything unreadable falls back to the defaults. */
+function readUi(): UiState {
+  const d = defaultUi();
+  try {
+    const raw = localStorage.getItem(UI_KEY);
+    if (!raw) return d;
+    const p = JSON.parse(raw) as Partial<UiState>;
+    const sections = { ...d.sections };
+    for (const id of SECTION_IDS) {
+      const v = p.sections?.[id];
+      if (v === 'open' || v === 'collapsed' || v === 'hidden') sections[id] = v;
+    }
+    return { left: p.left !== false, right: p.right !== false, sections };
+  } catch {
+    return d;
+  }
+}
+function writeUi(ui: UiState) {
+  try {
+    localStorage.setItem(UI_KEY, JSON.stringify(ui));
+  } catch {
+    /* private mode or no storage */
+  }
 }
 
 export const SCENARIO_COLORS = ['#7c3aed', '#0f766e', '#c2410c', '#be185d'];
@@ -65,7 +121,7 @@ try {
   /* no window in tests */
 }
 
-export const defaultLayers = (lite = liteDefault): Layers => ({ buildings: true, terrain: !lite, tracts: true, bg: false, zcta: false, county: false, city: true });
+export const defaultLayers = (lite = liteDefault): Layers => ({ buildings: true, terrain: !lite, tracts: true, bg: false, zcta: false, muni: false, county: false, city: true });
 export const defaultBrowse = (): Browse => ({ level: 'tract', variable: null, selected: null });
 
 export interface AppState {
@@ -92,7 +148,10 @@ export interface AppState {
   browse: Browse;
   /** Unit under the cursor in Explore (for the legend tick). */
   hoverId: string | null;
+  ui: UiState;
   set: (p: Partial<AppState>) => void;
+  setUi: (p: Partial<UiState>) => void;
+  setSection: (id: SectionId, state: SectionState) => void;
   setMode: (m: Mode) => void;
   select: (id: string | null) => void;
   setWeights: (w: Weights) => void;
@@ -126,7 +185,19 @@ export const useApp = create<AppState>((set, get) => ({
   layers: defaultLayers(),
   browse: defaultBrowse(),
   hoverId: null,
+  ui: readUi(),
   set: (p) => set(p),
+  setUi: (p) => {
+    const ui = { ...get().ui, ...p };
+    writeUi(ui);
+    set({ ui });
+  },
+  setSection: (id, state) => {
+    const s = get();
+    const ui = { ...s.ui, sections: { ...s.ui.sections, [id]: state } };
+    writeUi(ui);
+    set({ ui });
+  },
   setMode: (mode) => {
     const s = get();
     const patch: Partial<AppState> = { mode };
@@ -139,7 +210,10 @@ export const useApp = create<AppState>((set, get) => ({
     if (mode === 'scenarios' && !s.selectedId) patch.selectedId = focusTracts[0]?.GEOID ?? null;
     set(patch);
   },
-  select: (id) => set({ selectedId: id }),
+  select: (id) => {
+    const s = get();
+    set(id && !s.ui.right ? { selectedId: id, ui: { ...s.ui, right: true } } : { selectedId: id });
+  },
   setWeights: (weights) => set({ weights }),
   applyPreset: (id) => set({ weights: presetWeights(id) }),
   setScenarioWeights: (which, w) => {
@@ -176,6 +250,8 @@ export const useApp = create<AppState>((set, get) => ({
     }
     // A selected city tract is also the Analysis tract, so "Open in Analysis" lands on it.
     if (p.selected && p.selected.level === 'tract' && tractById.has(p.selected.geoid)) patch.selectedId = p.selected.geoid;
+    // Picking a unit or a variable brings the summary panel back if it was hidden.
+    if ((p.selected || p.variable) && !s.ui.right) patch.ui = { ...s.ui, right: true };
     set(patch);
   },
 }));

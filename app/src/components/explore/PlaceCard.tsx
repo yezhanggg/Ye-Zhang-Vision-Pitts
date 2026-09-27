@@ -5,7 +5,8 @@ import { KEY_VARS, LEVEL_LABEL, LEVEL_LAYER, RELIABILITY, groups, reference, uni
 import { finite, fmtEstimate, fmtMoe, fmtValue, reliability } from '../../lib/explore/bins';
 import { EXPLORE_UI } from '../../lib/explore/copy';
 import { useUnit } from '../../lib/explore/remote';
-import type { Estimate, UnitFC, VariableDef } from '../../lib/explore/types';
+import type { Estimate, Loaded, UnitFC, ValueMap, VariableDef } from '../../lib/explore/types';
+import PlaceSummary, { VariableDetail } from './PlaceSummary';
 import { cx } from '../../lib/format';
 import type { Conf } from '../../lib/types';
 import { Button, ConfChip, Dot, Explainer, SectionTitle } from '../primitives';
@@ -51,8 +52,8 @@ function KeyRow({ v, e, onMap, onShow }: { v: VariableDef; e: Estimate | undefin
   );
 }
 
-/** Right panel for a selected unit: headline table against city and county, every variable by group, and the way into Match. */
-export default function PlaceCard({ selected, fc }: { selected: { level: Level; geoid: string }; fc: UnitFC }) {
+/** Right panel for a selected unit: the full summary (or one variable's detail), the headline table, every variable by group. */
+export default function PlaceCard({ selected, fc, variable = null, values = null }: { selected: { level: Level; geoid: string }; fc: UnitFC; variable?: VariableDef | null; values?: Loaded<ValueMap> | null }) {
   const { level, geoid } = selected;
   const browse = useApp((s) => s.browse);
   const set = useApp((s) => s.set);
@@ -79,7 +80,7 @@ export default function PlaceCard({ selected, fc }: { selected: { level: Level; 
             <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-small text-slate-600 tnum">
               {sub && <span>{sub}</span>}
               <span className="rounded-full bg-stone-100 px-2 py-px text-caption font-semibold text-slate-700 ring-1 ring-stone-200">{LEVEL_LABEL[level].one}</span>
-              {typeof share === 'number' && share < 0.995 && <span className="text-caption">{EXPLORE_UI.insideCity(Math.max(1, Math.round(share * 100)))}</span>}
+              {level !== 'muni' && typeof share === 'number' && share < 0.995 && <span className="text-caption">{EXPLORE_UI.insideCity(Math.max(1, Math.round(share * 100)))}</span>}
               {unit.source === 'supabase' && <span className="text-caption text-emerald-700">online</span>}
             </div>
           </div>
@@ -90,8 +91,15 @@ export default function PlaceCard({ selected, fc }: { selected: { level: Level; 
           </button>
         </div>
       </div>
-      <div className="space-y-6 p-5">
-        {isCityTract && (
+      <div className="space-y-5 p-4">
+        {variable ? (
+          <VariableDetail level={level} geoid={geoid} variable={variable} values={values} unit={unit.values} />
+        ) : unit.loading && !unit.values ? (
+          <div className="rounded-xl bg-stone-50 px-3 py-6 text-center text-small text-slate-600 ring-1 ring-stone-200">Loading county-wide values…</div>
+        ) : (
+          <PlaceSummary level={level} geoid={geoid} unit={unit.values} />
+        )}
+        {isCityTract && !variable && (
           <Button className="w-full" onClick={() => {
             set({ selectedId: geoid });
             setMode('match');

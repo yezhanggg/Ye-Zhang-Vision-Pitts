@@ -201,7 +201,7 @@
  "coverage": {
   "n_city_tracts": 128,
   "n_with_rent_2025_26": 108,
-  "n_with_growth_existing": 30,
+  "n_with_growth_existing": 15,
   "n_with_growth_all": 51,
   "n_above_fmr": 76
  },

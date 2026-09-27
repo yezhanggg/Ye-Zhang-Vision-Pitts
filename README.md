@@ -12,8 +12,7 @@ A census data browser and an anti-displacement housing matchmaker for the **City
 
 The app opens on a landing page with a live 3D map. **Open VisionPitts** flies from a globe down to Pittsburgh and lands in Explore.
 
-**Explore** is a census data browser on a 3D map.
-Search an address, turn layers on and off (buildings, terrain, tracts, block groups, ZIP codes, county, city), and pick one of **37 ACS 2020–2024 variables**: population, race, income, work, housing stock, tenure, rent and cost burden, commuting. The map colors tracts, block groups or ZIP codes. Hover for the value and its margin of error; click for a place card next to the city and county. These values are **descriptive, never scored**.
+**Explore** is a data browser on a 3D map, with floating panels you can collapse, hide or reopen (the layout persists per browser). Search an address, turn layers on and off (buildings, terrain, tracts, block groups, ZIP codes, the **129 municipalities** of Allegheny County outside Pittsburgh, county, city), and pick a variable under Data: one of **37 ACS 2020–2024 variables** for any geography, or one of the **Analysis layers** for city tracts (the six factor percentiles, match scores under the current priorities, market pressure and the watch list, asking rents, the raw factor inputs). Hover for the value and its margin; click a tract, ZIP code or municipality and the right panel becomes a summary: headline figures, tenure, housing stock, race, cost burden and commuting against the city and county, median income and rent **2014–2024**, and, for city tracts, what the matchmaker says. With a variable painted, the same click shows that variable's value, rank, distribution and trend. These values are **descriptive, never scored**.
 
 **Analysis** is the Track 3 matchmaker. For any city tract it answers one question: *which housing type (ADU, duplex/triplex, townhome, small apartment, senior housing) best serves households at or below 50% of area median income without accelerating displacement?*
 
@@ -27,6 +26,8 @@ Search an address, turn layers on and off (buildings, terrain, tracts, block gro
 | ![](docs/screenshots/01-explore.png) | ![](docs/screenshots/03-match-hazelwood.png) | ![](docs/screenshots/05-compare-tracts.png) | ![](docs/screenshots/06-compare-scenarios.png) |
 | **Watch list** | **Asking rents** | **Sources** | **Offline file** |
 | ![](docs/screenshots/04-watch-list.png) | ![](docs/screenshots/08-asking-rents.png) | ![](docs/screenshots/07-sources.png) | ![](docs/screenshots/09-single-file-export.png) |
+| **Place summary** | **One variable, one municipality** | | |
+| ![](docs/screenshots/10-place-summary.png) | ![](docs/screenshots/11-municipality-detail.png) | | |
 
 Made for city planners, community development corporations and mission-driven developers. The tool produces scenarios for a meeting, not verdicts.
 
@@ -34,11 +35,11 @@ Made for city planners, community development corporations and mission-driven de
 
 ```bash
 # Open it
-open export/index.html                 # one 5.5 MB file; basemap and search need internet, data is inside
+open export/index.html                 # one 6.4 MB file; basemap and search need internet, data is inside
 
 # Run the app
 cd app && npm install && npm run dev   # http://localhost:5173
-npm test && npm run build              # 38 tests; static site in app/dist
+npm test && npm run build              # 46 tests; static site in app/dist
 npm run export                         # rebuild export/index.html
 
 # Rebuild the data (Python 3.12 + uv; CENSUS_API_KEY in .env)
@@ -48,9 +49,11 @@ uv run python scripts/02_build_factors.py       # six scoring factors + confiden
 uv run python scripts/03_build_pressure.py      # market pressure, watch list
 uv run python scripts/04_export_app_data.py     # app/src/data/*.json
 uv run python scripts/05_build_buildings.py     # 3D buildings, demo tracts
-uv run python scripts/07_build_acs_levels.py    # Explore: 37 variables x 5 geographies
-uv run python scripts/08_publish_supabase.py    # push county-wide rows to Supabase
-uv run pytest                                   # 45 tests
+uv run python scripts/06_build_asking_rents.py  # optional, licensed Dewey caches: asking-rent aggregates (tracts, ZIPs, municipalities)
+uv run python scripts/07_build_acs_levels.py    # Explore: 37 variables x 6 geographies (incl. municipalities)
+uv run python scripts/08_publish_supabase.py    # push county-wide rows to Supabase (apply supabase/migrations first)
+uv run python scripts/09_build_acs_history.py   # Explore: the same variables for every end year 2014-2024
+uv run pytest                                   # 51 tests
 ```
 
 **Deploy (Vercel):** Root Directory `app`; env vars `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (public), `ANTHROPIC_API_KEY` (optional, AI explanation).
@@ -72,7 +75,7 @@ The app paints the bundled city data at once, then swaps in county-wide rows fro
 
 ## Supabase at a glance
 
-Five tables, all read-only for the browser. Writes happen only from `scripts/08_publish_supabase.py` with the secret key.
+Five tables, all read-only for the browser. Writes happen only from `scripts/08_publish_supabase.py` with the secret key. Migration `0002_muni_level.sql` adds the `muni` level and a `kind` column; apply it before publishing municipalities. The app never depends on it: every municipality, the ACS history and the rent aggregates ship inside the bundle.
 
 | Table | Rows | Columns | What it holds |
 |---|---|---|---|
@@ -105,10 +108,12 @@ All scoring data is public. Full registry with links, retrieval dates and checks
 | Subsidy eligibility | HUD QCT and DDA 2026 · Opportunity Zones · CDBG areas | tract, ZCTA, 2010 geography |
 | Transit access | Pittsburgh Regional Transit GTFS | stops, June 2026 |
 | Flood exposure | HAND inundation on USGS 3DEP (screening model, not FEMA) | tract, 2024 |
-| Explore browser | ACS 5-year 2020–2024, 37 variables | tract, block group, ZCTA, county, city |
+| Explore browser | ACS 5-year 2020–2024, 37 variables | tract, block group, ZCTA, municipality, county, city |
+| Explore history | ACS 5-year, end years 2014–2024, same 37 variables; 2010-vintage tracts carried to 2020 tracts by housing units ([method](docs/data/acs_history.md)) | tract, ZCTA, municipality, county, city |
+| Municipal boundaries | Census cartographic county subdivisions 2023 (129 cities, boroughs and townships outside Pittsburgh) | municipality |
 | Boundaries, names | Census TIGER and cartographic files · WPRDC neighborhoods | 2020 geography |
 | 3D buildings | Overture footprints · WPRDC assessments (stories only) | demo tracts |
-| Asking rents (info layer) | Dewey rental listings, **licensed**; only tract aggregates leave the pipeline | tract, 2019–2026 |
+| Asking rents (info layer) | Dewey rental listings, **licensed**; only aggregates leave the pipeline (yearly 2BR medians and unit counts, hidden under 10 units) | tract, ZCTA, municipality, 2019–2026 |
 | Basemap, terrain, search | OpenFreeMap · Mapterhorn · Photon · Census Geocoder | live |
 
 No individual-level data is used anywhere.
@@ -126,6 +131,8 @@ No individual-level data is used anywhere.
 - Eviction filings are apportioned from ZIPs; vouchers are suppressed in small tracts; market change is direction only.
 - Flood exposure is a terrain screen, not a FEMA map. Transit access is schedule, not ridership.
 - Explore values are survey estimates: block groups and ZCTAs often have low reliability, and ZCTAs only approximate ZIP codes.
+- The 2014–2024 lines are overlapping five-year windows in each vintage's own dollars; values before 2020 for 19 city tracts were assembled from several 2010 tracts and are flagged as such.
+- Analysis layers and the matchmaker block exist for the 128 city tracts only; municipalities and ZIP codes get census description and, where listed, asking rents.
 - Not covered: zoning and buildability, infrastructure capacity, carbon, parcel feasibility, in-place rents.
 - The fit matrix is a judgment and is published for review in [docs/assumptions.md](docs/assumptions.md) rather than tuned.
 

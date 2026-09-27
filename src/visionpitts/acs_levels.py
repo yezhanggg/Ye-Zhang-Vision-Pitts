@@ -1,4 +1,4 @@
-"""ACS 5-year variables for five geographies: tract, block group, ZCTA, county and the city place.
+"""ACS 5-year variables for six geographies: tract, block group, ZCTA, municipality, county and the city place.
 
 The catalogue (37 derived variables from 84 ACS stems), the Census API fetch with a raw CSV cache, sentinel
 cleaning, MOE arithmetic (root-sum-square for sums, the ACS proportion formula for shares with the ratio
@@ -21,12 +21,13 @@ import requests
 
 from visionpitts.config import ACS_YEAR, CENSUS_API_KEY, CITY_PLACE_GEOID, COUNTY_FIPS, RAW, STATE_FIPS
 
-Level = Literal["tract", "bg", "zcta", "county", "city"]
-LEVELS: tuple[Level, ...] = ("tract", "bg", "zcta", "county", "city")
+Level = Literal["tract", "bg", "zcta", "muni", "county", "city"]
+LEVELS: tuple[Level, ...] = ("tract", "bg", "zcta", "muni", "county", "city")
 LEVEL_LABELS: dict[str, str] = {
     "tract": "Census tract",
     "bg": "Block group",
     "zcta": "ZIP code (ZCTA)",
+    "muni": "Municipality",
     "county": "County",
     "city": "City",
 }
@@ -42,10 +43,11 @@ GEO_COLS: dict[str, tuple[str, ...]] = {
     "tract": ("state", "county", "tract"),
     "bg": ("state", "county", "tract", "block group"),
     "zcta": ("zip code tabulation area",),
+    "muni": ("state", "county", "county subdivision"),
     "county": ("state", "county"),
     "city": ("state", "place"),
 }
-GEOID_LEN: dict[str, int] = {"tract": 11, "bg": 12, "zcta": 5, "county": 5, "city": 7}
+GEOID_LEN: dict[str, int] = {"tract": 11, "bg": 12, "zcta": 5, "muni": 10, "county": 5, "city": 7}
 
 
 # ------------------------------------------------------------------------------------------- catalogue
@@ -215,6 +217,8 @@ def geo_clause(level: str, zctas: list[str] | None = None) -> dict[str, str]:
         if not zctas:
             raise ValueError("the ZCTA clause needs the explicit list of ZCTA ids")
         return {"for": "zip code tabulation area:" + ",".join(zctas)}
+    if level == "muni":
+        return {"for": "county subdivision:*", "in": f"state:{STATE_FIPS} county:{COUNTY_FIPS}"}
     if level == "county":
         return {"for": f"county:{COUNTY_FIPS}", "in": f"state:{STATE_FIPS}"}
     if level == "city":
@@ -226,16 +230,17 @@ def _redact(text: str) -> str:
     return text.replace(CENSUS_API_KEY, "***") if CENSUS_API_KEY else text
 
 
-def request_rows(session: requests.Session, params: dict, tries: int = 4, timeout: int = 90) -> list[list]:
+def request_rows(session: requests.Session, params: dict, tries: int = 4, timeout: int = 90, url: str = API_URL) -> list[list]:
     """One Census API call. Returns the header row followed by data rows; [] when the geography is empty (204).
 
     Retries `tries` times with 1/2/4/8 s waits on network errors, 429 and 5xx. A 400 raises at once with the body
     and the requested columns (the API names the offending variable there). The key never appears in messages.
+    `url` defaults to the catalogue vintage; the history build passes earlier vintages.
     """
     last = ""
     for attempt in range(tries):
         try:
-            r = session.get(API_URL, params=params, timeout=timeout)
+            r = session.get(url, params=params, timeout=timeout)
         except requests.RequestException as e:
             last = type(e).__name__
         else:
@@ -488,6 +493,7 @@ def catalogue_markdown(levels_meta: dict[str, dict[str, int]] | None = None, cat
         "tract": "the 128 city tracts of the main pipeline (>= 50% of area inside the city)",
         "bg": ">= 50% of the block group's area inside the city",
         "zcta": ">= 1% of the ZCTA's area inside the city",
+        "muni": "all 129 municipalities other than Pittsburgh (county subdivisions), bundled in full",
         "county": "Allegheny County (42003)",
         "city": "Pittsburgh city place (4261000)",
     }

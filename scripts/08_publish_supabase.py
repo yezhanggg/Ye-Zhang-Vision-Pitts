@@ -45,7 +45,7 @@ def geo_rows(levels: list[str]) -> list[dict]:
         for f in fc["features"]:
             p = f["properties"]
             rows.append({"level": level, "geoid": p["GEOID"], "name": p["name"], "pgh_share": p["pgh_share"],
-                         "tract": p.get("tract"), "geom": f["geometry"]})
+                         "tract": p.get("tract"), "kind": p.get("kind"), "geom": f["geometry"]})
     return rows
 
 

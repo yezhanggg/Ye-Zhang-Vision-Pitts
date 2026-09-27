@@ -1,14 +1,15 @@
-"""Step 7: ACS 2020-2024 5-year variables for tracts, block groups, ZCTAs, Allegheny County and the Pittsburgh place.
+"""Step 7: ACS 2020-2024 5-year variables for tracts, block groups, ZCTAs, municipalities, Allegheny County and the
+Pittsburgh place.
 
 Per level: fetch the 84 ACS stems from the Census API (cached in data/raw/acs/, git-ignored), clean sentinels,
 derive the 37 catalogue variables with MOE and CV, round, join names and the city share, then write
-  data/processed/acs_<level>.csv        county-wide (394 / 1062 / 170 / 1 / 1 rows), tracked
+  data/processed/acs_<level>.csv        county-wide (394 / 1062 / 170 / 129 / 1 / 1 rows), tracked
   app/src/data/acs_<level>.json         city subset {geoid: {var: [est, moe, cv]}}
-  app/src/data/geo_<level>.json         city-subset FeatureCollections for bg, zcta, county, city (tracts reuse tracts.json)
+  app/src/data/geo_<level>.json         bundled FeatureCollections for bg, zcta, muni, county, city (tracts reuse tracts.json)
   data/processed/acs_variables.json + app/src/data/acs_variables.json   the catalogue and level counts
   docs/data/acs_variables.md            the human-readable catalogue
-Stops if the bundled counts are not 128 / 314 / 32 / 1 / 1.
-Run: uv run python scripts/07_build_acs_levels.py [--refresh] [--levels tract bg zcta county city]
+Stops if the bundled counts are not 128 / 314 / 32 / 129 / 1 / 1.
+Run: uv run python scripts/07_build_acs_levels.py [--refresh] [--levels tract bg zcta muni county city]
 """
 import sys
 from pathlib import Path

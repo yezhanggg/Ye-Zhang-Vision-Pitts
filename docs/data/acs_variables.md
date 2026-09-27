@@ -11,6 +11,7 @@ These values are descriptive context for browsing. They are never scored and nev
 | `tract` | Census tract | 394 | 128 | the 128 city tracts of the main pipeline (>= 50% of area inside the city) |
 | `bg` | Block group | 1062 | 314 | >= 50% of the block group's area inside the city |
 | `zcta` | ZIP code (ZCTA) | 170 | 32 | >= 1% of the ZCTA's area inside the city |
+| `muni` | Municipality | 129 | 129 | all 129 municipalities other than Pittsburgh (county subdivisions), bundled in full |
 | `county` | County | 1 | 1 | Allegheny County (42003) |
 | `city` | City | 1 | 1 | Pittsburgh city place (4261000) |
 

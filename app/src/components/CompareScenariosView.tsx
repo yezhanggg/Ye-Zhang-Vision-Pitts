@@ -5,7 +5,7 @@ import { flipsBetween, focusFlipList, resultFor, tLabel, useAllResults } from '.
 import { buildPaint } from '../lib/paint';
 import { MAX_SCENARIOS, SCENARIO_COLORS, matchPreset, useApp } from '../lib/store';
 import { cx } from '../lib/format';
-import { factorName, weightWord } from '../lib/copy';
+import { UI, factorName, weightWord } from '../lib/copy';
 import type { Scenario } from '../lib/types';
 import Rail, { RailSection } from './Rail';
 import TractSearch from './TractSearch';
@@ -87,11 +87,11 @@ export default function CompareScenariosView() {
 
   return (
     <div className="flex h-full">
-      <Rail>
-        <RailSection title="Find a place" step={1}>
+      <Rail title={UI.compareScenariosTab}>
+        <RailSection id="place" title="Find a place">
           <TractSearch value={selectedId} onChange={select} showQuickPicks={false} label="Search an address, neighborhood or tract" />
         </RailSection>
-        <RailSection title={`Scenarios to compare (${scenarios.length} of ${MAX_SCENARIOS})`} step={2} sub="A scenario is a saved set of priorities.">
+        <RailSection id="compare" title={`Scenarios to compare (${scenarios.length} of ${MAX_SCENARIOS})`} sub="A scenario is a saved set of priorities.">
           <div className="space-y-1.5 rounded-xl bg-white p-2 ring-1 ring-stone-200/80">
             <ScenarioPicker which="A" value={A.id} scenarios={scenarios} onChange={(id) => set({ scenA: id })} />
             <ScenarioPicker which="B" value={B.id} scenarios={scenarios} onChange={(id) => set({ scenB: id })} />
@@ -112,9 +112,9 @@ export default function CompareScenariosView() {
             </button>
           </div>
         </RailSection>
-        <div>
+        <RailSection id="priorities" title={`What matters in scenario ${editing}?`}>
           <div className="mb-2 flex items-center gap-2">
-            <span className="text-body font-semibold text-slate-900">Edit</span>
+            <span className="text-small font-semibold text-slate-700">Edit</span>
             <div className="inline-flex rounded-lg bg-stone-100 p-0.5 ring-1 ring-stone-200/70">
               {(['A', 'B'] as const).map((w) => (
                 <button key={w} onClick={() => set({ editing: w })} className={cx('rounded-md px-3 py-1 text-small font-semibold', editing === w ? 'bg-white shadow-sm ring-1 ring-black/5' : 'text-slate-600')} style={editing === w ? { color: w === 'A' ? colorA : colorB } : undefined}>
@@ -133,11 +133,11 @@ export default function CompareScenariosView() {
               if (label && label !== edited.name && !scenarios.some((s) => s.name === label)) useApp.setState((st) => ({ scenarios: st.scenarios.map((s) => (s.id === edited.id ? { ...s, name: label } : s)) }));
             }}
             accent={editColor}
-            title={`What matters in scenario ${editing}?`}
             compact
+            hideTitle
             fineTuneOpen
           />
-        </div>
+        </RailSection>
       </Rail>
       <main className="flex min-w-0 flex-1 flex-col">
         <div className="relative h-[46%] min-h-[260px]">

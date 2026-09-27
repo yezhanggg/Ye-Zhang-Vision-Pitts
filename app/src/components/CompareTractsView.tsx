@@ -4,6 +4,7 @@ import { tractById, tractLabel, typologyById } from '../lib/data';
 import { compareTakeaway, factorDeltas, stabilityFor, tLabel, useAllResults, type TractResult } from '../lib/derived';
 import { usePaint } from '../lib/paint';
 import { useApp } from '../lib/store';
+import { UI } from '../lib/copy';
 import Rail, { RailSection } from './Rail';
 import TractSearch from './TractSearch';
 import WeightPanel from './WeightPanel';
@@ -62,8 +63,8 @@ export default function CompareTractsView() {
 
   return (
     <div className="flex h-full">
-      <Rail>
-        <RailSection title="Choose two places" step={1} sub="Search an address, neighborhood or tract.">
+      <Rail title={UI.compareTractsTab}>
+        <RailSection id="place" title="Choose two places" sub="Search an address, neighborhood or tract.">
           <div className="space-y-2">
             <TractSearch value={a} onChange={(id) => set({ selectedId: id })} tag="A" tagColor={COLOR_A} showQuickPicks={false} exclude={b} label="Place A" />
             <TractSearch value={b} onChange={(id) => set({ compareId: id })} tag="B" tagColor={COLOR_B} showQuickPicks={false} exclude={a} label="Place B" />
@@ -72,8 +73,12 @@ export default function CompareTractsView() {
             ⇅ Swap A and B
           </button>
         </RailSection>
-        <WeightPanel weights={weights} onChange={setWeights} title="What matters most? (both places)" compact steps={[2, 3]} />
-        <MetricPicker value={metric} onChange={(m) => set({ metric: m })} step={4} />
+        <RailSection id="priorities" title="What matters most? (both places)">
+          <WeightPanel weights={weights} onChange={setWeights} compact hideTitle />
+        </RailSection>
+        <RailSection id="colorBy" title={UI.colorBy}>
+          <MetricPicker value={metric} onChange={(m) => set({ metric: m })} hideTitle />
+        </RailSection>
       </Rail>
       <main className="flex min-w-0 flex-1 flex-col">
         <div className="relative h-[46%] min-h-[260px]">

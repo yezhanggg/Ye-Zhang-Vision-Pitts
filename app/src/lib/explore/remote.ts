@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { tractById } from '../data';
 import { restGet, supabase } from '../supabase';
-import { bundledGeo, bundledValues, levelMeta, reference, unitValues, valuesFor } from './catalog';
+import { bundledGeo, bundledValues, isCountyWide, levelMeta, reference, unitValues, valuesFor } from './catalog';
 import type { DataSource, Estimate, GeoLevel, Loaded, Scope, UnitFC, UnitFeature, ValueMap } from './types';
 
 let unavailable = false;
@@ -127,13 +127,14 @@ export function loadUnit(level: GeoLevel, geoid: string): Promise<Record<string,
 
 // ------------------------------------------------------------------ hooks
 const online = <T,>(data: T): Loaded<T> => ({ data, source: 'supabase' as DataSource, scope: 'county' as Scope });
-const bundled = <T,>(data: T): Loaded<T> => ({ data, source: 'bundled' as DataSource, scope: 'city' as Scope });
+/** Bundled data is the city subset, except for levels the bundle holds county-wide (municipalities). */
+const bundled = <T,>(data: T, level: GeoLevel): Loaded<T> => ({ data, source: 'bundled' as DataSource, scope: (isCountyWide(level) ? 'county' : 'city') as Scope });
 
 /** Geometry for a level: bundled first, county-wide when Supabase answers. */
 export function useGeo(level: GeoLevel): Loaded<UnitFC> {
   const snapshot = (l: GeoLevel) => {
     const r = geoResults.get(l);
-    return { level: l, ...(r ? online(r) : bundled(bundledGeo(l))) };
+    return { level: l, ...(r ? online(r) : bundled(bundledGeo(l), l)) };
   };
   const [state, setState] = useState(() => snapshot(level));
   useEffect(() => {
@@ -168,7 +169,7 @@ export function useVariable(level: GeoLevel, varId: string | null): Loaded<Value
   const snapshot = (k: string | null) => {
     if (!k || !varId) return null;
     const r = valueResults.get(k);
-    return { key: k, ...(r ? online(r) : bundled(bundledVariable(level, varId))) };
+    return { key: k, ...(r ? online(r) : bundled(bundledVariable(level, varId), level)) };
   };
   const [state, setState] = useState(() => snapshot(key));
   useEffect(() => {
