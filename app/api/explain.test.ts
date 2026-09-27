@@ -19,6 +19,13 @@ describe('verifyNumbers', () => {
     const t = 'Small apartment ranks first (0.71) ahead of Senior housing (0.69). Need at the 92nd percentile adds +8.4 points. It stays first in 8 of 10 nudges.';
     expect(verifyNumbers(t, payload)).toEqual({ ok: true, unmatched: [] });
   });
+  it('accepts what the prompt states: the clamped 99th percentile and the tract number in the name', () => {
+    const p = { ...payload, factors: [...payload.factors, { id: 'subsidy_eligible', label: 'Subsidy eligibility', percentile: 1, confidence: 'high' }], parts: [...payload.parts, { factor: 'subsidy_eligible', label: 'Subsidy eligibility', percentile: 1, lift_pts: 11.9, wants: 'high' as const }] };
+    const t = 'In Hazelwood (Tract 5623), small apartment ranks first at 0.71. Subsidy eligibility at the 99th percentile adds 11.9 points, and the pick holds in 8 of 10 nudges.';
+    expect(verifyNumbers(t, p)).toEqual({ ok: true, unmatched: [] });
+    // the same tract number is not a licence for other figures
+    expect(verifyNumbers('Tract 5623 has 1,240 renters.', p).unmatched).toEqual(['240']);
+  });
   it('rejects any number the model made up', () => {
     const t = 'Small apartment ranks first with 590 low-income renter households and a 0.71 score.';
     const r = verifyNumbers(t, payload);

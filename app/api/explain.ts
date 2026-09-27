@@ -135,6 +135,9 @@ export function verifyNumbers(text: string, p: Payload): { ok: boolean; unmatche
     allowed.add('10');
   }
   for (const y of ['2016', '2021', '50']) allowed.add(y); // "2016", "≤50% AMI" are labels, not results
+  // Whatever the prompt itself states is a given value, written the way the model saw it: percentiles as ordinals
+  // clamped to 1–99 (a 1.0 percentile reads "99th"), and the digits of the tract's name ("Tract 5623").
+  for (const n of buildPrompt(p).match(/\d+(?:\.\d+)?/g) ?? []) allowed.add(n.replace(/^0+(?=\d)/, ''));
   const found = text.match(/-?\d+(?:\.\d+)?/g) ?? [];
   const unmatched = found.filter((n) => !allowed.has(n.replace(/^0+(?=\d)/, '')) && !allowed.has(n.replace(/^-/, '')));
   return { ok: unmatched.length === 0, unmatched };
