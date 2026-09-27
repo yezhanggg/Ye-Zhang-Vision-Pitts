@@ -25,7 +25,7 @@ export default function SyncedMapPair({ a, b, children }: { a: PairSide; b: Pair
     <div className="relative grid h-full grid-cols-2 gap-1.5 bg-stone-200/60 p-1.5">
       {[a, b].map((s, i) => (
         <div key={i} className="relative overflow-hidden rounded-xl ring-1 ring-black/5">
-          <MapView paint={s.paint} selectedId={s.selectedId} buildingColor={s.buildingColor} flips={s.flips} lite={lite} terrain={layers.terrain} buildings={layers.buildings} sync={sync} padding={pad} onSelect={s.onSelect} tooltip={s.tooltip} overlay={s.overlay} pin={s.pin} />
+          <MapView paint={s.paint} selectedId={s.selectedId} buildingColor={s.buildingColor} flips={s.flips} lite={lite} terrain={layers.terrain} buildings={layers.buildings} hillshade={layers.hillshade} sync={sync} padding={pad} onSelect={s.onSelect} tooltip={s.tooltip} overlay={s.overlay} pin={s.pin} />
         </div>
       ))}
       {children}

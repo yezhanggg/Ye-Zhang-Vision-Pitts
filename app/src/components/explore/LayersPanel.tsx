@@ -29,6 +29,7 @@ export default function LayersPanel() {
         const caption = id === 'terrain' && lite ? `${row.caption} · ${EXPLORE_UI.terrainOffWhenLite}` : row.caption;
         return <Switch key={id} id={`layer-${id}`} on={!!layers[id]} label={row.label} caption={caption} onChange={(on) => setLayer(id, on)} />;
       })}
+      <p className="px-1 pt-1 text-caption text-slate-600">{EXPLORE_UI.flatHint}</p>
     </div>
   );
 }

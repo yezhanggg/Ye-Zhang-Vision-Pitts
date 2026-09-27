@@ -6,7 +6,7 @@ export type GeoLevel = 'tract' | 'bg' | 'zcta' | 'muni' | 'county' | 'city';
 /** Geographies the map can paint (same literal union as `Level` in lib/store). */
 export type BrowseLevel = 'tract' | 'bg' | 'zcta' | 'muni';
 /** Same literal union as `LayerId` in lib/store. */
-export type LayerKey = 'buildings' | 'terrain' | 'tracts' | 'bg' | 'zcta' | 'muni' | 'county' | 'city';
+export type LayerKey = 'buildings' | 'terrain' | 'hillshade' | 'tracts' | 'bg' | 'zcta' | 'muni' | 'county' | 'city';
 
 /** ACS units, plus the units of the Analysis layers (pct = 0–1 percentile, score = 0–1 match score, class = category index). */
 export type Unit = 'count' | 'usd' | 'share' | 'years' | 'age' | 'pct' | 'score' | 'class' | 'flag' | 'rate' | 'ratio';

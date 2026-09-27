@@ -23,6 +23,8 @@ export const EXPLORE_UI = {
   turnOnButton: 'Turn it on',
   notBuilt: 'Data browser not built. Run scripts/07_build_acs_levels.py, then the app export, to bundle the census variables.',
   clickForDetails: 'Click for details',
+  flatHint: 'The map is tilted by default. Hold ⌘ (Command) with the pointer over the map for a flat, top-down view; release to tilt back.',
+  flatChip: 'Flat view · release ⌘ to tilt back',
   analysisOnly: 'City tracts only · the same values the Analysis section shows',
   analysisPriorities: (preset: string | null) => (preset ? `Under your current priorities (${preset})` : 'Under your current priorities (custom mix)'),
   analysisSwitch: 'Analysis layers exist for city tracts only. Picking one switches the map to tracts.',
@@ -93,7 +95,8 @@ export const EXPLORE_UI = {
 
 export const LAYER_ROWS: { id: LayerKey; label: string; caption: string }[] = [
   { id: 'buildings', label: 'Buildings', caption: '3D footprints from OpenStreetMap and Overture' },
-  { id: 'terrain', label: 'Terrain', caption: 'Hillshade, contours and relief (USGS 3DEP)' },
+  { id: 'terrain', label: 'Terrain', caption: '3D relief and contour lines (USGS 3DEP)' },
+  { id: 'hillshade', label: 'Hill shading', caption: 'Shaded relief over the basemap' },
   { id: 'tracts', label: 'Census tracts', caption: '128 city tracts' },
   { id: 'bg', label: 'Block groups', caption: '314 city block groups' },
   { id: 'zcta', label: 'ZIP codes', caption: '32 ZCTAs that touch the city' },

@@ -21,8 +21,8 @@ export type MapMetric =
 /** Geographies the data browser can paint. County and city are single values shown as reference lines. */
 export type Level = 'tract' | 'bg' | 'zcta' | 'muni';
 export const LEVELS: Level[] = ['tract', 'bg', 'zcta', 'muni'];
-export type LayerId = 'buildings' | 'terrain' | 'tracts' | 'bg' | 'zcta' | 'muni' | 'county' | 'city';
-export const LAYER_IDS: LayerId[] = ['buildings', 'terrain', 'tracts', 'bg', 'zcta', 'muni', 'county', 'city'];
+export type LayerId = 'buildings' | 'terrain' | 'hillshade' | 'tracts' | 'bg' | 'zcta' | 'muni' | 'county' | 'city';
+export const LAYER_IDS: LayerId[] = ['buildings', 'terrain', 'hillshade', 'tracts', 'bg', 'zcta', 'muni', 'county', 'city'];
 export type Layers = Record<LayerId, boolean>;
 /** The map layer that carries a browse level. */
 export const LAYER_FOR_LEVEL: Record<Level, LayerId> = { tract: 'tracts', bg: 'bg', zcta: 'zcta', muni: 'muni' };
@@ -121,7 +121,8 @@ try {
   /* no window in tests */
 }
 
-export const defaultLayers = (lite = liteDefault): Layers => ({ buildings: true, terrain: !lite, tracts: true, bg: false, zcta: false, muni: false, county: false, city: true });
+/** Hill shading is off by default so the basemap stays evenly toned; 3D relief and contours follow the Terrain layer. */
+export const defaultLayers = (lite = liteDefault): Layers => ({ buildings: true, terrain: !lite, hillshade: false, tracts: true, bg: false, zcta: false, muni: false, county: false, city: true });
 export const defaultBrowse = (): Browse => ({ level: 'tract', variable: null, selected: null });
 
 export interface AppState {

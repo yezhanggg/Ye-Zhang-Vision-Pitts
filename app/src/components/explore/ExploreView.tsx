@@ -141,6 +141,7 @@ export default function ExploreView() {
         terrain={layers.terrain}
         terrainAlways={layers.terrain}
         buildings={layers.buildings}
+        hillshade={layers.hillshade}
         pin={pin}
         elevationReadout
         overlays={overlays}

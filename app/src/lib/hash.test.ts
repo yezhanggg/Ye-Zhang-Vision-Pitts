@@ -26,7 +26,7 @@ describe('parseHash', () => {
     expect(p.mode).toBe('explore');
     expect(p.lastAnalysis).toBeUndefined();
     // L lists the layers that are on; bg stays off here even though g=bg (the store turns it on via setBrowse, parseHash is pure).
-    expect(p.layers).toEqual({ buildings: false, terrain: false, tracts: true, bg: false, zcta: false, muni: false, county: false, city: true });
+    expect(p.layers).toEqual({ buildings: false, terrain: false, hillshade: false, tracts: true, bg: false, zcta: false, muni: false, county: false, city: true });
     expect(p.browse).toEqual({ level: 'bg', variable: 'pop', selected: null });
   });
 
@@ -56,7 +56,7 @@ describe('parseHash', () => {
     expect(p.lite).toBe(true);
     expect(p.layers?.terrain).toBe(false);
     const q = parseHash('m=explore&L=buildings,terrain,tracts&lite=1');
-    expect(q.layers).toEqual({ buildings: true, terrain: false, tracts: true, bg: false, zcta: false, muni: false, county: false, city: false });
+    expect(q.layers).toEqual({ buildings: true, terrain: false, hillshade: false, tracts: true, bg: false, zcta: false, muni: false, county: false, city: false });
   });
 
   it('accepts a leading # and an empty hash', () => {

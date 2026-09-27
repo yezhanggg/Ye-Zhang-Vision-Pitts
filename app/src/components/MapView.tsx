@@ -78,6 +78,8 @@ interface Props {
   baseTracts?: boolean;
   /** 3D buildings (OSM backdrop + focus-tract footprints), default true. */
   buildings?: boolean;
+  /** Shaded relief over the basemap, default false (the basemap stays evenly toned). */
+  hillshade?: boolean;
   /** Feature under the cursor changed (tract layers and interactive overlays). */
   onHover?: (id: string | null, overlayId?: string) => void;
   /** Play the globe → Pittsburgh flight once the style loads (landing page → Explore). */
@@ -157,6 +159,7 @@ export default function MapView(props: Props) {
   const mapRef = useRef<MLMap | null>(null);
   const [ready, setReady] = useState(false);
   const [hover, setHover] = useState<{ overlay: string | null; id: string; x: number; y: number } | null>(null);
+  const [flat, setFlat] = useState(false);
   const [elev, setElev] = useState<number | null>(null);
   const markerRef = useRef<maplibregl.Marker | null>(null);
   const live = useRef(props);
@@ -271,15 +274,16 @@ export default function MapView(props: Props) {
     st.firstSymbol = firstSymbol;
     for (const l of layers) if (l.type === 'symbol' && /poi|housenum/.test(l.id)) map.setLayoutProperty(l.id, 'visibility', 'none');
 
-    // Elevation: hillshade always, 3D terrain on demand, hypsometric tint for the Elevation layer.
+    // Elevation: hill shading only when asked for, 3D terrain on demand, hypsometric tint for the Elevation layer.
+    const hv = live.current.hillshade ? ('visible' as const) : ('none' as const);
     const dem = st.dem!;
     const demSrc = { type: 'raster-dem' as const, tiles: dem.tiles, encoding: dem.encoding, tileSize: dem.tileSize, maxzoom: dem.maxzoom };
     map.addSource('dem-terrain', demSrc);
     map.addSource('dem-hillshade', demSrc);
     try {
-      map.addLayer({ id: 'hillshade', type: 'hillshade', source: 'dem-hillshade', paint: { 'hillshade-method': 'multidirectional', 'hillshade-exaggeration': 0.35, 'hillshade-highlight-color': ['#ffffff', '#ffffff', '#ffffff', '#ffffff'], 'hillshade-shadow-color': ['#6b6258', '#7a7168', '#6b6258', '#8a8177'], 'hillshade-accent-color': '#8a8177' } as never }, firstSymbol);
+      map.addLayer({ id: 'hillshade', type: 'hillshade', source: 'dem-hillshade', layout: { visibility: hv }, paint: { 'hillshade-method': 'multidirectional', 'hillshade-exaggeration': 0.35, 'hillshade-highlight-color': ['#ffffff', '#ffffff', '#ffffff', '#ffffff'], 'hillshade-shadow-color': ['#6b6258', '#7a7168', '#6b6258', '#8a8177'], 'hillshade-accent-color': '#8a8177' } as never }, firstSymbol);
     } catch {
-      map.addLayer({ id: 'hillshade', type: 'hillshade', source: 'dem-hillshade', paint: { 'hillshade-exaggeration': 0.3, 'hillshade-shadow-color': '#6b6258', 'hillshade-highlight-color': '#ffffff', 'hillshade-accent-color': '#8a8177' } }, firstSymbol);
+      map.addLayer({ id: 'hillshade', type: 'hillshade', source: 'dem-hillshade', layout: { visibility: hv }, paint: { 'hillshade-exaggeration': 0.3, 'hillshade-shadow-color': '#6b6258', 'hillshade-highlight-color': '#ffffff', 'hillshade-accent-color': '#8a8177' } }, firstSymbol);
     }
     try {
       const stops: unknown[] = [];
@@ -848,6 +852,60 @@ export default function MapView(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.terrain, props.lite, props.selectedId, props.terrainAlways, ready]);
 
+  // hill shading on / off
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    if (map.getLayer('hillshade')) map.setLayoutProperty('hillshade', 'visibility', props.hillshade ? 'visible' : 'none');
+  }, [props.hillshade, ready]);
+
+  // Hold the Command key with the pointer over the map for a flat, top-down view; releasing it restores the tilt.
+  useEffect(() => {
+    const map = mapRef.current;
+    const node = el.current;
+    if (!map || !node || !ready || props.interactive === false) return;
+    let over = false;
+    let saved: number | null = null;
+    const ms = props.lite ? 0 : 350;
+    const flatten = () => {
+      if (saved != null || !st.introDone) return;
+      saved = map.getPitch();
+      map.easeTo({ pitch: 0, duration: ms, essential: true });
+      setFlat(true);
+    };
+    const restore = () => {
+      if (saved == null) return;
+      const pitch = saved;
+      saved = null;
+      map.easeTo({ pitch, duration: ms, essential: true });
+      setFlat(false);
+    };
+    const down = (e: KeyboardEvent) => {
+      if (e.key === 'Meta' && over && !e.repeat) flatten();
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.key === 'Meta') restore();
+    };
+    const enter = () => (over = true);
+    const leave = () => (over = false);
+    node.addEventListener('mouseenter', enter);
+    node.addEventListener('mousemove', enter);
+    node.addEventListener('mouseleave', leave);
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    window.addEventListener('blur', restore);
+    return () => {
+      restore();
+      node.removeEventListener('mouseenter', enter);
+      node.removeEventListener('mousemove', enter);
+      node.removeEventListener('mouseleave', leave);
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', restore);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.interactive, props.lite, ready]);
+
   // idle orbit after 25 s without input
   useEffect(() => {
     const map = mapRef.current;
@@ -931,6 +989,7 @@ export default function MapView(props: Props) {
           {tooltipFor(hover.id)}
         </div>
       )}
+      {flat && <div className="pointer-events-none absolute left-1/2 top-16 z-20 -translate-x-1/2 rounded-full bg-slate-900/90 px-3 py-1 text-small font-medium text-white shadow-md">Flat view · release ⌘ to tilt back</div>}
       {props.elevationReadout && elev != null && (
         <div className="pointer-events-none absolute bottom-3 left-1/2 z-20 -translate-x-1/2 rounded-full bg-white/95 px-3 py-1 text-small font-medium text-slate-800 shadow-md ring-1 ring-black/5 tnum">
           Ground ≈ <b>{fmtFt(elev)}</b>

@@ -337,6 +337,7 @@ export default function MatchView() {
         lite={lite}
         terrain={layers.terrain}
         buildings={layers.buildings}
+        hillshade={layers.hillshade}
         padding={padding}
         pin={pin}
         elevationReadout
