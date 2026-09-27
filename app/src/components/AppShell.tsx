@@ -23,7 +23,7 @@ function Pill<T extends string>({ items, value, onPick, ariaLabel, layoutId, siz
       {items.map((t) => {
         const on = value === t.id;
         return (
-          <button key={t.id} onClick={() => onPick(t.id)} aria-current={on ? 'page' : undefined} data-slide-on={on} className={cx('relative rounded-lg font-semibold transition-colors', size === 'md' ? 'px-4 py-1.5 text-body' : 'px-3 py-1 text-small', on ? 'text-slate-900' : 'text-slate-600 hover:text-slate-900')}>
+          <button key={t.id} onClick={() => onPick(t.id)} aria-current={on ? 'page' : undefined} data-slide-on={on} className={cx('relative whitespace-nowrap rounded-lg font-semibold transition-colors', size === 'md' ? 'px-4 py-1.5 text-body max-sm:px-3 max-sm:text-small' : 'px-3 py-1 text-small max-sm:px-2', on ? 'text-slate-900' : 'text-slate-600 hover:text-slate-900')}>
             <span className="relative">{t.label}</span>
           </button>
         );
@@ -51,13 +51,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
     <div className="relative h-full">
       <div className="absolute inset-0">{children}</div>
       <div className="absolute left-3 top-3 z-30 flex items-center gap-1.5">
-        <motion.button onClick={() => set({ view: 'landing' })} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.94 }} transition={SPRING_TAB} title={UI.homeTitle} className="flex items-center gap-1.5 rounded-xl bg-white/95 px-3 py-2 text-small font-semibold text-slate-700 shadow-lg ring-1 ring-black/5 backdrop-blur hover:bg-white hover:text-slate-900">
+        <motion.button onClick={() => set({ view: 'landing' })} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.94 }} transition={SPRING_TAB} title={UI.homeTitle} aria-label={UI.home} className="flex items-center gap-1.5 rounded-xl bg-white/95 px-3 py-2 text-small font-semibold text-slate-700 shadow-lg ring-1 ring-black/5 backdrop-blur hover:bg-white hover:text-slate-900 max-sm:px-2.5">
           <Home className="h-4 w-4" />
-          {UI.home}
+          <span className="max-sm:hidden">{UI.home}</span>
         </motion.button>
-        <motion.button onClick={() => useTour.getState().start()} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.94 }} transition={SPRING_TAB} title={TOUR_COPY.buttonTitle} className="flex items-center gap-1.5 rounded-xl bg-white/95 px-3 py-2 text-small font-semibold text-slate-700 shadow-lg ring-1 ring-black/5 backdrop-blur hover:bg-white hover:text-slate-900">
+        <motion.button onClick={() => useTour.getState().start()} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.94 }} transition={SPRING_TAB} title={TOUR_COPY.buttonTitle} aria-label={TOUR_COPY.button} className="flex items-center gap-1.5 rounded-xl bg-white/95 px-3 py-2 text-small font-semibold text-slate-700 shadow-lg ring-1 ring-black/5 backdrop-blur hover:bg-white hover:text-slate-900 max-sm:px-2.5">
           <Compass className="h-4 w-4" />
-          {TOUR_COPY.button}
+          <span className="max-sm:hidden">{TOUR_COPY.button}</span>
         </motion.button>
       </div>
       <div className="pointer-events-none absolute left-1/2 top-3 z-30 flex -translate-x-1/2 flex-col items-center gap-1.5">

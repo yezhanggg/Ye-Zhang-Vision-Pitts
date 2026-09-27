@@ -15,7 +15,7 @@ const NARROW: Partial<Record<MeasureId, string>> = { burdened: 'Burdened', trans
 function MeasureSeg({ value, onChange }: { value: MeasureId; onChange: (m: MeasureId) => void }) {
   const [ref, box] = useSlide(value);
   return (
-    <div ref={ref} role="radiogroup" aria-label="Measure to show" className="relative flex h-8 w-full items-stretch gap-0.5 rounded-lg bg-stone-100 p-1 ring-1 ring-stone-200/70">
+    <div ref={ref} role="radiogroup" aria-label="Measure to show" className="scroll-quiet relative flex h-8 w-full items-stretch gap-0.5 overflow-x-auto rounded-lg bg-stone-100 p-1 ring-1 ring-stone-200/70 [&>button]:shrink-0">
       <SlideBg box={box} className="rounded-md bg-white shadow-sm ring-1 ring-violet-300" />
       {MEASURES.map((m) => {
         const on = m.id === value;
@@ -53,7 +53,7 @@ const LEVER_TINY: Record<LeverId, string> = { adu: 'ADU', bonus: 'Density', vouc
 
 function LeverChips({ on, onToggle, homesText, onHomes }: { on: Record<LeverId, boolean>; onToggle: (id: LeverId) => void; homesText: string; onHomes: (v: string) => void }) {
   return (
-    <div role="group" aria-label="Policy levers" data-tour="equity-levers" className="flex h-8 w-full items-stretch gap-0.5 rounded-lg bg-stone-100 p-1 ring-1 ring-stone-200/70">
+    <div role="group" aria-label="Policy levers" data-tour="equity-levers" className="scroll-quiet flex h-8 w-full items-stretch gap-0.5 overflow-x-auto rounded-lg bg-stone-100 p-1 ring-1 ring-stone-200/70 [&>div]:shrink-0">
       {LEVER_IDS.map((id) => {
         const v = on[id];
         return (

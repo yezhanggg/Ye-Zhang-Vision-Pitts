@@ -36,7 +36,7 @@ export function ToolSeg<T extends string>({
       role="radiogroup"
       aria-label={label}
       className={cx(
-        "relative inline-flex items-stretch gap-0.5 rounded-lg bg-stone-100 p-1 ring-1 ring-stone-200/70",
+        "scroll-quiet relative inline-flex max-w-full items-stretch gap-0.5 overflow-x-auto rounded-lg bg-stone-100 p-1 ring-1 ring-stone-200/70 [&>button]:shrink-0",
         compact ? "h-8" : "h-10",
       )}
     >

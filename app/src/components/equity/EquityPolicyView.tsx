@@ -241,7 +241,7 @@ export default function EquityPolicyView({ active = true }: { active?: boolean }
               flips={flips}
               lite={lite}
               terrain={false}
-              buildings={false}
+              buildings
               hillshade={false}
               onSelect={(id) => select(useApp.getState().selectedId === id ? null : id)}
               onMapReady={onMapReady}

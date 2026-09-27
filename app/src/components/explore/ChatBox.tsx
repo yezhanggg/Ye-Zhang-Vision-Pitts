@@ -305,7 +305,7 @@ export default function ChatBox({ scope, resolve, onGo, compact = false, fill = 
   }, [threadShown]);
 
   return (
-    <div data-tour="ask" className={cx('pointer-events-auto ml-auto flex w-full flex-col overflow-hidden rounded-[24px] bg-white/95 shadow-lg ring-1 ring-black/5 backdrop-blur transition-[max-width,box-shadow] duration-500 ease-[cubic-bezier(0.175,0.885,0.32,1.1)] focus-within:ring-2 focus-within:ring-violet-300', fill && 'h-full min-h-0')} style={{ maxWidth: fill ? undefined : wide ? 440 : 320 }}>
+    <div data-tour="ask" className={cx('pointer-events-auto ml-auto flex w-full shrink-0 flex-col overflow-hidden rounded-[24px] bg-white/95 shadow-lg ring-1 ring-black/5 backdrop-blur transition-[max-width,box-shadow] duration-500 ease-[cubic-bezier(0.175,0.885,0.32,1.1)] focus-within:ring-2 focus-within:ring-violet-300', fill && 'h-full min-h-0')} style={{ maxWidth: fill ? undefined : wide ? 440 : 320 }}>
       <div className={cx('shrink-0', chat && 'order-3 border-t border-stone-200/70 p-2')}>
       <div className={cx(chat && 'overflow-hidden rounded-2xl bg-stone-100 ring-1 ring-stone-200/80 transition-shadow focus-within:ring-2 focus-within:ring-violet-300')}>
       <PromptInput bare small={fill || chat} value={value} onChange={setValue} onSubmit={() => act(rows[hi])} onKey={onKey} onOpenChange={setInputOpen} busy={busy} placeholder={name ? C.askAbout(name) : C.ask} grey={chat} />
@@ -397,7 +397,7 @@ export default function ChatBox({ scope, resolve, onGo, compact = false, fill = 
         {hasAi && !typing && !(fill && !messages.length) && (
           <motion.div key="foot" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={SOFT} className={cx('shrink-0 overflow-hidden', chat ? 'order-first' : fill && 'mt-auto')}>
             <div className={cx('flex items-center justify-between gap-2 border-stone-200/70 py-1 pl-4 pr-1.5', chat ? 'border-b' : 'border-t')}>
-              <span className="truncate text-caption text-slate-500">{fill ? '' : CHAT_COPY.name}</span>
+              <span className="truncate text-caption font-semibold text-violet-700">{fill ? '' : CHAT_COPY.name}</span>
               <span className="flex shrink-0 items-center gap-0.5">
                 {messages.length > 0 && !busy && (
                   <button onClick={clear} className="rounded-lg px-2 py-1 text-caption font-semibold text-slate-500 hover:bg-stone-100 hover:text-slate-900" title={C.clearTitle}>

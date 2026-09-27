@@ -28,6 +28,7 @@ import { downloadCsv, exportFilename, toCsv } from '../lib/export/csv';
 import { getMap, registerMap } from '../lib/export/mapRegistry';
 import { mapSnapshot, printReport } from '../lib/export/report';
 import Rail, { RailSection } from './Rail';
+import { mapPadding, usePhoneTakeTurns, useViewport } from '../lib/viewport';
 import { useTour } from '../lib/tour';
 import AnalysisChat from './AnalysisChat';
 import PanelFrame, { RightColumn } from './PanelFrame';
@@ -420,7 +421,9 @@ export default function MatchView() {
   const rec = selectedId ? suggestions.get(selectedId) ?? null : null;
   const lead = rec?.types[0]?.typology ?? null;
   const buildingColor = lead ? typologyById.get(lead)?.color : null;
-  const padding = useMemo(() => ({ top: 90, bottom: 90, left: ui.left ? 420 : 70, right: ui.right ? 500 : 70 }), [ui.left, ui.right]);
+  const vp = useViewport();
+  const padding = useMemo(() => mapPadding(vp, ui.left, ui.right), [vp, ui.left, ui.right]);
+  usePhoneTakeTurns(vp.phone, ui.left, ui.right, () => useApp.getState().setUi({ left: false }), () => useApp.getState().setUi({ right: false }));
   const focusLabel = STANCE_LABEL[focus];
   const noneLabel = focus === 'market_led' || plan.level === 'market' ? 'No suggestion (the market test fails or cannot run)' : focus === 'transit_first' ? 'No suggestion (no under-served renters at this level, or frequent transit farther than you chose)' : focus === 'climate_resilient' ? 'No suggestion (over 5% of land in a flood zone, transit too far, or no under-served renters)' : 'No suggestion (no under-served renters at this level)';
 
@@ -477,7 +480,7 @@ export default function MatchView() {
         <PanelFrame inline>{t && r ? <TractDetail t={t} r={r} weights={weights} rec={rec} fitOrder={fitOrders.get(t.GEOID)} onClose={() => select(null)} /> : <StartCard />}</PanelFrame>
       </RightColumn>
       {(
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="absolute bottom-3 left-3 z-20 w-[340px] xl:w-[360px]">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="absolute bottom-3 left-3 z-20 w-[340px] xl:w-[360px] max-sm:hidden">
           <SuggestionLegend focus={focusLabel} level={[plan.size === 'auto' ? '' : sizeWord(plan.size), plan.age === 'any' ? '' : AGE_LABEL[plan.age].toLowerCase(), LEVEL_LABEL[plan.level]].filter(Boolean).join(' · ')} counts={counts} noneLabel={noneLabel} />
         </motion.div>
       )}

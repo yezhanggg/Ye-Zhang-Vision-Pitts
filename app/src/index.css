@@ -209,3 +209,12 @@ input[type='range'].weight:focus-visible::-webkit-slider-thumb {
     background: none;
   }
 }
+
+/* Phones: the bottom of the screen belongs to the question box and the summary, so the map's zoom buttons and
+   credits move to the top right, under the top bar. Pinch to zoom still works. */
+@media (max-width: 639px) {
+  .maplibregl-ctrl-bottom-right {
+    top: 7.75rem;
+    bottom: auto;
+  }
+}

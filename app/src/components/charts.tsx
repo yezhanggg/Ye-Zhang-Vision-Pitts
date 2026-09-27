@@ -49,8 +49,8 @@ export function StatTile({ label, value, sub, delta, conf }: { label: string; va
       <div className="flex items-baseline gap-1.5">
         <span className="text-lead font-semibold text-slate-900 tnum">{value}</span>
         {delta && (
-          <span className="text-caption text-slate-400" title={delta.text}>
-            {delta.dir === 'up' ? '▲' : delta.dir === 'down' ? '▼' : '≈'}
+          <span className="text-caption text-slate-500" title={delta.text}>
+            {delta.dir === 'up' ? 'above city' : delta.dir === 'down' ? 'below city' : 'same as city'}
           </span>
         )}
       </div>

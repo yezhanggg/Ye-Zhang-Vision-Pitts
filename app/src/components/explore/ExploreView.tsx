@@ -20,6 +20,7 @@ import IntroOverlay from '../IntroOverlay';
 import PanelFrame, { RightColumn } from '../PanelFrame';
 import Rail, { RailSection } from '../Rail';
 import TourNotice from '../tour/TourNotice';
+import { mapPadding, usePhoneTakeTurns, useViewport } from '../../lib/viewport';
 import { useTour } from '../../lib/tour';
 import ChatBox from './ChatBox';
 import DataLegend, { LandUseLegend, ZoningLegend } from './DataLegend';
@@ -145,7 +146,9 @@ export default function ExploreView() {
   const browseIndex = useMemo(() => indexOf(browseGeo.data.features), [browseGeo.data]);
   const resolve = useMemo(() => resolveForLevel(level, browseGeo.data), [level, browseGeo.data]);
   // The map keeps its focus clear of whichever panels are open.
-  const padding = useMemo(() => ({ top: 90, bottom: 90, left: left ? 420 : 70, right: panelOpen ? 500 : 70 }), [left, panelOpen]);
+  const vp = useViewport();
+  const padding = useMemo(() => mapPadding(vp, left, panelOpen), [vp, left, panelOpen]);
+  usePhoneTakeTurns(vp.phone, left, panelOpen, () => useApp.getState().setUi({ left: false }), () => set({ browsePanel: false }));
 
   const overlays = useMemo<OverlayLayer[]>(() => {
     const out: OverlayLayer[] = [];
@@ -227,7 +230,7 @@ export default function ExploreView() {
         }}
       />
       {phase === 'done' && (
-        <Rail float title={EXPLORE_UI.intro.kicker} reserveBottom={legendH ? legendH + 8 : 0}>
+        <Rail float title={EXPLORE_UI.intro.kicker} reserveBottom={legendH && !vp.phone ? legendH + 8 : 0}>
           <RailSection id="layers" title={EXPLORE_UI.layers} sub={EXPLORE_UI.layersSub}>
             <BoundaryPanel />
           </RailSection>
@@ -253,10 +256,10 @@ export default function ExploreView() {
       <TourNotice show={showNotice} />
       <AnimatePresence>
         {showHint && (
-          <motion.div key="hint" layout={!lite} initial={lite ? false : { opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className={cx('absolute left-1/2 z-20 -translate-x-1/2', showNotice ? 'top-[6.75rem]' : 'top-16')} role="status">
+          <motion.div key="hint" layout={!lite} initial={lite ? false : { opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className={cx('absolute left-1/2 z-20 -translate-x-1/2 max-sm:left-3 max-sm:right-3 max-sm:translate-x-0', showNotice ? 'top-[6.75rem] max-[1099px]:hidden' : 'top-16')} role="status">
             <div className="flex items-center gap-2 rounded-full bg-slate-900/90 py-1.5 pl-3.5 pr-1.5 text-small font-medium text-white shadow-lg backdrop-blur">
               <MousePointerClick className="h-4 w-4 shrink-0 text-violet-200" />
-              <span className="whitespace-nowrap">{EXPLORE_UI.hint}</span>
+              <span className="whitespace-nowrap max-sm:min-w-0 max-sm:flex-1 max-sm:whitespace-normal">{EXPLORE_UI.hint}</span>
               <button onClick={() => set({ hintClosed: true })} className="grid h-6 w-6 place-items-center rounded-full text-white/70 hover:bg-white/15 hover:text-white" aria-label={EXPLORE_UI.hintClose} title={EXPLORE_UI.hintClose}>
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -266,7 +269,7 @@ export default function ExploreView() {
       </AnimatePresence>
       <AnimatePresence>
         {phase === 'done' && ((variable && values) || zoningOn || (landOn && open)) && (
-          <motion.div key="legend" ref={legendRef} initial={lite ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute bottom-3 left-3 z-20 flex items-end gap-2">
+          <motion.div key="legend" ref={legendRef} initial={lite ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className={cx('absolute bottom-3 left-3 z-20 flex items-end gap-2 max-sm:bottom-[8.5rem] max-sm:right-3 max-sm:overflow-x-auto', panelOpen && 'max-sm:hidden')}>
             {variable && values && <DataLegend variable={variable} level={level} values={values} breaks={breaks} ext={ext} hoverId={hoverId} />}
             {landOn && open && <LandUseLegend classes={landClasses} hoverId={hoverId} />}
             {zoningOn && <ZoningLegend hoverCode={zoningHover} />}

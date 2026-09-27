@@ -191,6 +191,9 @@ const OVERLAY_SUFFIXES = [
   "-label",
 ] as const;
 const DEFAULT_PAD = { top: 60, right: 60, bottom: 60, left: 60 };
+/** Zoom range after clicking a place: building shapes are drawn from zoom 14; above 16 reads as too close. */
+const SELECT_ZOOM_MIN = 14.6;
+const SELECT_ZOOM_MAX = 16;
 
 function tint(hex: string, amt: number) {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex);
@@ -906,12 +909,12 @@ export default function MapView(props: Props) {
   // ------------------------------------------------------------ overlays
   function flyToBounds(map: MLMap, b: Bounds) {
     st.camAt = performance.now();
-    const cam = map.cameraForBounds(b, {
-      padding: live.current.padding ?? DEFAULT_PAD,
-      bearing: -20,
-    });
+    // Fit the place with even padding, then keep the zoom where building shapes show (from zoom 14) without going
+    // too close; the place's own middle goes to the middle of the screen (side panels do not shift it).
+    const cam = map.cameraForBounds(b, { padding: DEFAULT_PAD, bearing: -20 });
     if (!cam) return;
-    let zoom = Math.min((cam.zoom ?? 14) - 0.35, 16);
+    let zoom = Math.max(SELECT_ZOOM_MIN, Math.min((cam.zoom ?? 14) - 0.35, SELECT_ZOOM_MAX));
+    cam.center = [(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2];
     // Paired maps share one zoom level: the smallest either map needs, and the other map follows (keeping its center).
     const sync = live.current.sync;
     if (sync) {
@@ -1413,22 +1416,9 @@ export default function MapView(props: Props) {
   // ------------------------------------------------------------ intro: globe spin, then fly to Pittsburgh
   function runIntro(map: MLMap) {
     live.current.onIntroPhase?.("spin");
-    // The intro never holds the map hostage: the first drag, scroll, pinch or tap ends it at once, lands on
-    // Pittsburgh and hands the map over (the same as "Skip intro").
-    const el = map.getCanvasContainer();
-    const takeOver = () => {
-      el.removeEventListener("pointerdown", takeOver);
-      el.removeEventListener("wheel", takeOver);
-      el.removeEventListener("touchstart", takeOver);
-      if (st.introDone) return;
-      finishIntro(map);
-      map.stop();
-      map.jumpTo(PGH_VIEW);
-    };
-    el.addEventListener("pointerdown", takeOver, { passive: true });
-    el.addEventListener("wheel", takeOver, { passive: true });
-    el.addEventListener("touchstart", takeOver, { passive: true });
-    map.easeTo({ center: [-96, 38], duration: 2200, easing: (t) => t });
+    // The intro plays through: the map ignores drags, scrolls and zooms until it lands on Pittsburgh.
+    setIntroInput(map, false);
+    map.easeTo({ center: [-96, 38], duration: 1700, easing: (t) => t });
     map.once("moveend", () => {
       if (st.introDone) return;
       live.current.onIntroPhase?.("fly");
@@ -1441,7 +1431,15 @@ export default function MapView(props: Props) {
     st.introDone = true;
     if (map.getLayer("tract-fill"))
       map.setPaintProperty("tract-fill", "fill-opacity", fillOpacity);
+    if (live.current.interactive ?? true) setIntroInput(map, true);
     live.current.onIntroPhase?.("done");
+  }
+  /** Turn every map gesture off (during the intro) or back on. */
+  function setIntroInput(map: MLMap, on: boolean) {
+    for (const h of [map.dragPan, map.scrollZoom, map.boxZoom, map.dragRotate, map.keyboard, map.doubleClickZoom, map.touchZoomRotate, map.touchPitch]) {
+      if (on) h.enable();
+      else h.disable();
+    }
   }
   useEffect(() => {
     const map = mapRef.current;

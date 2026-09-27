@@ -6,6 +6,7 @@ import { buildPaint } from '../lib/paint';
 import { HERO_VIEW } from '../lib/mapStyle';
 import { EXPLORE_SECTIONS, presetWeights, useApp } from '../lib/store';
 import { useTour } from '../lib/tour';
+import { isPhone } from '../lib/viewport';
 import MapView from './MapView';
 import { AboutModal } from './LandingModals';
 
@@ -42,7 +43,7 @@ export default function LandingPage() {
     // A fresh visit starts clean: nothing selected, nothing painted, the summary folded away and the tip back.
     useTour.getState().reset();
     // A fresh open: the Explore panel shows, with Boundary, Data and Settings folded.
-    const ui = { ...s.ui, left: true, sections: { ...s.ui.sections, ...Object.fromEntries(EXPLORE_SECTIONS.map((id) => [id, 'collapsed' as const])) } };
+    const ui = { ...s.ui, left: !isPhone(), sections: { ...s.ui.sections, ...Object.fromEntries(EXPLORE_SECTIONS.map((id) => [id, 'collapsed' as const])) } };
     s.setUi(ui);
     useApp.setState({ view: 'app', mode: 'explore', introNonce: s.introNonce + 1, introDone: false, hintClosed: false, browsePanel: false, browse: { level: s.browse.level, variable: null, selected: null } });
   };

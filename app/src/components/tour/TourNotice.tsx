@@ -10,10 +10,10 @@ export default function TourNotice({ show }: { show: boolean }) {
   return (
     <AnimatePresence>
       {show && (
-        <motion.div key="tour-notice" initial={lite ? false : { opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="absolute left-1/2 top-16 z-20 -translate-x-1/2" role="status">
+        <motion.div key="tour-notice" initial={lite ? false : { opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="absolute left-1/2 top-16 z-20 max-sm:left-3 max-sm:right-3 max-sm:translate-x-0 -translate-x-1/2" role="status">
           <div className="flex items-center gap-2 rounded-full bg-slate-900/90 py-1.5 pl-3.5 pr-1.5 text-small font-medium text-white shadow-lg backdrop-blur">
             <Compass className="h-4 w-4 shrink-0 text-violet-200" />
-            <span className="whitespace-nowrap">{T.notice}</span>
+            <span className="whitespace-nowrap max-sm:min-w-0 max-sm:flex-1 max-sm:whitespace-normal">{T.notice}</span>
             <button onClick={start} className="rounded-full bg-white px-3 py-1 text-caption font-semibold text-slate-900 hover:bg-violet-50">
               {T.start}
             </button>

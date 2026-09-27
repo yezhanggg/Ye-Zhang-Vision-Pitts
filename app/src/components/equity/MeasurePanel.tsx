@@ -371,7 +371,7 @@ export default function MeasurePanel({
     // the selected tract against the city, and the ranked list.
     const box = 'rounded-xl bg-white ring-1 ring-stone-200/80';
     return (
-      <section aria-label="Measure" data-testid="equity-measure" className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] gap-2.5">
+      <section aria-label="Measure" data-testid="equity-measure" className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] gap-2.5 max-sm:grid-cols-1">
         <div className="scroll-quiet flex min-h-0 flex-col gap-2.5 overflow-y-auto">
           <div className={cx(box, 'flex shrink-0 flex-col gap-2.5 px-4 pb-3.5 pt-3')}>
             {header}

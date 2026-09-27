@@ -31,12 +31,12 @@ export default function Rail({ children, title, float, maxHeightClass, reserveBo
     return (
       <AnimatePresence initial={false} mode="popLayout">
         {open ? (
-          <motion.aside key="rail" data-tour="rail" style={{ transformOrigin: 'top left', ...(reserveBottom ? { maxHeight: `calc(100% - 4.75rem - ${reserveBottom}px)` } : {}) }} initial={{ opacity: 0, scale: 0.9, x: -14, filter: 'blur(6px)' }} animate={{ opacity: 1, scale: 1, x: 0, filter: 'blur(0px)' }} exit={{ opacity: 0, scale: 0.92, x: -14, filter: 'blur(6px)', transition: { duration: 0.18, ease: 'easeIn' } }} transition={SPRING_PANEL} className={cx('absolute left-3 top-16 z-20 flex w-[340px] flex-col', maxHeightClass ?? 'max-h-[calc(100%-4.75rem)]', 'rounded-2xl bg-white/95 shadow-[0_10px_40px_-10px_rgba(15,23,42,0.25)] ring-1 ring-black/5 backdrop-blur xl:w-[360px]')} aria-label={title}>
+          <motion.aside key="rail" data-tour="rail" style={{ transformOrigin: 'top left', ...(reserveBottom ? { maxHeight: `calc(100% - 4.75rem - ${reserveBottom}px)` } : {}) }} initial={{ opacity: 0, scale: 0.9, x: -14, filter: 'blur(6px)' }} animate={{ opacity: 1, scale: 1, x: 0, filter: 'blur(0px)' }} exit={{ opacity: 0, scale: 0.92, x: -14, filter: 'blur(6px)', transition: { duration: 0.18, ease: 'easeIn' } }} transition={SPRING_PANEL} className={cx('absolute left-3 top-16 z-20 flex w-[340px] flex-col', maxHeightClass ?? 'max-h-[calc(100%-4.75rem)]', 'rounded-2xl bg-white/95 shadow-[0_10px_40px_-10px_rgba(15,23,42,0.25)] ring-1 ring-black/5 backdrop-blur xl:w-[360px] max-[1099px]:top-[7.25rem] max-sm:right-3 max-sm:w-auto max-sm:!max-h-[40vh]')} aria-label={title}>
             <RailHeader title={title} onHide={() => setUi({ left: false })} />
             <div className={BODY}>{children}</div>
           </motion.aside>
         ) : (
-          <motion.div key="rail-tab" style={{ transformOrigin: 'top left' }} initial={{ opacity: 0, scale: 0.6, x: -8 }} animate={{ opacity: 1, scale: 1, x: 0 }} exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.12 } }} transition={SPRING_TAB} className="absolute left-3 top-16 z-20">
+          <motion.div key="rail-tab" style={{ transformOrigin: 'top left' }} initial={{ opacity: 0, scale: 0.6, x: -8 }} animate={{ opacity: 1, scale: 1, x: 0 }} exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.12 } }} transition={SPRING_TAB} className="absolute left-3 top-16 z-20 max-[1099px]:top-[7.25rem]">
             <motion.button onClick={() => setUi({ left: true })} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.95 }} transition={SPRING_TAB} className="flex items-center gap-2 rounded-xl bg-white/95 px-3 py-2 text-small font-semibold text-slate-800 shadow-lg ring-1 ring-black/5 backdrop-blur hover:bg-white" aria-label={UI.showPanel} title={UI.showPanel}>
               <PanelLeftOpen className="h-4 w-4 text-slate-600" />
               {title}
