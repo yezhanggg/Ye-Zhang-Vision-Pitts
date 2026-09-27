@@ -134,7 +134,7 @@ export function Explainer({ title, children, defaultOpen = false, className, ton
       <AnimatePresence initial={false}>
         {open && (
           <motion.div id={id} initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0, transition: { ...SPRING_FOLD, opacity: { duration: 0.12 } } }} transition={SPRING_FOLD} className="overflow-hidden">
-            <motion.div initial={{ y: -8 }} animate={{ y: 0 }} exit={{ y: -8 }} transition={SPRING_FOLD} className={cx(tone === 'card' ? 'px-3 pb-3' : 'pt-1.5')}>
+            <motion.div initial={{ y: -8 }} animate={{ y: 0 }} exit={{ y: -8 }} transition={SPRING_FOLD} className={cx(tone === 'card' ? 'px-3 pb-3 pt-1' : 'px-0.5 pb-0.5 pt-1.5')}>
               {children}
             </motion.div>
           </motion.div>

@@ -1,7 +1,8 @@
 // Data files in src/data are read at build time (Vite inlines them), so the single-file export works over file://.
 // A missing file never breaks the build: each loader has a fallback.
+import { decodeBuildings } from './buildingsCodec';
 import { featureAt, type IndexedFeature } from './geo';
-import type { AskingRentsContext, BuildingProps, FC, FocusDef, Meta, NeighborhoodFeature, ScoringConfig, SourceDef, TractFeature, TractProps } from './types';
+import type { AskingRentsContext, FC, FocusDef, Meta, NeighborhoodFeature, ScoringConfig, SourceDef, TractFeature, TractProps } from './types';
 
 const raw = import.meta.glob('../data/*.json', { eager: true, query: '?raw', import: 'default' }) as Record<string, string>;
 
@@ -27,7 +28,7 @@ export const scoring = load<ScoringConfig>('scoring', {
 });
 export const tractsFC = load<FC<TractFeature>>('tracts', { type: 'FeatureCollection', features: [] });
 export const neighborhoodsFC = load<FC<NeighborhoodFeature>>('neighborhoods', { type: 'FeatureCollection', features: [] });
-export const buildingsFC = load<FC<{ type: 'Feature'; properties: BuildingProps; geometry: unknown }>>('buildings', { type: 'FeatureCollection', features: [] });
+export const buildingsFC = decodeBuildings(load<unknown>('buildings', null));
 export const sources = load<SourceDef[]>('sources', []);
 export const focusDefs = load<FocusDef[]>('focus', []);
 export const meta = load<Meta>('meta', {});

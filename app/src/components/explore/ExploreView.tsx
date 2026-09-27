@@ -4,8 +4,9 @@ import { MapPinned, MousePointerClick, X } from 'lucide-react';
 import type { ExpressionSpecification } from 'maplibre-gl';
 import { useApp, type Level } from '../../lib/store';
 import type { MapPaint } from '../../lib/paint';
-import { LEVEL_LAYER, variableById } from '../../lib/explore/catalog';
-import { browsePaint, estimates, extent, quantileBreaks } from '../../lib/explore/bins';
+import { LEVEL_LAYER, reference, variableById } from '../../lib/explore/catalog';
+import { browsePaint, divergingBreaks, estimates, extent, quantileBreaks } from '../../lib/explore/bins';
+import { isDiverging, themePalette } from '../../lib/explore/palettes';
 import { BOUNDARY_STYLE, EXPLORE_UI } from '../../lib/explore/copy';
 import { useGeo, useVariable } from '../../lib/explore/remote';
 import { resolveForLevel } from '../../lib/explore/search';
@@ -111,9 +112,14 @@ export default function ExploreView() {
   const values = loaded?.data ?? null;
 
   const fixedPaint = useMemo(() => (analysis && values ? analysisPaint(analysis, values) : null), [analysis, values]);
-  const breaks = useMemo(() => (values && !fixedPaint ? quantileBreaks(estimates(values), 5) : []), [values, fixedPaint]);
+  // Each topic has its own ramp; a few shares diverge around the city value instead of splitting into quintiles.
+  const palette = useMemo(() => themePalette(variable), [variable]);
+  const breaks = useMemo(() => {
+    if (!values || fixedPaint) return [];
+    return isDiverging(variable) ? divergingBreaks(estimates(values), reference(variable?.id ?? null).city?.est) : quantileBreaks(estimates(values), 5);
+  }, [values, fixedPaint, variable]);
   const ext = useMemo(() => (values && !fixedPaint ? extent(estimates(values)) : null), [values, fixedPaint]);
-  const fillPaint = useMemo(() => fixedPaint ?? (values ? browsePaint(values, breaks) : null), [fixedPaint, values, breaks]);
+  const fillPaint = useMemo(() => fixedPaint ?? (values ? browsePaint(values, breaks, palette) : null), [fixedPaint, values, breaks, palette]);
   const browseIndex = useMemo(() => indexOf(browseGeo.data.features), [browseGeo.data]);
   const resolve = useMemo(() => resolveForLevel(level, browseGeo.data), [level, browseGeo.data]);
   // The map keeps its focus clear of whichever panels are open.

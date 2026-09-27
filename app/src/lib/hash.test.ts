@@ -106,7 +106,7 @@ describe('encodeHash', () => {
   it('writes Explore params only for an Explore state', () => {
     const q = new URLSearchParams(encodeHash({ ...base(), mode: 'explore', selectedId: TRACT }));
     expect(q.get('m')).toBe('explore');
-    expect(q.get('L')).toBe('buildings,terrain,tracts,city');
+    expect(q.get('L')).toBe('buildings,tracts,city');
     for (const k of ['t', 'b', 'w', 's', 'sa', 'sb', 'c', 'g', 'v', 'u', 'lite']) expect(q.has(k)).toBe(false);
   });
 

@@ -1,7 +1,8 @@
 import { motion } from 'motion/react';
 import { activeFactors, meta, scoring, sourceById, typologyById } from '../lib/data';
 import { FACTOR_COPY, GLOSSARY, UI, directionWord, factorName, percentilePhrase, weightWord } from '../lib/copy';
-import { cx, fmtInt, fmtNum, fmtPct, isNum } from '../lib/format';
+import { ANALYSIS_COPY as C } from '../lib/analysis/copy';
+import { cx, fmtInt, fmtMoney, fmtNum, fmtPct, isNum } from '../lib/format';
 import type { Conf, FactorDef, TractProps, Weights } from '../lib/types';
 import { ConfChip, Explainer, InfoTip } from './primitives';
 
@@ -33,7 +34,22 @@ function Flag({ label, v, note }: { label: string; v: unknown; note: string }) {
   );
 }
 
-function rawLine(f: FactorDef, t: TractProps): string {
+/** The subsidy grade in words: 1 full, 0.5 partial, 0 none (lib/analysis/copy). */
+export function subsidyGrade(x: number | null): string {
+  if (x == null) return 'No data for this tract';
+  const word = x >= 0.75 ? C.subsidy.full : x >= 0.25 ? C.subsidy.partial : C.subsidy.none;
+  return `Grade ${x >= 0.75 ? 1 : x >= 0.25 ? 0.5 : 0}: ${word}`;
+}
+
+/** The HUD income line behind the need count ("50% of area median income is $55,200 a year …"), or null without the HUD figures. */
+export function hudLine(): string | null {
+  const h = meta.hud;
+  if (!h || !isNum(h.ami_50_4p)) return null;
+  return `50% of area median income is ${fmtMoney(h.ami_50_4p)} a year for a family of four, HUD FY${h.fy ?? 2026}`;
+}
+
+/** The observed value behind a factor, in one line. */
+export function rawLine(f: FactorDef, t: TractProps): string {
   switch (f.id) {
     case 'need':
       return `${fmtInt(t.need_count)} renter households earning ${GLOSSARY.AMI}`;
@@ -47,9 +63,13 @@ function rawLine(f: FactorDef, t: TractProps): string {
       return fired.length ? fired.join(' · ') : 'No subsidy program applies';
     }
     case 'transit_access':
-      return `${fmtNum(t.transit_departures_per_acre, 1)} weekday departures per acre`;
+      return isNum(t.transit_departures_per_hh) ? `${fmtNum(t.transit_departures_per_hh, 1)} weekday departures per household within 400 m${isNum(t.households) && t.households < 400 ? ' (divided by 400: fewer households than that)' : ''}` : 'No transit count';
     case 'flood_exposure':
       return `${fmtNum(t.flood_share_pct, 0)}% of land in a low-lying flood-screening area`;
+    case 'senior_demand':
+      return isNum(t.age65_share) ? `${fmtPct(t.age65_share)} of residents are 65 or older` : 'No population estimate';
+    case 'small_multifamily_stock':
+      return isNum(t.units_2_4_share) ? `${fmtPct(t.units_2_4_share)} of housing units are in 2–4 unit buildings` : 'No housing-unit estimate';
     default:
       return f.raw_field ? `${fmtNum(t[f.raw_field])} ${f.unit}` : f.unit;
   }
@@ -81,11 +101,14 @@ function Components({ f, t }: { f: FactorDef; t: TractProps }) {
   }
   if (f.id === 'subsidy_eligible') {
     return (
-      <div className="grid grid-cols-2 gap-1.5">
+      <div>
+        <p className="mb-1.5 text-caption text-slate-700">{subsidyGrade(num(t.subsidy_eligible))}. A 2026 tax-credit or high-cost designation counts in full; an Opportunity Zone or community-development area alone counts half.</p>
+        <div className="grid grid-cols-2 gap-1.5">
         <Flag label={GLOSSARY.QCT} v={t.qct} note="No data" />
         <Flag label={GLOSSARY.DDA} v={t.dda} note="No data" />
         <Flag label={GLOSSARY.OZ} v={t.oz} note="No data" />
         <Flag label={GLOSSARY.CDBG} v={t.cdbg} note="Not covered by the city file" />
+        </div>
       </div>
     );
   }
@@ -103,6 +126,7 @@ function Components({ f, t }: { f: FactorDef; t: TractProps }) {
     return (
       <div>
         <Row k="Renter households ≤50% of area median income" v={fmtInt(t.need_count)} b={fmtInt(bench.need_count)} />
+        {hudLine() && <p className="py-0.5 text-caption text-slate-600">{hudLine()}</p>}
         <Row k="Margin of error (CV)" v={fmtPct(t.need_count_cv)} />
         <Row k="Households that rent" v={fmtPct(t.renter_share)} b={fmtPct(bench.renter_share)} />
         <Row k="Renters paying >30% of income" v={fmtPct(t.rent_burdened_share)} b={fmtPct(bench.rent_burdened_share)} />
@@ -121,7 +145,7 @@ export function FactorCard({ f, t, weight, topTypology }: { f: FactorDef; t: Tra
   const topName = topTypology ? typologyById.get(topTypology)?.label : null;
   const c = FACTOR_COPY[f.id];
   const srcNames = f.sources.map((s) => sourceById.get(s)?.name ?? s.toUpperCase());
-  const fitLine = d === undefined || !topName ? null : d === 0 ? `Doesn’t affect the ${topName} match` : isFlag ? `${d > 0 ? 'Eligibility helps' : 'Eligibility counts against'} the ${topName} match` : `${d > 0 ? 'Higher' : 'Lower'} is better for ${topName}`;
+  const fitLine = d === undefined || !topName ? null : d === 0 ? `Doesn’t affect the ${topName} match` : isFlag ? `${d > 0 ? 'A higher grade helps' : 'A higher grade counts against'} the ${topName} match` : `${d > 0 ? 'Higher' : 'Lower'} is better for ${topName}`;
   return (
     <div className="rounded-xl bg-white p-3 ring-1 ring-stone-200/80">
       <div className="flex items-start justify-between gap-2">
@@ -131,8 +155,9 @@ export function FactorCard({ f, t, weight, topTypology }: { f: FactorDef; t: Tra
         </div>
         <ConfChip conf={x == null ? null : conf} />
       </div>
-      <div className="mt-1 text-small font-semibold text-slate-800">{x == null ? 'No data for this tract' : isFlag ? (x >= 0.5 ? 'Eligible for at least one program' : 'Not eligible') : percentilePhrase(x)}</div>
+      <div className="mt-1 text-small font-semibold text-slate-800">{x == null ? 'No data for this tract' : isFlag ? subsidyGrade(x) : percentilePhrase(x)}</div>
       <div className="text-caption text-slate-600">{rawLine(f, t)}</div>
+      {f.id === 'need' && hudLine() && <div className="text-caption text-slate-600">{hudLine()}</div>}
       {!isFlag && (
         <>
           <div className="relative mt-2.5 h-2 rounded-full bg-gradient-to-r from-stone-100 via-stone-200 to-stone-300">

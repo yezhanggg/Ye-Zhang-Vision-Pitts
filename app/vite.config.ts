@@ -46,6 +46,8 @@ export default defineConfig(({ mode }) => {
   return {
     base: './',
     plugins: [react(), tailwindcss(), devApi(), ...(single ? [viteSingleFile({ removeViteModuleLoader: true })] : [])],
+    // The offline file never talks to Supabase (file:// turns it off), so it carries no Supabase URL or key at all.
+    define: single ? { 'import.meta.env.VITE_SUPABASE_URL': '""', 'import.meta.env.VITE_SUPABASE_ANON_KEY': '""' } : undefined,
     // Read the repo-root .env so VITE_SUPABASE_* reach the browser bundle (only VITE_-prefixed keys are exposed).
     envDir: resolve(__dirname, '..'),
     server: { port: 5173 },

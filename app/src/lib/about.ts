@@ -11,7 +11,7 @@ export const PROJECT = {
   ],
   has: [
     { title: 'Explore', text: '37 census variables for 2020–2024 with a 2014–2024 history, for city and county tracts, block groups, ZIP codes and 129 municipalities, plus the Analysis layers for city tracts.' },
-    { title: 'Analysis', text: 'A matchmaker that ranks five housing types for each of the 128 city tracts from six public-data factors and the priorities you set, with a side-by-side view of two places or two sets of priorities.' },
+    { title: 'Analysis', text: 'A matchmaker that ranks five housing types for each of the 114 ranked of 128 city tracts from eight public-data factors and the priorities you set, with a side-by-side view of two places or two sets of priorities.' },
     { title: 'Search and questions', text: 'One box finds a place or answers a question about it from the tool’s own figures. Searching is free; only questions go to the language model.' },
     { title: 'Open and portable', text: 'Every view is a link, the whole tool also runs as a single offline file, and the code and methods are public.' },
   ],
@@ -54,12 +54,14 @@ export const LIMITS: { title: string; items: string[] }[] = [
   {
     title: 'What the data cannot tell you yet',
     items: [
-      'Eviction filings are apportioned from ZIP codes to tracts by housing units. They are an estimate, not a tract observation, and every use of them drops the confidence tag one level.',
-      'HUD suppresses voucher counts where 10 or fewer households hold one (47 ranked tracts), so those tracts’ displacement score rests on fewer parts.',
+      'Eviction filings are apportioned from ZIP codes to tracts by housing units. They are an estimate, not a tract observation. The displacement confidence tag drops one level only where the tract’s housing sits in several ZIP codes and none holds at least 80% of it; a tract inside one ZIP keeps its level.',
+      'HUD suppresses voucher counts where 10 or fewer households hold one (33 of the 114 ranked tracts), so those tracts’ displacement score rests on fewer parts.',
       'Market change is direction only: the 2016 and 2021 market-type letters are not comparable one to one, and 20 city tracts have no classification at all (mostly non-residential land).',
-      'Flood exposure comes from a terrain screening model (height above nearest drainage), not a FEMA floodplain; it ignores stormwater and flash flooding.',
-      'Transit access measures the schedule, not reliability, and the 400 m buffer crosses tract lines, so small dense tracts score very high.',
-      'Need counts households, not fit: student-heavy tracts rank high on the count and nothing adjusts for that.',
+      'Flood exposure comes from a terrain screening model (height above nearest drainage), not a FEMA floodplain; it ignores stormwater and flash flooding. Its confidence is medium at best and low in the 14 tracts where more than half the land reads as flooded (Shadyside, Homewood South, North Shore and South Side Flats among them).',
+      'Transit access measures the schedule per household, not reliability; households are floored at 400 so a near-empty tract cannot rank first, and the 400 m buffer crosses tract lines, so small dense tracts still score high.',
+      'Need counts households, not fit: student-heavy tracts rank high on the count and nothing adjusts for that. For scale, HUD’s FY2026 50% income limit for a family of four in the Pittsburgh area is $55,200; the count itself uses the CHAS 2018–2022 bands.',
+      'Residents 65 and over is a share of who lives there now, not unmet demand: a tract with senior buildings already built reads high (North Oakland: 45% aged 65 and over, 89% of homes in 20+ unit buildings).',
+      'The 2–4 unit homes share is built form, not zoning, and its census margin is wide: the estimate is unreliable in most tracts, so that factor usually reads medium confidence.',
       'The city is the universe. Neighbors outside the city limits are not in the market-pressure computation, so edge tracts have fewer neighbors.',
       '3D buildings exist for the eight demo tracts only; guessed heights are drawn faded and counted in each tract’s data-limits panel.',
     ],
@@ -70,7 +72,7 @@ export const LIMITS: { title: string; items: string[] }[] = [
       'Zoning and what is buildable by right, parcel availability and site feasibility.',
       'Infrastructure capacity, embodied carbon and vehicle miles travelled.',
       'School quality, and access to jobs and services beyond transit frequency. Asking rents from listings are shown as information (licensed Dewey aggregates) and never scored.',
-      'The fit matrix and the presets are value judgments. Under Balanced weights senior housing ranks first in 40 of 114 tracts, largely because its fit row is short and strongly flood-averse. That is documented for review, not tuned to look better.',
+      'The fit matrix and the presets are value judgments, published with every changed cell and its reason. Under Balanced weights senior housing ranks first in 17 of 114 tracts, where seniors already live and subsidy applies; under the earlier method it won 40 because nothing measured seniors. Many picks are close calls, and the tool says so rather than painting them solid.',
     ],
   },
 ];
@@ -80,10 +82,10 @@ export const NEXT: { title: string; items: string[] }[] = [
   {
     title: 'Future implementation',
     items: [
-      'Hosted on Vercel with the AI explanation service on, and a Supabase store so saved scenarios can be shared by link and revisited.',
+      'A Supabase store so saved scenarios can be shared by link and revisited.',
       'Score all 394 Allegheny County tracts, not only the 128 city tracts (Explore already browses every municipality, county tract and ZIP code).',
       'Zoning gate per tract from the City’s district layer: allowed by right, needs approval, not allowed, for each of the five types.',
-      'HUD income limits so “≤50% AMI” reads as a dollar figure for a family of four; FEMA flood layer to validate the screening model.',
+      'FEMA flood zones to replace the terrain screening model, with the share of each tract’s land and homes inside the Special Flood Hazard Area.',
       'An access-to-opportunity factor (jobs, schools, everyday services) and policy toggles (density bonus, ADUs by right) as labeled value judgments with their own parity tests.',
       'Local spatial clusters of the recommendations, so a planner can see corridors rather than single tracts.',
     ],

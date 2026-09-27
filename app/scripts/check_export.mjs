@@ -22,7 +22,7 @@ const protocol = await page.evaluate(() => location.protocol);
 if (protocol !== 'file:') throw new Error(`expected the export to run over file:, got ${protocol}`);
 await page.waitForTimeout(6000);
 await page.getByRole('button', { name: 'Analysis', exact: true }).click();
-await page.waitForSelector('text=Find a place', { timeout: 20000 });
+await page.waitForSelector('text=Start here', { timeout: 20000 });
 await page.waitForTimeout(4000);
 await page.click('text=Hazelwood');
 await page.waitForSelector('text=Best match here', { timeout: 20000 });

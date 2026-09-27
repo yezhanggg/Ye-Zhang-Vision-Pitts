@@ -30,7 +30,8 @@ function Ramp({ palette, ticks, lo, hi, w }: { palette: string[]; ticks?: string
   );
 }
 
-export default function Legend({ metric, flips, compact, buildings }: { metric: MapMetric; flips?: boolean; compact?: boolean; buildings?: string | null }) {
+/** `closeCalls`: the map draws the close-call overlay (top two within the close margin), so the legend explains it. */
+export default function Legend({ metric, flips, compact, buildings, closeCalls }: { metric: MapMetric; flips?: boolean; compact?: boolean; buildings?: string | null; closeCalls?: boolean }) {
   const w = compact ? 'w-56' : 'w-60';
   const pct = (b: number[]) => b.map((x) => String(Math.round(x * 100)));
   let title = 'Best match score';
@@ -45,6 +46,12 @@ export default function Legend({ metric, flips, compact, buildings }: { metric: 
             {t.label}
           </div>
         ))}
+        {closeCalls && (
+          <div className="col-span-full mt-0.5 flex items-center gap-1.5 text-small text-slate-800">
+            <span className="h-3 w-4 rounded-sm border border-dashed border-slate-600 bg-white/60" />
+            Close call: top two within {Math.round((scoring.scoring.close_margin ?? 0.03) * 100)} points
+          </div>
+        )}
         {flips && (
           <div className="col-span-full mt-0.5 flex items-center gap-1.5 text-small text-slate-800">
             <span className="h-3 w-4 rounded-sm border-2 border-slate-900" />
@@ -69,7 +76,7 @@ export default function Legend({ metric, flips, compact, buildings }: { metric: 
       </div>
     );
   } else if (metric.kind === 'lens') {
-    title = 'Need × market change (2016→2021)';
+    title = 'Watch list: need × market change, 2016 → 2021';
     body = (
       <div className="flex items-end gap-2 pt-1">
         <div className="flex flex-col-reverse gap-0.5">

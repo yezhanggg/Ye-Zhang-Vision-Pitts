@@ -4,6 +4,7 @@ import { EXPLORE_UI } from '../../lib/explore/copy';
 import { useReference } from '../../lib/explore/remote';
 import type { BrowseLevel, ValueMap, VariableDef } from '../../lib/explore/types';
 import { classCounts, isAnalysis, type AnalysisVar } from '../../lib/explore/analysisVars';
+import { isDiverging, themePalette } from '../../lib/explore/palettes';
 import { cx } from '../../lib/format';
 
 /** Anchors a label so it never spills past the ramp ends. */
@@ -92,8 +93,10 @@ interface Props {
 /** Bottom-left legend of the painted variable: the five-class ramp with break labels, city/county marks and the hovered unit. */
 export default function DataLegend({ variable, level, values, breaks, ext, hoverId }: Props) {
   const ref = useReference(variable.id);
-  if (isAnalysis(variable)) return <AnalysisLegend variable={variable} values={values} hoverId={hoverId} />;
-  const palette = paletteFor(breaks.length + 1);
+  // Fixed-palette Analysis layers (scores, classes) have their own legend; quantile ones (dollars, counts, shares) use the ramp below.
+  const analysis = isAnalysis(variable) ? variable : null;
+  if (analysis && analysis.paint.kind !== 'quantile') return <AnalysisLegend variable={analysis} values={values} hoverId={hoverId} />;
+  const palette = paletteFor(breaks.length + 1, themePalette(variable));
   const n = palette.length;
   const unit = variable.unit;
   const cityPos = refPosition(ref.city?.est, breaks, ext);
@@ -127,11 +130,18 @@ export default function DataLegend({ variable, level, values, breaks, ext, hover
         )}
       </div>
       <div className="relative h-4">{countyPos != null && <RefMark label={EXPLORE_UI.place.county} pos={countyPos} value={fmtValue(ref.county?.est, unit)} up />}</div>
+      {isDiverging(variable) && breaks.length === 4 && (
+        <div className="flex justify-between text-caption text-slate-700">
+          <span>← Below the city</span>
+          <span>Above the city →</span>
+        </div>
+      )}
       <div className="mt-1 space-y-0.5 text-caption text-slate-600">
         <div className="flex items-center gap-1.5">
           <span className={cx('h-3 w-4 rounded-sm', hoverNoData && 'ring-2 ring-slate-900')} style={{ background: NO_DATA }} />
           {EXPLORE_UI.legend.noData}
         </div>
+        {analysis && <div>{EXPLORE_UI.cityTractsOnly}</div>}
       </div>
     </div>
   );

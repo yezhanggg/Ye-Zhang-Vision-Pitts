@@ -31,7 +31,7 @@ await open('#m=match&c=lens.bivariate', 'text=Start here');
 await shot('04-watch-list', 4000);
 await open('#m=tracts&t=42003562300&b=42003140300&c=top', 'text=Why they differ');
 await shot('05-compare-tracts', 4500);
-await open('#m=scenarios&t=42003562300', 'text=How the two scenarios weigh things');
+await open('#m=scenarios&t=42003562300', 'text=Policy simulator');
 await shot('06-compare-scenarios', 4500);
 // Details (the project, its data and method, its limits, what comes next): Home -> the Details door -> Data & method.
 await page.click('[title="Back to the start page"]');

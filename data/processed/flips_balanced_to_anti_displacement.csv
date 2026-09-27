@@ -1,15 +1,19 @@
 GEOID,from,to,neighborhood
-42003060300,small_apartment,townhome,Lower Lawrenceville
-42003080400,adu,townhome,Bloomfield
-42003080900,small_apartment,senior,Bloomfield
-42003130600,senior,small_apartment,East Hills
-42003140200,townhome,senior,Squirrel Hill North
-42003140400,townhome,adu,Point Breeze
-42003191500,small_apartment,townhome,Mount Washington
-42003191700,townhome,adu,Brookline
+42003051100,townhome,senior,Terrace Village
+42003070300,small_apartment,senior,Shadyside
+42003070800,townhome,small_apartment,Shadyside
+42003090300,duplex_triplex,townhome,Bloomfield
+42003100500,senior,townhome,Stanton Heights
+42003151700,duplex_triplex,townhome,Greenfield
+42003170600,duplex_triplex,townhome,South Side Slopes
+42003180300,small_apartment,senior,Allentown
+42003191400,duplex_triplex,townhome,Mount Washington
 42003192000,adu,townhome,Beechview
-42003562000,small_apartment,senior,North Oakland
-42003562600,senior,small_apartment,Elliott
-42003562800,small_apartment,senior,East Carnegie
-42003565300,townhome,adu,Hays
-42003980700,small_apartment,townhome,South Shore
+42003202200,senior,townhome,Sheraden
+42003250900,small_apartment,senior,Fineview
+42003270300,duplex_triplex,townhome,Brighton Heights
+42003270800,townhome,adu,Brighton Heights
+42003290200,senior,small_apartment,Carrick
+42003290400,duplex_triplex,adu,Carrick
+42003563000,senior,adu,Fairywood
+42003565200,duplex_triplex,small_apartment,Manchester

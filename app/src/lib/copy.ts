@@ -41,7 +41,7 @@ export const FACTOR_COPY: Record<string, FactorCopy> = {
     high: 'subsidy eligibility',
     low: 'no subsidy designation',
     more: 'subsidy eligibility',
-    how: 'Yes if the tract is a low-income tax-credit area (QCT), a high-cost area (DDA), an Opportunity Zone, or a City of Pittsburgh community-development area (CDBG).',
+    how: 'A grade, not a rank: 1 if the tract is a low-income tax-credit area (QCT) or a high-cost area (DDA, 2026); one half if its only designation is an Opportunity Zone or a City of Pittsburgh community-development area (CDBG, 2018); 0 if none.',
   },
   transit_access: {
     name: 'Transit access',
@@ -49,7 +49,7 @@ export const FACTOR_COPY: Record<string, FactorCopy> = {
     high: 'frequent transit',
     low: 'little transit service',
     more: 'more frequent transit',
-    how: 'Counts weekday departures from Pittsburgh Regional Transit stops within 400 m (about a quarter mile), divided by the tract’s land area, then ranks tracts city-wide. It measures the schedule, not reliability. Small dense tracts score very high.',
+    how: 'Counts weekday departures from Pittsburgh Regional Transit stops within 400 m (about a quarter mile), divided by the number of households (tracts with fewer than 400 households are divided by 400), then ranks tracts city-wide. It measures the schedule, not reliability.',
   },
   flood_exposure: {
     name: 'Flood exposure',
@@ -57,7 +57,23 @@ export const FACTOR_COPY: Record<string, FactorCopy> = {
     high: 'a lot of flood-prone land',
     low: 'little flood-prone land',
     more: 'more flood-prone land',
-    how: 'Share of tract land inside a terrain-based flood screening model (height above the nearest drainage). It is not a FEMA floodplain and ignores stormwater, so check before citing.',
+    how: 'Share of tract land inside a terrain-based flood screening model (height above the nearest drainage). It is not a FEMA floodplain and ignores stormwater, so check before citing. Confidence is medium at best, and low where the model reads more than half the land as flood-prone.',
+  },
+  senior_demand: {
+    name: 'Residents 65 and over',
+    meaning: 'How large a share of the residents here are aged 65 or older.',
+    high: 'many residents aged 65 or older',
+    low: 'few residents aged 65 or older',
+    more: 'more residents aged 65 or older',
+    how: 'Share of residents aged 65 or older (ACS 2020–24, table B01001), ranked against every residential tract in the city. Tracts with senior buildings already in place read high, so a high value can mean homes already built rather than unmet demand.',
+  },
+  small_multifamily_stock: {
+    name: '2–4 unit homes',
+    meaning: 'How much of the housing here is already in two- to four-unit buildings.',
+    high: 'many homes in 2–4 unit buildings',
+    low: 'few homes in 2–4 unit buildings',
+    more: 'more homes in 2–4 unit buildings',
+    how: 'Share of housing units in 2–4 unit buildings (ACS 2020–24, table B25024), ranked city-wide. It describes what is built, not what zoning allows, and its margin of error is wide in small tracts.',
   },
 };
 
@@ -78,7 +94,7 @@ export const GLOSSARY = {
 
 export const PRESET_COPY: Record<string, string> = {
   balanced: 'Every factor counts the same.',
-  anti_displacement: 'Protect current residents first.',
+  anti_displacement: 'Weight need and displacement risk most.',
   market_led: 'Build where the market is strong.',
   transit_first: 'Put new homes near frequent transit.',
 };
@@ -114,7 +130,7 @@ export function stabilityWords(share: number) {
   return { n, tone, label };
 }
 export const STABILITY_HOW =
-  'We nudge your priority settings at random 200 times (small shifts in every direction) and re-score the tract each time. The count shows how often the same housing type stays on top. A “close call” means a small change in priorities could change the answer.';
+  'We nudge your priority settings at random 1,000 times (small shifts in every direction) and re-score the tract each time. The count shows how often the same housing type stays on top. A “close call” means a small change in priorities could change the answer.';
 
 // ------------------------------------------------------------------ scores and percentiles
 export const matchText = (score: number | null | undefined) => (score == null ? 'No score' : `${Math.round(score * 100)} / 100 match`);
@@ -164,9 +180,9 @@ export const UI = {
   rentLayerSub: 'Median 2BR asking rent, 2019–20 → 2025–26, buildings listed before 2019 · Dewey listings, information only',  // sections and the Analysis sub-tab bar
   explore: 'Explore',
   analysis: 'Analysis',
-  matchTab: 'Match',
-  compareTractsTab: 'Compare tracts',
-  compareScenariosTab: 'Compare scenarios',
+  matchTab: 'Place',
+  compareTractsTab: 'Compare places',
+  compareScenariosTab: 'Equity & policy',
   copyLink: 'Copy link',
   linkCopied: 'Link copied ✓',
   aboutTitle: 'About VisionPitts',

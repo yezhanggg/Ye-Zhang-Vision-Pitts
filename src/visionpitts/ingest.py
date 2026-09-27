@@ -21,6 +21,7 @@ from visionpitts.config import (
     COUNTY_GEOID,
     CRS_PA_SOUTH,
     CRS_WGS84,
+    PROCESSED,
     RAW,
     SQM_PER_ACRE,
     STATE_FIPS,
@@ -93,6 +94,32 @@ def acs(geoids: pd.Index) -> pd.DataFrame:
     keep = ["pop", "households", "med_hh_income", "med_hh_income_cv", "med_gross_rent", "med_gross_rent_cv",
             "med_home_value", "renter_hh", "renter_hh_moe", "renter_share", "rent_burdened_share", "vacancy_share"]
     return out[keep].reindex(geoids)
+
+
+# ---------------------------------------------------------------------------------------- ACS shares
+ACS_TRACT_CSV = PROCESSED / "acs_tract.csv"  # written by scripts/07_build_acs_levels.py
+ACS_SHARE_COLS = ["age65_share", "age65_share_cv", "units_2_4_share", "units_2_4_share_cv"]
+ACS_SHARE_OPTIONAL = ["households_cv"]
+
+
+def acs_shares(geoids: pd.Index, path=None) -> pd.DataFrame:
+    """Two ACS shares that are scored (residents 65+, units in 2-4 unit buildings) with their CVs, plus the
+    household-count CV when the table has it. Read from data/processed/acs_tract.csv; nothing is imputed."""
+    path = ACS_TRACT_CSV if path is None else path
+    if not path.exists():
+        raise FileNotFoundError(f"{path} is missing. Run scripts/07_build_acs_levels.py before scripts/02_build_factors.py "
+                                "(pipeline order: 01, 07, 02, 03, 04).")
+    a = pd.read_csv(path, dtype={"GEOID": str})
+    missing = [c for c in ["GEOID", *ACS_SHARE_COLS] if c not in a.columns]
+    if missing:
+        raise KeyError(f"{path} has no column {missing}. Rebuild it with scripts/07_build_acs_levels.py; the scored ACS "
+                       f"shares need {ACS_SHARE_COLS}.")
+    a = a.set_index("GEOID")
+    keep = ACS_SHARE_COLS + [c for c in ACS_SHARE_OPTIONAL if c in a.columns]
+    out = a[keep].apply(pd.to_numeric, errors="coerce").reindex(geoids)
+    print(f"  ACS shares: {int(out['age65_share'].notna().sum())} tracts with a 65+ share, "
+          f"{int(out['units_2_4_share'].notna().sum())} with a 2-4 unit share")
+    return out
 
 
 # ---------------------------------------------------------------------------------------------- CHAS
@@ -316,6 +343,11 @@ def eviction(tracts: gpd.GeoDataFrame, renter_hh: pd.Series) -> pd.DataFrame:
     Annual filings per ZIP = mean over ETS_YEARS of the monthly `filings_2020` column (the column name is legacy; it holds
     the filings in that month). Each ZIP's filings are split among tracts in proportion to the housing units of the
     2020 blocks that fall in the ZIP's ZCTA. This is an estimate, not a tract observation, and is tagged as such.
+
+    `eviction_zip_dominant` is the largest share of the tract's 2020 housing units that sits in one ZCTA and
+    `eviction_zip_n` the number of ZCTAs that hold any of them: a tract inside one ZIP inherits that ZIP's rate cleanly,
+    a tract split across several does not. (`eviction_zips` lists every ZCTA a block of the tract falls in, including
+    ZCTAs that hold none of its housing, so it cannot be used for that test.)
     """
     e = pd.read_csv(ETS, dtype={"GEOID": str}, usecols=["city", "type", "GEOID", "month", "filings_2020"], low_memory=False)
     e = e[(e["city"] == "Pittsburgh, PA") & (e["type"] == "Zip Code")].copy()
@@ -325,6 +357,7 @@ def eviction(tracts: gpd.GeoDataFrame, renter_hh: pd.Series) -> pd.DataFrame:
     zcta = gpd.read_file(RAW / "benchmark" / "flags" / "zcta2020_allegheny.geojson")[["ZCTA5", "geometry"]].to_crs(CRS_WGS84)
     blocks = geo.blocks2020()  # whole county: a ZIP's housing outside the city still belongs to the ZIP's denominator
     j = gpd.sjoin(blocks, zcta, how="left", predicate="within").drop_duplicates("block20")
+    tract_hu = j.groupby("tract20")["hu"].sum()  # every block of the tract, in a ZCTA or not
     j = j[j["ZCTA5"].notna()]
     j["zip_hu"] = j.groupby("ZCTA5")["hu"].transform("sum")
     j["zip_filings"] = j["ZCTA5"].map(annual)
@@ -341,5 +374,9 @@ def eviction(tracts: gpd.GeoDataFrame, renter_hh: pd.Series) -> pd.DataFrame:
     rh = renter_hh.reindex(geoids)
     out["eviction_filing_rate"] = out["eviction_filings_est"] / rh.where(rh > 0) * 100
     out["eviction_zips"] = by_tract.groupby("tract20")["ZCTA5"].agg(lambda s: ",".join(sorted(set(s)))).reindex(geoids)
+    zip_hu = by_tract.groupby(["tract20", "ZCTA5"])["hu"].sum()
+    zip_hu = zip_hu[zip_hu > 0]
+    out["eviction_zip_dominant"] = (zip_hu.groupby(level=0).max() / tract_hu.replace(0, np.nan)).reindex(geoids)
+    out["eviction_zip_n"] = zip_hu.groupby(level=0).size().reindex(geoids).fillna(0).astype(int)
     print(f"  ETS: {annual.notna().sum()} ZIPs with filings, years {ETS_YEARS}; tracts with a rate: {out['eviction_filing_rate'].notna().sum()}")
     return out

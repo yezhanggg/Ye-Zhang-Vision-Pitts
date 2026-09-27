@@ -68,6 +68,18 @@ export function topTypology(x: FactorValues, weights: Weights, cfg: ScoringConfi
   return rank(scoreTract(x, weights, cfg))[0] ?? null;
 }
 
+/** Score gap between the best and the second-best typology; null with fewer than two scored. Mirrors scoring.margin in Python. */
+export function topMargin(scores: TypologyScore[]): number | null {
+  const s = scores.map((x) => x.score).filter((v): v is number => v != null).sort((a, b) => b - a);
+  return s.length >= 2 ? s[0] - s[1] : null;
+}
+
+/** True when the top two scores are closer than eps: a tie, not a pick. Mirrors scoring.is_tie in Python. */
+export function isTie(scores: TypologyScore[], eps = 0.005): boolean {
+  const m = topMargin(scores);
+  return m != null && m < eps;
+}
+
 // ---------------------------------------------------------------------------------------- stability
 /** Small seeded PRNG (mulberry32) so stability numbers are reproducible per tract. */
 export function prng(seed: number): () => number {

@@ -55,6 +55,18 @@ def ranking(scores: dict[str, float | None]) -> list[str]:
     return sorted((k for k in order if scores[k] is not None), key=lambda k: (-scores[k], order.index(k)))
 
 
+def margin(scores: dict[str, float | None]) -> float | None:
+    """Score gap between the best and the second-best typology; None with fewer than two scored. Mirrors topMargin."""
+    v = sorted((s for s in scores.values() if s is not None), reverse=True)
+    return v[0] - v[1] if len(v) >= 2 else None
+
+
+def is_tie(scores: dict[str, float | None], eps: float = 0.005) -> bool:
+    """True when the top two scores are closer than eps: a tie, not a pick. Mirrors isTie."""
+    m = margin(scores)
+    return m is not None and m < eps
+
+
 def top(x: dict, weights: dict, cfg: dict) -> str | None:
     r = ranking(score(x, weights, cfg))
     return r[0] if r else None

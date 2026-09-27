@@ -33,8 +33,29 @@ export interface ScoringConfig {
   notes?: string;
   factors: FactorDef[];
   typologies: Typology[];
-  fit: { label: string; matrix: Record<string, Record<string, number>> };
-  scoring: { formula?: string; stability_draws: number; stability_concentration: number; stability_seed?: number };
+  fit: {
+    label: string;
+    matrix: Record<string, Record<string, number>>;
+    /** Every cell changed since the previous version, with who proposed it (value judgments stay signed by the author). */
+    changes?: { cell: string; from: number | null; to: number; source: string; adopted: string }[];
+  };
+  scoring: {
+    formula?: string;
+    stability_draws: number;
+    stability_concentration: number;
+    stability_seed?: number;
+    /** Top two closer than this: a tie, not a pick. */
+    tie_margin?: number;
+    /** Top two closer than this: a close call. */
+    close_margin?: number;
+  };
+  /** How the observed factors are built (switches read by src/visionpitts/factors.py). */
+  factor_options?: {
+    subsidy?: { mode: 'graded' | 'flag'; tiers?: Record<string, number> };
+    transit?: { basis: 'household' | 'acre'; household_floor?: number };
+    flood?: { base_confidence?: Conf; implausible_share_pct?: number };
+    displacement?: { eviction_zip_dominant_min?: number };
+  };
   presets: Preset[];
   confidence?: { rule: string; levels: string[] };
   pressure?: { label: string; bivariate: string; flat_band: number };
@@ -123,6 +144,22 @@ export interface TractProps {
   rent_index_2025_26: number | null;
   rent_2br_gt_fmr: boolean | null;
   asking_rents_conf: Conf | null;
+  /** Scoring v0.4.0 (optional so older data files still load). */
+  senior_demand?: number | null;
+  senior_demand_conf?: Conf | null;
+  small_multifamily_stock?: number | null;
+  small_multifamily_stock_conf?: Conf | null;
+  /** Share of residents aged 65 or older (ACS B01001) and its coefficient of variation. */
+  age65_share?: number | null;
+  age65_share_cv?: number | null;
+  /** Share of housing units in 2–4 unit buildings (ACS B25024) and its coefficient of variation. */
+  units_2_4_share?: number | null;
+  units_2_4_share_cv?: number | null;
+  /** Weekday departures within 400 m per household (households floored at 400). */
+  transit_departures_per_hh?: number | null;
+  /** Largest share of the tract's housing units that sits in one ZIP, and how many ZIPs hold any. */
+  eviction_zip_dominant?: number | null;
+  eviction_zip_n?: number | null;
   [key: string]: unknown;
 }
 
@@ -179,6 +216,16 @@ export interface Meta {
   watch_list_count?: number | null;
   building_height_share?: Record<string, number>;
   asking_rents?: { n_with_rent_2025_26: number; n_with_growth_existing: number; n_with_growth_all: number; n_above_fmr: number; confidence_counts: Record<string, number> } | null;
+  /** HUD FY figures for the Pittsburgh metro, read from the HUD workbooks by src/visionpitts/hud.py. */
+  hud?: { hmfa?: string; fy?: number; fmr_2br?: number | null; median_family_income?: number | null; ami_30_4p?: number | null; ami_50_4p?: number | null; ami_80_4p?: number | null } | null;
+  /** Best-match counts by typology over ranked tracts, per preset id. */
+  winners?: Record<string, Record<string, number>>;
+  /** Per preset: how many ranked tracts have a #1–#2 gap under each threshold, ties, and the median gap. */
+  margins?: Record<string, { lt05: number; lt03: number; lt02: number; ties: number; median: number | null }>;
+  /** Ranked tracts at each subsidy grade (keys '1', '0.5', '0'). */
+  subsidy_tiers?: Record<string, number>;
+  hcv_suppressed_ranked?: number | null;
+  flood_over_50?: number | null;
 }
 
 /** County / city asking-rent context (app/src/data/asking_rents.json, from scripts/06_build_asking_rents.py). */

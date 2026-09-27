@@ -58,11 +58,33 @@ export function paletteFor(n: number, palette = BROWSE_PALETTE): string[] {
 
 export const estimates = (values: ValueMap): (number | null)[] => [...values.values()].map((e) => e.est);
 
-/** MapPaint for an overlay: one category per class (feature-state `k`), null → no-data grey. */
-export function browsePaint(values: ValueMap | Map<string, number | null>, breaks: number[]): MapPaint {
+/**
+ * Four breaks for a diverging ramp centred on `center` (the city value): the middle class is "about the city"
+ * (± a tenth of the 10th–90th percentile spread), the outer breaks split the values below and above at their median.
+ * Falls back to quantile breaks when the center is missing or the classes would not be strictly increasing.
+ */
+export function divergingBreaks(values: Iterable<number | null | undefined>, center: number | null | undefined): number[] {
+  const xs = [...values].filter(finite).sort((a, b) => a - b);
+  if (!finite(center) || xs.length < 5) return quantileBreaks(xs, 5);
+  const q = (arr: number[], p: number) => {
+    const pos = p * (arr.length - 1);
+    const lo = Math.floor(pos), hi = Math.ceil(pos);
+    return arr[lo] + (arr[hi] - arr[lo]) * (pos - lo);
+  };
+  const d = 0.1 * (q(xs, 0.9) - q(xs, 0.1));
+  const below = xs.filter((x) => x < center - d);
+  const above = xs.filter((x) => x > center + d);
+  if (d <= 0 || below.length === 0 || above.length === 0) return quantileBreaks(xs, 5);
+  const out = [q(below, 0.5), center - d, center + d, q(above, 0.5)];
+  for (let i = 1; i < out.length; i++) if (!(out[i] > out[i - 1])) return quantileBreaks(xs, 5);
+  return out;
+}
+
+/** MapPaint for an overlay: one category per class (feature-state `k`), null → no-data grey. `palette` is the variable's theme ramp. */
+export function browsePaint(values: ValueMap | Map<string, number | null>, breaks: number[], palette: string[] = BROWSE_PALETTE): MapPaint {
   const out = new Map<string, number | null>();
   for (const [id, v] of values) out.set(id, classify(typeof v === 'number' || v == null ? v : v.est, breaks));
-  return { kind: 'cat', palette: paletteFor(breaks.length + 1), values: out };
+  return { kind: 'cat', palette: paletteFor(breaks.length + 1, palette), values: out };
 }
 
 // ------------------------------------------------------------------ formats

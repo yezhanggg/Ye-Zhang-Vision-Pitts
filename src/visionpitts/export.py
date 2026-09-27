@@ -9,7 +9,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 
-from visionpitts import sources
+from visionpitts import factors, hud, scoring, sources
 from visionpitts.asking_rents import APP_FIELDS as ASKING_RENTS
 from visionpitts.config import APP_DATA, CRS_PA_SOUTH, CRS_WGS84, INTERIM, PROCESSED, load_scoring
 
@@ -17,13 +17,22 @@ CONTEXT = ["pop", "households", "med_hh_income", "med_hh_income_cv", "med_gross_
            "renter_hh", "renter_share", "rent_burdened_share", "vacancy_share"]
 RAW_FIELDS = ["need_count", "need_count_cv", "mva21", "mva16", "mva21_score", "mva16_score", "mva_change", "mva_raw",
               "svi_overall", "svi_t1", "svi_t2", "svi_t3", "svi_t4", "chas_burden_le50_share", "eviction_filing_rate", "eviction_filings_est", "eviction_coverage", "eviction_zips",
+              "eviction_zip_dominant", "eviction_zip_n",
               "hcv_count", "hcv_per_renter", "displacement_n", "qct", "dda", "oz", "cdbg", "zcta",
-              "transit_departures", "transit_departures_per_acre", "flood_share_pct", "flood_deep_share_pct", "veg_cover_land_pct"]
+              "transit_departures", "transit_departures_per_acre", "transit_departures_per_hh",
+              "flood_share_pct", "flood_deep_share_pct", "veg_cover_land_pct",
+              "age65_share", "age65_share_cv", "units_2_4_share", "units_2_4_share_cv"]
+# Raw fields added in scoring v0.4.0 (also reported in meta.city_medians).
+NEW_RAW_FIELDS = ["transit_departures_per_hh", "age65_share", "age65_share_cv", "units_2_4_share", "units_2_4_share_cv",
+                  "eviction_zip_dominant", "eviction_zip_n"]
+MEDIAN_FIELDS = ["need_count", "flood_share_pct", "transit_departures_per_acre", *NEW_RAW_FIELDS,
+                 "svi_overall", "chas_burden_le50_share", "eviction_filing_rate", "hcv_per_renter"]
+MARGIN_CUTS = {"lt05": 0.05, "lt03": 0.03, "lt02": 0.02}
 PRESSURE = ["n_neighbors", "market_lag", "market_pressure", "market_pressure_pct", "need_tercile", "market_direction",
             "bivariate_class", "watch_list"]
 # ASKING_RENTS (asking_rents.APP_FIELDS): an information layer joined from data/processed/asking_rents.csv when present.
 INT_FIELDS = {"pop", "households", "med_hh_income", "med_gross_rent", "med_home_value", "renter_hh", "need_count", "hcv_count",
-              "transit_departures", "rent_2br_2025_26", "n_units_2025_26"}
+              "transit_departures", "rent_2br_2025_26", "n_units_2025_26", "eviction_zip_n"}
 ASKING_RENTS_CSV = PROCESSED / "asking_rents.csv"
 
 
@@ -102,9 +111,39 @@ def neighborhoods_geojson(nbhd: gpd.GeoDataFrame, tracts: gpd.GeoDataFrame) -> d
     return {"type": "FeatureCollection", "features": feats}
 
 
+def ranked(df: pd.DataFrame) -> pd.DataFrame:
+    """The tracts that are scored: residential ones (every tract when the table has no `residential` column)."""
+    return df[df["residential"].fillna(False).astype(bool)] if "residential" in df else df
+
+
+def winners(df: pd.DataFrame, cfg: dict) -> tuple[dict, dict]:
+    """Per preset over the ranked tracts: best-match counts by typology, and how close the top two scores are."""
+    r = ranked(df)
+    r = r.assign(**{f["id"]: np.nan for f in cfg["factors"] if f["id"] not in r})  # a factor not built yet has no data
+    tie = cfg["scoring"].get("tie_margin", 0.005)
+    tids = [t["id"] for t in cfg["typologies"]]
+    wins, gaps = {}, {}
+    for p in cfg["presets"]:
+        tops, margins = [], []
+        for x in r[[f["id"] for f in cfg["factors"]]].to_dict(orient="records"):
+            sc = scoring.score(x, p["weights"], cfg)
+            rk = scoring.ranking(sc)
+            tops.append(rk[0] if rk else None)
+            margins.append(scoring.margin(sc))
+        m = pd.Series(margins, dtype=float)
+        wins[p["id"]] = {k: tops.count(k) for k in tids}
+        gaps[p["id"]] = {**{k: int((m < cut).sum()) for k, cut in MARGIN_CUTS.items()}, "ties": int((m < tie).sum()),
+                         "median": clean(m.median(), 4) if m.notna().any() else None}
+    return wins, gaps
+
+
 def meta(df: pd.DataFrame, cfg: dict) -> dict:
-    fids = [f["id"] for f in cfg["factors"]]
-    med = {c: clean(df[c].median(), 4) for c in CONTEXT + ["need_count", "flood_share_pct", "transit_departures_per_acre"] if c in df}
+    fids = [f["id"] for f in cfg["factors"] if f["id"] in df]
+    med = {c: clean(df[c].median(), 4) for c in CONTEXT + MEDIAN_FIELDS if c in df}
+    r = ranked(df)
+    wins, gaps = winners(df, cfg)
+    flood_cut = factors.options(cfg)["flood"]["implausible_share_pct"]
+    tiers = r["subsidy_eligible"].dropna().value_counts() if "subsidy_eligible" in r else pd.Series(dtype=int)
     return {
         "built_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "scope": cfg["scope"],
@@ -116,6 +155,12 @@ def meta(df: pd.DataFrame, cfg: dict) -> dict:
         "confidence_counts": {f: df[f"{f}_conf"].value_counts(dropna=False).rename(lambda k: str(k)).to_dict() for f in fids},
         "watch_list_count": int(df["watch_list"].sum()) if "watch_list" in df else None,
         "displacement_parts": df["displacement_n"].value_counts().rename(lambda k: str(int(k))).to_dict() if "displacement_n" in df else None,
+        "hud": hud.summary(),
+        "winners": wins,
+        "margins": gaps,
+        "subsidy_tiers": {f"{k:g}": int(tiers.get(k, 0)) for k in sorted({1.0, 0.5, 0.0} | set(tiers.index), reverse=True)},
+        "hcv_suppressed_ranked": int(r["hcv_count"].isna().sum()) if "hcv_count" in r else None,
+        "flood_over_50": int((r["flood_share_pct"] > flood_cut).sum()) if "flood_share_pct" in r else None,
         "asking_rents": {
             "n_with_rent_2025_26": int(df["rent_2br_2025_26"].notna().sum()),
             "n_with_growth_existing": int(df["rent_2br_growth_existing"].notna().sum()),

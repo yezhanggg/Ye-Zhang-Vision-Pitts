@@ -27,6 +27,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 
+from visionpitts import hud
 from visionpitts.config import CRS_WGS84, RAW
 
 DEWEY_CACHE = RAW / "dewey_cache"
@@ -43,7 +44,7 @@ LATE = (2025, 2026)
 EXISTING_BEFORE = 2019      # a property is "existing stock" if it was listed before this year
 MIN_UNITS_CELL = 10         # distinct units per tract-year cell
 MIN_UNITS_POOLED = 20       # distinct units for pooled 2025-26 levels, the index and both growth columns
-FMR_2BR_FY2026 = 1299       # HUD FY2026 Fair Market Rent, 2 bedrooms, Pittsburgh HMFA
+FMR_2BR_FY2026 = hud.fmr(2) or 1299  # HUD FY2026 Fair Market Rent, 2 bedrooms, Pittsburgh HMFA (read from the HUD workbook)
 CONF_UNITS = {"high": 50, "medium": 20}  # distinct 2BR units in 2025-26; below medium -> low
 LL_DECIMALS = 5             # ~1 m: the location key for rows with no unit or property id
 SITE_DECIMALS = 4           # ~10 m: the site key that identifies a building across Dewey's PROPERTY_ID re-keying

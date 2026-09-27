@@ -1,43 +1,67 @@
-import { useMemo } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
-import { FMR_2BR, focusTracts, hasAskingRents, meta, rankedTracts, scoring, tractById, tractLabel, tractSubLabel, typologyById } from '../lib/data';
-import { stabilityFor, tLabel, topCounts, useAllResults, type TractResult } from '../lib/derived';
-import { usePaint } from '../lib/paint';
-import { MAX_SCENARIOS, matchPreset, useApp } from '../lib/store';
-import { fmtInt, fmtMoney, fmtPct, fmtSignedPct, score100 } from '../lib/format';
-import { PRESSURE_HOW, RENT_CAVEAT, RENT_HOW, SCORE_HOW, UI, directionWord, matchText, percentilePhrase } from '../lib/copy';
-import { useExplanation } from '../lib/explainRemote';
-import type { TractProps } from '../lib/types';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { motion } from 'motion/react';
+import { FMR_2BR, activeFactorIds, focusTracts, hasAskingRents, rankedTracts, scoring, tractById, tractLabel, tractSubLabel, typologyById } from '../lib/data';
+import { tLabel, useAllResults, type TractResult } from '../lib/derived';
+import { TYPOLOGY_COLORS, type MapPaint } from '../lib/paint';
+import { matchPreset, useApp } from '../lib/store';
+import { fmtInt, fmtMoney, fmtPct, fmtSignedPct } from '../lib/format';
+import { PRESSURE_HOW, RENT_CAVEAT, RENT_HOW, UI, directionWord, percentilePhrase } from '../lib/copy';
+// lib/explainRemote (the AI reading) is not imported here since update 3: the place page is evidence blocks and a
+// rules-based recommendation; see the note at the top of that file.
+import { closeMargin, rationale } from '../lib/analysis/rationale';
+import { APP_STANCES } from '../lib/analysis/copy';
+import { cityView, type View } from '../lib/analysis/framing';
+import { topMargin } from '../lib/scoring';
+import { hasPlaceData, hud as hudTable, placeById, placeFor } from '../lib/place/data';
+import { FIXTURE_HUD, FIXTURE_PLACES } from '../lib/place/fixture';
+import { LEVEL_LABEL } from '../lib/place/plan';
+import { usePlan } from '../lib/place/planStore';
+import type { Recommendation } from '../lib/place/recommend';
+import { suggestAll } from '../lib/place/suggest';
+import { STANCE_LABEL } from '../lib/place/thresholds';
+import type { HudTable, PlaceMeasures, Stance, Typology } from '../lib/place/types';
+import type { TractProps, Weights } from '../lib/types';
 import MapView from './MapView';
 import Rail, { RailSection } from './Rail';
 import AnalysisChat from './AnalysisChat';
 import PanelFrame, { RightColumn } from './PanelFrame';
-import TractSearch from './TractSearch';
-import WeightPanel from './WeightPanel';
-import MetricPicker from './MetricPicker';
-import Legend from './Legend';
-import TypologyRankList, { StabilityBadge } from './TypologyRankList';
-import FactorCards from './FactorCards';
 import DataLimitsPanel from './DataLimitsPanel';
-import { ConfChip, Dot, Explainer, InfoTip, ObservedBadge, SectionTitle, readableColor } from './primitives';
+import FactorTable from './analysis/FactorTable';
+import FitOrder from './place/FitOrder';
+import AdvancedSettings from './place/AdvancedSettings';
+import FocusPicker from './place/FocusPicker';
+import PlanAnswer from './place/PlanAnswer';
+import PlanInputs from './place/PlanInputs';
+import PlaceFolds, { Fold } from './place/PlaceFolds';
+import SuggestionLegend from './place/SuggestionLegend';
+import { ConfChip, Dot, Explainer, InfoTip, ObservedBadge, SectionTitle } from './primitives';
 
-export function MapTooltip({ id, results }: { id: string; results: Map<string, TractResult> }) {
+/** Map hover card. `weights` (the Match view passes them) lets it tell "every factor is zero" from "no data". */
+export function MapTooltip({ id, results, weights }: { id: string; results: Map<string, TractResult>; weights?: Weights }) {
   const t = tractById.get(id);
   const r = results.get(id);
   if (!t) return null;
+  const zero = !!weights && activeFactorIds.length > 0 && activeFactorIds.every((f) => !((weights[f] ?? 0) > 0));
+  const m = r ? topMargin(r.scores) : null;
+  const close = r?.top && m != null && m < closeMargin() ? r.ranking[1] ?? null : null;
   return (
     <div className="max-w-64">
       <div className="font-semibold">{tractLabel(t)}</div>
       <div className="text-caption text-white/75">{tractSubLabel(t)}</div>
       {!t.residential ? (
-        <div className="mt-1 text-white/80">Not ranked (fewer than 25 households)</div>
+        <div className="mt-1 text-white/80">Not ranked ({typeof t.households === 'number' ? `${fmtInt(t.households)} households, ` : ''}fewer than 25)</div>
+      ) : zero ? (
+        <div className="mt-1 text-white/80">No score: every factor is set to zero</div>
       ) : r?.top ? (
-        <div className="mt-1 flex items-center gap-1.5">
-          <Dot color={typologyById.get(r.top)?.color ?? '#999'} size={9} />
-          <span>
-            Best match: <b>{tLabel(r.top)}</b> ({score100(r.topScore)}/100)
-          </span>
-        </div>
+        <>
+          <div className="mt-1 flex items-center gap-1.5">
+            <Dot color={typologyById.get(r.top)?.color ?? '#999'} size={9} />
+            <span>
+              Best match: <b>{tLabel(r.top)}</b>
+            </span>
+          </div>
+          {close && <div className="mt-0.5 text-caption font-semibold text-amber-200">Close call with {tLabel(close)}</div>}
+        </>
       ) : (
         <div className="mt-1 text-white/80">No score (missing data)</div>
       )}
@@ -63,6 +87,8 @@ function AskingRentLine({ t }: { t: TractProps }) {
   const n = t.n_units_2025_26 ?? 0;
   const gx = t.rent_2br_growth_existing;
   const ga = t.rent_2br_growth_all;
+  // Asking rent more than twice the census median: the listings and the residents are different markets.
+  const reconcile = rent != null && typeof t.med_gross_rent === 'number' && t.med_gross_rent > 0 && rent > 2 * t.med_gross_rent;
   let growth: React.ReactNode;
   if (gx != null) {
     growth = (
@@ -99,6 +125,7 @@ function AskingRentLine({ t }: { t: TractProps }) {
           {RENT_HOW}
         </InfoTip>
       </div>
+      {reconcile && <p className="mt-1 text-caption text-slate-700">Listings here are mostly new market-rate units. The census median ({fmtMoney(t.med_gross_rent)}) includes subsidized homes, which is what most residents pay.</p>}
       <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-caption text-slate-600">
         <span>{RENT_CAVEAT}</span>
         <ConfChip conf={t.asking_rents_conf} />
@@ -142,7 +169,7 @@ function PressureCard({ t }: { t: TractProps }) {
       <div className={`rounded-xl px-3 py-2.5 ring-1 ${t.watch_list ? 'bg-rose-50 ring-rose-200' : 'bg-white ring-stone-200/80'}`}>
         {p != null && (
           <div className="text-body text-slate-900">
-            Neighboring tracts’ markets are <b>{word}</b> than this one ({p > 0 ? '+' : ''}
+            Neighboring tracts’ markets are <b>{word}</b> {word === 'about the same' ? 'as' : 'than'} this one ({p > 0 ? '+' : ''}
             {p.toFixed(2)} on the 0–1 market scale).
           </div>
         )}
@@ -167,214 +194,244 @@ function PressureCard({ t }: { t: TractProps }) {
   );
 }
 
-function CitySummary({ results }: { results: Map<string, TractResult> }) {
+/** No tract yet: one line and the demo neighborhoods. Nothing else. */
+function StartCard() {
   const select = useApp((s) => s.select);
-  const set = useApp((s) => s.set);
-  const counts = useMemo(() => topCounts(results), [results]);
-  const n = results.size;
-  const lead = scoring.typologies.map((t) => ({ t, c: counts[t.id] ?? 0 })).sort((a, b) => b.c - a.c)[0];
-  const watch = rankedTracts.filter((t) => t.watch_list);
   return (
-    <div className="space-y-5 p-5">
-      <div>
-        <div className="text-small font-semibold text-violet-700">Start here</div>
-        <h2 className="mt-1 font-display text-title font-bold text-slate-900">Pick a place to see which kind of housing fits it best, and why.</h2>
-        <ul className="mt-3 space-y-1.5 text-body text-slate-700">
-          {['Search an address or click the map.', 'Choose what matters most and watch the ranking change.', 'Compare two places, or two sets of priorities.'].map((t) => (
-            <li key={t} className="flex gap-2.5">
-              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-violet-600" aria-hidden />
-              <span>{t}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-      <div>
-        <div className="mb-1.5 text-small text-slate-700">Demo neighborhoods</div>
-        <div className="flex flex-wrap gap-1.5">
-          {focusTracts.map((t) => (
-            <button key={t.GEOID} onClick={() => select(t.GEOID)} className="rounded-full bg-white px-3 py-1 text-small font-medium text-slate-800 ring-1 ring-stone-300 hover:bg-violet-50 hover:text-violet-800 hover:ring-violet-200">
-              {tractLabel(t)}
-            </button>
-          ))}
-        </div>
-      </div>
-      <button onClick={() => set({ metric: { kind: 'lens', id: 'bivariate' } })} className="block w-full rounded-xl bg-rose-50 px-3 py-2.5 text-left ring-1 ring-rose-200 hover:bg-rose-100/70">
-        <div className="text-small font-semibold text-rose-900">
-          Watch list: <span className="tnum">{watch.length}</span> tracts with high need and a rising market
-        </div>
-        <div className="text-caption text-rose-800">About {fmtInt(watch.reduce((s, t) => s + (t.need_count ?? 0), 0))} renter households at ≤50% AMI live in them. Show on the map →</div>
-      </button>
-      <div>
-        <SectionTitle sub={lead ? `${lead.t.label} wins in the most places (${lead.c} of ${n}).` : undefined}>Best match across all {n} ranked tracts</SectionTitle>
-        <div className="space-y-2">
-          {scoring.typologies.map((t) => {
-            const c = counts[t.id] ?? 0;
-            return (
-              <div key={t.id} className="flex items-center gap-2 text-small">
-                <span className="w-32 shrink-0 truncate text-slate-800">{t.label}</span>
-                <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-stone-100">
-                  <motion.div className="h-full rounded-full" style={{ background: t.color }} initial={false} animate={{ width: `${n ? (c / n) * 100 : 0}%` }} transition={{ type: 'spring', stiffness: 220, damping: 30 }} />
-                </div>
-                <span className="w-9 text-right font-semibold text-slate-900 tnum">{c}</span>
-              </div>
-            );
-          })}
-        </div>
-        <p className="mt-2 text-caption text-slate-600">{meta.n_tracts ?? 0} city tracts in all; {(meta.n_tracts ?? 0) - n} with fewer than 25 households are shown but not ranked.</p>
+    <div className="space-y-3 p-5">
+      <div className="text-small font-semibold text-violet-700">Start here</div>
+      <p className="font-display text-lead font-semibold leading-snug text-slate-900">Pick a place: tap a neighborhood below or search above.</p>
+      <div className="flex flex-wrap gap-1.5">
+        {focusTracts.map((t) => (
+          <button key={t.GEOID} onClick={() => select(t.GEOID)} className="rounded-full bg-white px-3 py-1 text-small font-medium text-slate-800 ring-1 ring-stone-300 hover:bg-violet-50 hover:text-violet-800 hover:ring-violet-200">
+            {tractLabel(t)}
+          </button>
+        ))}
       </div>
     </div>
   );
 }
 
-function AnswerCard({ t, r, weights }: { t: TractProps; r: TractResult; weights: Record<string, number> }) {
-  const stability = useMemo(() => stabilityFor(t.GEOID, weights), [t.GEOID, weights]);
-  const top = r.top ? typologyById.get(r.top) : null;
-  const presetLabel = scoring.presets.find((p) => p.id === matchPreset(weights))?.label ?? null;
-  const ex = useExplanation(t, r, weights, stability, presetLabel);
-  if (!top) return <div className="rounded-2xl bg-stone-50 p-4 text-body text-slate-700 ring-1 ring-stone-200">{ex.text}</div>;
+/** Map hover card on Match: the suggested type under the focusing issue and the planning inputs. */
+function SuggestTooltip({ id, rec }: { id: string; rec: Recommendation | null | undefined }) {
+  const t = tractById.get(id);
+  if (!t) return null;
+  const lead = rec?.types[0]?.typology ?? null;
   return (
-    <div className="rounded-2xl p-4 ring-1" style={{ background: `${top.color}14`, boxShadow: `inset 0 0 0 1px ${top.color}40` }}>
-      <div className="text-small font-medium text-slate-700">{UI.bestMatch}</div>
-      <AnimatePresence mode="wait">
-        <motion.div key={top.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.18 }}>
-          <div className="font-display text-display font-bold" style={{ color: readableColor(top.color) }}>
-            {top.label}
-          </div>
-          <div className="mt-0.5 text-small text-slate-700">
-            {top.long} · <b className="text-slate-900">{matchText(r.topScore)}</b>
-          </div>
-        </motion.div>
-      </AnimatePresence>
-      <p className="mt-2.5 text-body text-slate-800">{ex.text}</p>
-      <div className="mt-3">
-        <StabilityBadge stability={stability} />
-      </div>
-      <p className="mt-2 text-caption text-slate-600">{ex.source === 'ai' ? `${UI.whyAI(ex.provider ?? 'an AI model')} (${ex.model}).` : `${UI.whyAuto}.`}</p>
+    <div className="max-w-64">
+      <div className="font-semibold">{tractLabel(t)}</div>
+      <div className="text-caption text-white/75">{tractSubLabel(t)}</div>
+      {!t.residential ? (
+        <div className="mt-1 text-white/80">Not ranked ({typeof t.households === 'number' ? `${fmtInt(t.households)} households, ` : ''}fewer than 25)</div>
+      ) : lead ? (
+        <div className="mt-1 flex items-center gap-1.5">
+          <Dot color={typologyById.get(lead)?.color ?? '#999'} size={9} />
+          <span>
+            Suggested: <b>{typologyById.get(lead)?.label ?? lead}</b>
+          </span>
+        </div>
+      ) : (
+        <div className="mt-1 text-white/80">{rec ? 'No suggestion at this level' : 'No place data'}</div>
+      )}
     </div>
   );
 }
 
-export function TractDetail({ t, r, weights, onClose }: { t: TractProps; r: TractResult; weights: Record<string, number>; onClose?: () => void }) {
+/** Demo tracts the synthetic fixture (lib/place/fixture) stands in for, dev server only, with `?fixture=1` in the URL. */
+const FIXTURE_GEOIDS: Record<string, keyof typeof FIXTURE_PLACES> = { '42003562300': 'hazelwood', '42003130700': 'homewood_north', '42003140300': 'squirrel_hill_north' };
+function devFixtureOn(): boolean {
+  try {
+    return import.meta.env.DEV && new URLSearchParams(window.location.search).has('fixture');
+  } catch {
+    return false;
+  }
+}
+/** The place measures and HUD table for a tract: the built files, or (dev server with ?fixture=1) the synthetic fixture. */
+function placeDataFor(geoid: string): { place: PlaceMeasures | null; hud: HudTable | null } {
+  if (hasPlaceData) return { place: placeFor(geoid), hud: hudTable };
+  if (devFixtureOn()) {
+    const key = FIXTURE_GEOIDS[geoid];
+    return { place: key ? FIXTURE_PLACES[key] : null, hud: FIXTURE_HUD };
+  }
+  return { place: null, hud: null };
+}
+
+function DetailHeader({ t, onClose }: { t: TractProps; onClose?: () => void }) {
+  return (
+    <div className="sticky top-0 z-10 border-b border-stone-100 bg-white/95 px-5 pb-3 pt-4 backdrop-blur">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="truncate font-display text-title font-bold text-slate-900">{tractLabel(t)}</h2>
+          <div className="text-small text-slate-600 tnum">
+            {tractSubLabel(t)}
+            {t.focus && <span className="ml-2 rounded-full bg-violet-50 px-2 py-px text-caption font-semibold text-violet-700 ring-1 ring-violet-200">demo</span>}
+          </div>
+        </div>
+        {onClose && (
+          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-500 hover:bg-stone-100 hover:text-slate-900" aria-label="Clear selection">
+            <svg viewBox="0 0 20 20" className="h-4 w-4">
+              <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * One place. With place measures: the answer card (the suggestion under the focusing issue and the planning inputs,
+ * with its arithmetic), then the evidence folds A–F, how the suggestion was made and the fit order, then data limits.
+ * Without them (the pipeline has not run): the weighted fit order and the factor table, as in update 2.
+ */
+export function TractDetail({ t, r, weights, rec, fitOrder, onClose }: { t: TractProps; r: TractResult; weights: Weights; rec?: Recommendation | null; fitOrder?: Typology[]; onClose?: () => void }) {
+  const ra = useMemo(() => rationale(t, r, weights), [t, r, weights]);
+  const plan = usePlan();
+  const { place, hud } = placeDataFor(t.GEOID);
+  if (place && hud && rec) {
+    return (
+      <div>
+        <DetailHeader t={t} onClose={onClose} />
+        <div className="space-y-3 p-5">
+          <PlanAnswer rec={rec} place={place} hud={hud} level={plan.level} household={plan.household} homes={plan.homes} />
+          <PlaceFolds t={t} place={place} hud={hud} rec={rec} level={plan.level} fitOrder={fitOrder ?? (r.ranking as Typology[])} />
+          <Fold title="Data limits" headline="what these numbers cannot tell you">
+            <DataLimitsPanel t={t} />
+          </Fold>
+        </div>
+      </div>
+    );
+  }
   return (
     <div>
-      <div className="sticky top-0 z-10 border-b border-stone-100 bg-white/95 px-5 pb-3 pt-4 backdrop-blur">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h2 className="truncate font-display text-title font-bold text-slate-900">{tractLabel(t)}</h2>
-            <div className="text-small text-slate-600 tnum">
-              {tractSubLabel(t)}
-              {t.focus && <span className="ml-2 rounded-full bg-violet-50 px-2 py-px text-caption font-semibold text-violet-700 ring-1 ring-violet-200">demo</span>}
-            </div>
-          </div>
-          {onClose && (
-            <button onClick={onClose} className="rounded-lg p-1.5 text-slate-500 hover:bg-stone-100 hover:text-slate-900" aria-label="Clear selection">
-              <svg viewBox="0 0 20 20" className="h-4 w-4">
-                <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </button>
-          )}
-        </div>
-      </div>
+      <DetailHeader t={t} onClose={onClose} />
       <div className="space-y-6 p-5">
-        {t.residential ? (
-          <>
-            <AnswerCard t={t} r={r} weights={weights} />
-            <section>
-              <SectionTitle right={<InfoTip label="How the match score works" side="bottom">{SCORE_HOW}</InfoTip>} sub="Match score (0–100) combines your priorities with observed data.">
-                {UI.howTypesCompare}
-              </SectionTitle>
-              <TypologyRankList result={r} />
-            </section>
-          </>
-        ) : (
-          <div className="hatch rounded-2xl px-4 py-3 text-body text-slate-700 ring-1 ring-stone-200">{UI.notRanked}</div>
-        )}
+        <FitOrder t={t} r={r} ra={ra} weights={weights} expanded />
+        <Explainer tone="card" title={UI.dataBehind} right={<ObservedBadge small />}>
+          <FactorTable t={t} weights={weights} topTypology={r.top} />
+        </Explainer>
         <PressureCard t={t} />
         <AboutPlace t={t} />
-        <Explainer
-          tone="card"
-          title={
-            <span>
-              <span className="block">{UI.dataBehind}</span>
-              <span className="block text-caption font-normal text-slate-600">The 6 factors, their sources and how they are calculated</span>
-            </span>
-          }
-          right={<ObservedBadge small />}
-        >
-          <p className="mb-2 text-small text-slate-700">Observed public data, ranked against every residential tract in the city. The violet line on each card shows how much you told us it matters.</p>
-          <FactorCards t={t} weights={weights} topTypology={r.top} />
-        </Explainer>
         <DataLimitsPanel t={t} />
       </div>
     </div>
   );
 }
 
-/** Analysis → Match: search a place, set priorities, read which housing type fits it best and why. */
+/** Once per session: the first visit to Match that arrives on the equal-weights reference starts from a stance. */
+let stanceApplied = false;
+
+const isStance = (s: string | null): s is Stance => !!s && (APP_STANCES as readonly string[]).includes(s);
+const TYPOLOGY_INDEX = new Map(scoring.typologies.map((t, i) => [t.id, i]));
+
+/** Analysis → Match: pick a place, a focusing issue and who you are planning for; read the suggestion and its numbers. */
 export default function MatchView() {
+  // The reference (Balanced) is not a stance, so a first visit that lands on it moves to Anti-displacement, once.
+  // A link that carries custom weights (matchPreset === null) or any stance is left alone; so is every later visit.
+  useEffect(() => {
+    if (stanceApplied) return;
+    stanceApplied = true;
+    const s = useApp.getState();
+    if (matchPreset(s.weights) === 'balanced') s.applyPreset(APP_STANCES[0]);
+  }, []);
   const selectedId = useApp((s) => s.selectedId);
   const weights = useApp((s) => s.weights);
-  const metric = useApp((s) => s.metric);
   const lite = useApp((s) => s.lite);
   const layers = useApp((s) => s.layers);
-  const scenarios = useApp((s) => s.scenarios);
   const pin = useApp((s) => s.pin);
   const ui = useApp((s) => s.ui);
-  const { set, select, setWeights, saveScenario } = useApp.getState();
+  const { select, setWeights, applyPreset } = useApp.getState();
+  const plan = usePlan();
   const results = useAllResults(weights);
-  const paint = usePaint(metric, results);
+
+  // The focusing issue: the stance the weights match (a shared link carries it), else the last one picked.
+  const preset = matchPreset(weights);
+  useEffect(() => {
+    if (isStance(preset) && preset !== usePlan.getState().focus) usePlan.getState().setPlan({ focus: preset });
+  }, [preset]);
+  const focus: Stance = isStance(preset) ? preset : plan.focus;
+
+  // The suggested type for every place under the focus and the planning inputs; the fit order (current weights) only
+  // orders types inside each suggested set.
+  const fitOrders = useMemo(() => new Map([...results].map(([id, r]) => [id, r.ranking as Typology[]])), [results]);
+  const suggestions = useMemo(() => {
+    if (!hasPlaceData || !hudTable) return new Map<string, Recommendation>();
+    return suggestAll(placeById, hudTable, focus, { level: plan.level, household: plan.household, transitMi: plan.transitMi }, fitOrders);
+  }, [focus, plan.level, plan.household, plan.transitMi, fitOrders]);
+  const { paint, counts } = useMemo(() => {
+    const values = new Map<string, number | null>();
+    const counts: Record<string, number> = { none: 0 };
+    for (const t of rankedTracts) {
+      const rec = suggestions.get(t.GEOID);
+      const lead = rec?.types[0]?.typology ?? null;
+      values.set(t.GEOID, lead ? TYPOLOGY_INDEX.get(lead) ?? null : null);
+      counts[lead ?? 'none'] = (counts[lead ?? 'none'] ?? 0) + 1;
+    }
+    const paint: MapPaint = { kind: 'cat', palette: TYPOLOGY_COLORS, values };
+    return { paint, counts };
+  }, [suggestions]);
+
   const t = selectedId ? tractById.get(selectedId) : null;
   const r = selectedId ? results.get(selectedId) ?? { scores: [], ranking: [], top: null, topScore: null } : null;
-  const buildingColor = r?.top ? typologyById.get(r.top)?.color : null;
-  const presetName = scoring.presets.find((p) => p.id === matchPreset(weights))?.label;
+  const rec = selectedId ? suggestions.get(selectedId) ?? null : null;
+  const lead = rec?.types[0]?.typology ?? null;
+  const buildingColor = lead ? typologyById.get(lead)?.color : null;
   const padding = useMemo(() => ({ top: 90, bottom: 90, left: ui.left ? 420 : 70, right: ui.right ? 500 : 70 }), [ui.left, ui.right]);
+  const focusLabel = STANCE_LABEL[focus];
+  const noneLabel = focus === 'market_led' ? 'No suggestion (the market test fails or cannot run)' : focus === 'transit_first' ? 'No suggestion (no under-served renters at this level, or frequent transit farther than you chose)' : 'No suggestion (no under-served renters at this level)';
+
+  // On entry with no tract the camera frames the whole city inside the space the panels leave. Measured once, from
+  // this element's size, before the map mounts; with a tract selected the map flies to it as before.
+  const root = useRef<HTMLDivElement>(null);
+  const [view, setView] = useState<View | null | undefined>(undefined);
+  useLayoutEffect(() => {
+    const el = root.current;
+    const s = useApp.getState();
+    const pad = { top: 90, bottom: 90, left: s.ui.left ? 420 : 70, right: s.ui.right ? 500 : 70 };
+    setView(!s.selectedId && el ? cityView(el.clientWidth, el.clientHeight, pad) : null);
+  }, []);
 
   return (
-    <div className="relative h-full">
-      <MapView
-        paint={paint}
-        selectedId={selectedId}
-        buildingColor={buildingColor}
-        lite={lite}
-        terrain={layers.terrain}
-        buildings={layers.buildings}
-        hillshade={layers.hillshade}
-        padding={padding}
-        pin={pin}
-        elevationReadout
-        onSelect={select}
-        idleOrbit
-        tooltip={(id) => <MapTooltip id={id} results={results} />}
-      />
+    <div ref={root} className="relative h-full">
+      {view !== undefined && (
+        <MapView
+          paint={paint}
+          selectedId={selectedId}
+          buildingColor={buildingColor}
+          lite={lite}
+          terrain={layers.terrain}
+          buildings={layers.buildings}
+          hillshade={layers.hillshade}
+          padding={padding}
+          pin={pin}
+          elevationReadout
+          onSelect={select}
+          idleOrbit
+          initialView={view ?? undefined}
+          tooltip={(id) => <SuggestTooltip id={id} rec={suggestions.get(id)} />}
+        />
+      )}
       <Rail float title={UI.matchTab}>
-        <RailSection id="place" title="Find a place">
-          <TractSearch value={selectedId} onChange={select} label="Search an address, neighborhood or tract" />
-        </RailSection>
-        <RailSection id="priorities" title={UI.whatMatters}>
-          <WeightPanel weights={weights} onChange={setWeights} hideTitle />
-        </RailSection>
-        <RailSection id="colorBy" title={UI.colorBy}>
-          <MetricPicker value={metric} onChange={(m) => set({ metric: m })} hideTitle />
-        </RailSection>
-        <RailSection id="save" title={UI.saveCompare} sub="Keep these priorities and see how the map changes under another set.">
-          <button
-            disabled={scenarios.length >= MAX_SCENARIOS}
-            onClick={() => {
-              saveScenario(presetName ?? `Custom ${scenarios.length + 1}`, weights);
-              set({ mode: 'scenarios', editing: 'B' });
+        <RailSection id="priorities" title="Focusing issue">
+          <FocusPicker
+            value={focus}
+            onChange={(s) => {
+              plan.setPlan({ focus: s });
+              applyPreset(s);
             }}
-            className="w-full rounded-xl bg-slate-900 px-3 py-2.5 text-small font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40"
-          >
-            Save “{presetName ?? 'Custom mix'}” and compare →
-          </button>
+          />
         </RailSection>
+        <RailSection id="colorBy" title="Who you’re planning for">
+          <PlanInputs />
+        </RailSection>
+        <AdvancedSettings weights={weights} onChange={setWeights} custom={!isStance(preset)} onReset={() => applyPreset(focus)} />
       </Rail>
       <RightColumn>
         <AnalysisChat />
-        <PanelFrame inline>{t && r ? <TractDetail t={t} r={r} weights={weights} onClose={() => select(null)} /> : <CitySummary results={results} />}</PanelFrame>
+        <PanelFrame inline>{t && r ? <TractDetail t={t} r={r} weights={weights} rec={rec} fitOrder={fitOrders.get(t.GEOID)} onClose={() => select(null)} /> : <StartCard />}</PanelFrame>
       </RightColumn>
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={`absolute bottom-3 z-20 transition-[left] duration-200 ${ui.left ? 'left-[364px] xl:left-[384px]' : 'left-3'}`}>
-        <Legend metric={metric} buildings={buildingColor} />
+        <SuggestionLegend focus={focusLabel} level={LEVEL_LABEL[plan.level]} counts={counts} noneLabel={noneLabel} />
       </motion.div>
     </div>
   );

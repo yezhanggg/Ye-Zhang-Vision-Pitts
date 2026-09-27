@@ -16,5 +16,20 @@
   "42003160900": 1018,
   "42003191600": 1963,
   "42003562300": 1456
+ },
+ "encoding": {
+  "format": "compact v1: delta-coded integer coordinates with index tables for tract and height source; decoded by app/src/lib/buildingsCodec.ts",
+  "scale": 100000,
+  "coordinate_step_deg": 1e-05,
+  "height_step_m": 0.1,
+  "n_vertices": 55244,
+  "bytes": 469296,
+  "max_coordinate_error_deg": 5e-06,
+  "max_height_error_m": 0.0,
+  "properties_not_written": [
+   "yb"
+  ],
+  "features_left_out": 0,
+  "written_by": "full build"
  }
 }

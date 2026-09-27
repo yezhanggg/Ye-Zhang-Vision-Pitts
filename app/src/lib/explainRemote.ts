@@ -1,9 +1,15 @@
-// The "why" sentence. Starts as a template built from the computed values and swaps in an AI-written version
-// (DeepSeek or Claude, whichever the deployment is configured with) from /api/explain when that service answers
-// and its number check passes. Never blocks the interface.
+// The "why" sentence. Starts as the deterministic rationale (lib/analysis.whySentence, the sentence of record) and
+// swaps in an AI-written version (DeepSeek or Claude, whichever the deployment is configured with) from /api/explain
+// when that service answers and its number check passes. Never blocks the interface.
+//
+// Not called from the Analysis tab since update 3 (Sun 2026-09-27): the place page reads as evidence blocks and a
+// rules-based recommendation, and an AI paragraph that restates the same numbers in a second voice added nothing a
+// reader could check that the template did not already say. The hook is kept (it compiles and its endpoint still
+// works) for the Explore question box and for a future opt-in; nothing here is rendered by MatchView.
 import { useEffect, useState } from 'react';
 import { scoring, typologyById, factorById, tractLabel } from './data';
-import { templateSummary, type TractResult } from './derived';
+import type { TractResult } from './derived';
+import { rationale, whySentence, type Rationale } from './analysis/rationale';
 import type { Stability } from './scoring';
 import type { TractProps, Weights } from './types';
 
@@ -18,8 +24,8 @@ export interface Explanation {
 const memo = new Map<string, Explanation>();
 let serviceDown = false;
 
-export function useExplanation(t: TractProps, r: TractResult, weights: Weights, stability: Stability | null, presetLabel: string | null): Explanation {
-  const template = templateSummary(t, r);
+export function useExplanation(t: TractProps, r: TractResult, weights: Weights, stability: Stability | null, presetLabel: string | null, ra?: Rationale): Explanation {
+  const template = whySentence(t, ra ?? rationale(t, r, weights));
   const key = JSON.stringify([t.GEOID, weights, r.topScore]);
   const [state, setState] = useState<Explanation>(() => memo.get(key) ?? { text: template, source: 'template' });
   useEffect(() => {

@@ -69,7 +69,7 @@ export const SECTION_LABELS: Record<SectionId, string> = {
 /** Sections each mode shows, in panel order (the Panels menu lists these). */
 export const SECTIONS_FOR_MODE: Record<Mode, SectionId[]> = {
   explore: ['layers', 'data', 'settings'],
-  match: ['place', 'priorities', 'colorBy', 'save'],
+  match: ['priorities', 'colorBy', 'settings'],
   tracts: ['place', 'priorities', 'colorBy'],
   scenarios: ['place', 'compare', 'priorities'],
 };
@@ -80,9 +80,10 @@ export interface UiState {
   right: boolean;
   sections: Record<SectionId, SectionState>;
 }
-const UI_KEY = 'visionpitts.ui';
-/** Everything open except Settings, which most visits never need. */
-export const defaultUi = (): UiState => ({ left: true, right: true, sections: Object.fromEntries(SECTION_IDS.map((id) => [id, id === 'settings' ? 'collapsed' : 'open'])) as Record<SectionId, SectionState> });
+/** v2: every section starts collapsed (a clean first view); the new key drops layouts saved under the old all-open default. */
+const UI_KEY = 'visionpitts.ui.v2';
+/** Every section collapsed: the panel opens as a short list of headings and the map stays clear. */
+export const defaultUi = (): UiState => ({ left: true, right: true, sections: Object.fromEntries(SECTION_IDS.map((id) => [id, 'collapsed'])) as Record<SectionId, SectionState> });
 /** Layout preferences persist per browser; never in the URL. Anything unreadable falls back to the defaults. */
 function readUi(): UiState {
   const d = defaultUi();
@@ -142,7 +143,7 @@ try {
  * Hill shading is off by default so the basemap stays evenly toned; 3D relief and contours follow the Terrain layer.
  * Explore opens on census tracts with "Pittsburgh only" (`city`) on.
  */
-export const defaultLayers = (lite = liteDefault): Layers => ({ buildings: true, terrain: !lite, hillshade: false, tracts: true, bg: false, zcta: false, muni: false, county: false, city: true });
+export const defaultLayers = (_lite = liteDefault): Layers => ({ buildings: true, terrain: false, hillshade: false, tracts: true, bg: false, zcta: false, muni: false, county: false, city: true });
 export const defaultBrowse = (): Browse => ({ level: 'tract', variable: null, selected: null });
 
 export type DetailsTab = 'overview' | 'sources' | 'limits' | 'next';
