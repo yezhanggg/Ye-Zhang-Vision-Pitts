@@ -169,7 +169,7 @@ describe('measures', () => {
     expect(lg.items.length).toBe(lg.colors.length);
     const jobs = buildLegend(measureById.get('jobs')!, [100, 1000, 5000, 20000, 60000]);
     // fewer jobs = more need = darker
-    expect(jobs.colors[0]).toBe('#5a36b0');
+    expect(jobs.colors[0]).toBe('#1f4f99'); // jobs: blue ramp, fewest jobs darkest
   });
 });
 

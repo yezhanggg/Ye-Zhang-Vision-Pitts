@@ -6,11 +6,11 @@ import { canCopy, shareUrl } from './link';
 const state = (): AppState => ({ ...useApp.getState(), mode: 'match', lite: false, pin: null });
 
 describe('shareUrl', () => {
-  it('puts the encoded state in the hash of the base URL, replacing any hash there', () => {
+  it('writes a page path on the web, keeping any folder and dropping an old hash or query', () => {
     const s = state();
-    expect(shareUrl(s, 'https://visionpitts.test/app/')).toBe(`https://visionpitts.test/app/#${encodeHash(s)}`);
-    expect(shareUrl(s, 'https://visionpitts.test/app/?x=1#m=explore&L=tracts')).toBe(`https://visionpitts.test/app/?x=1#${encodeHash(s)}`);
-    expect(shareUrl(s, 'https://visionpitts.test/')).toContain('#m=match');
+    expect(shareUrl(s, 'https://visionpitts.test/')).toBe('https://visionpitts.test/place');
+    expect(shareUrl(s, 'https://visionpitts.test/app/compare?t=1#m=explore')).toBe('https://visionpitts.test/app/place');
+    expect(shareUrl({ ...s, mode: 'tracts', selectedId: '42003562300', compareId: '42003140300' }, 'https://x.test/equity')).toBe('https://x.test/compare?t=42003562300&b=42003140300');
   });
   it('falls back to an empty base without a window', () => {
     const s = state();

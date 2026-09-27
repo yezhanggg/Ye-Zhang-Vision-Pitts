@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FIXTURE_CITY_MEDIAN_VALUE, FIXTURE_HUD as hud, HAZELWOOD, HOMEWOOD_NORTH, SQUIRREL_HILL_NORTH, ZERO_PLACE } from './fixture';
 import {
-  amiOf, ceilingForSize, floodCheck, homesLines, largestType, levelIncomeLine, levelTarget, marketRent, planTenants, resolveHousehold, sizeBedrooms, sizeIncomeLine, transitTestMiles, typesFor, HOUSEHOLD_SIZES,
+  amiOf, ceilingForSize, floodCheck, homesLines, largestType, levelIncomeLine, levelTarget, marketRent, planTenants, resolveHousehold, sizeBedrooms, sizeIncomeLine, transitTestMiles, typesFor, typesNote, AGE_GROUPS, AGE_LABEL, AGE_TYPES, FLOOD_LABEL, FLOOD_LIMIT_PCT, FLOOD_RISKS, HOUSEHOLD_SIZES, SIZE_LABEL,
 } from './plan';
 import { CLIMATE_WHY, climateTest, recommend, type Recommendation } from './recommend';
 import { suggestAll } from './suggest';
@@ -46,6 +46,34 @@ describe('age × size → CHAS household type', () => {
     expect(typesFor(2, 'any')).toEqual(['elderly_family', 'small_family']);
   });
 
+  it('five age options, each keeping the CHAS types it can support', () => {
+    expect(AGE_GROUPS).toEqual(['any', 'under62', 'senior62', 'senior_alone', 'senior_couple']);
+    expect(AGE_GROUPS.map((a) => AGE_LABEL[a])).toEqual(['Any age', 'Under 62', '62+', '62+ alone', '62+ couple']);
+    expect(AGE_TYPES.any).toHaveLength(5);
+    expect(AGE_TYPES.under62).toEqual(['other', 'small_family', 'large_family']);
+    expect(AGE_TYPES.senior62).toEqual(['elderly_alone', 'elderly_family']);
+    expect(AGE_TYPES.senior_alone).toEqual(['elderly_alone']);
+    expect(AGE_TYPES.senior_couple).toEqual(['elderly_family']);
+    for (const a of AGE_GROUPS) expect(typesFor('auto', a)).toEqual(AGE_TYPES[a]);
+  });
+
+  it('62+ alone and 62+ couple fix the size (1 and 2) whatever size is chosen', () => {
+    for (const s of HOUSEHOLD_SIZES) {
+      expect(typesFor(s, 'senior_alone')).toEqual(['elderly_alone']);
+      expect(typesFor(s, 'senior_couple')).toEqual(['elderly_family']);
+    }
+    expect(resolveHousehold(HAZELWOOD, ['le30'], 4, 'senior_alone')).toMatchObject({ size: 1, auto: false });
+    expect(resolveHousehold(HAZELWOOD, ['le30'], 4, 'senior_couple')).toMatchObject({ size: 2, auto: false });
+    expect(resolveHousehold(HAZELWOOD, ['le30'], 'auto', 'senior_alone')).toMatchObject({ type: 'elderly_alone', size: 1 });
+    expect(typesNote(4, 'senior_couple')).toContain('priced for 2 people');
+    expect(typesNote(2, 'senior_couple')).toBeNull();
+    const t = planTenants(HAZELWOOD, ['le30'], 3, 'senior_alone', 'at or below 30% AMI');
+    expect(t.types[0]).toMatchObject({ type: 'elderly_alone', count: 165 });
+    expect(t.seniorAlone).toBe(true);
+    expect(t.bedrooms).toBe(1);
+    expect(t.sentence).toContain('62+ living alone');
+  });
+
   it('who it serves sums the types over the level’s bands, with the sum written out', () => {
     const t = planTenants(HAZELWOOD, ['le30', 'b30_50'], 3, 'any', 'at or below 50% AMI');
     expect(t.types).toEqual([{ type: 'small_family', label: 'small families (2–4 people)', count: 150 + 60 }]);
@@ -87,24 +115,41 @@ describe('income level', () => {
 });
 
 describe('flood limit', () => {
-  it('Hazelwood (9.6%) is above "Avoid" (5%), within "Some is OK" (15%)', () => {
-    expect(floodCheck(HAZELWOOD, 'avoid')).toMatchObject({ blocked: true, sentence: '9.6% of the land is in a FEMA flood zone (above your limit of 5%).' });
-    expect(floodCheck(HAZELWOOD, 'some').blocked).toBe(false);
+  it('four options by share of land in the flood zone: None 0%, ≤5%, ≤15%, Any', () => {
+    expect(FLOOD_RISKS).toEqual(['none', 'le5', 'le15', 'any']);
+    expect(FLOOD_RISKS.map((f) => FLOOD_LIMIT_PCT[f])).toEqual([0, 5, 15, null]);
+    expect(FLOOD_RISKS.map((f) => FLOOD_LABEL[f])).toEqual(['None', '≤5%', '≤15%', 'Any']);
+  });
+
+  it('Hazelwood (9.6%) is above None and ≤5%, within ≤15% and Any', () => {
+    expect(floodCheck(HAZELWOOD, 'none')).toMatchObject({ blocked: true, limit: 0, sentence: '9.6% of the land is in a FEMA flood zone (above your limit of none (0%)).' });
+    expect(floodCheck(HAZELWOOD, 'le5')).toMatchObject({ blocked: true, sentence: '9.6% of the land is in a FEMA flood zone (above your limit of 5%).' });
+    expect(floodCheck(HAZELWOOD, 'le15').blocked).toBe(false);
     expect(floodCheck(HAZELWOOD, 'any').blocked).toBe(false);
   });
 
+  it('None passes only a tract with no land in the zone; a missing share is never blocked', () => {
+    const dry = { ...HAZELWOOD, flood: { ...HAZELWOOD.flood, fema_sfha_pct: 0 } } as PlaceMeasures;
+    expect(floodCheck(dry, 'none')).toMatchObject({ blocked: false, limit: 0 });
+    const wet = { ...HAZELWOOD, flood: { ...HAZELWOOD.flood, fema_sfha_pct: 0.2 } } as PlaceMeasures;
+    expect(floodCheck(wet, 'none').blocked).toBe(true);
+    expect(floodCheck(wet, 'le5').blocked).toBe(false);
+    const unknown = { ...HAZELWOOD, flood: { ...HAZELWOOD.flood, fema_sfha_pct: null } } as unknown as PlaceMeasures;
+    for (const f of FLOOD_RISKS) expect(floodCheck(unknown, f).blocked).toBe(false);
+  });
+
   it('a tract above the limit gets no suggestion, with the flood reason', () => {
-    const r = recommend(HAZELWOOD, hud, 'anti_displacement', { ...base, level: 50, size: 3, age: 'any', flood: 'avoid' });
+    const r = recommend(HAZELWOOD, hud, 'anti_displacement', { ...base, level: 50, size: 3, age: 'any', flood: 'le5' });
     expect(r.types).toEqual([]);
     expect(r.floodLimit?.blocked).toBe(true);
     expect(r.headline).toContain('above your limit of 5%');
-    const ok = recommend(HAZELWOOD, hud, 'anti_displacement', { ...base, level: 50, size: 3, age: 'any', flood: 'some' });
+    const ok = recommend(HAZELWOOD, hud, 'anti_displacement', { ...base, level: 50, size: 3, age: 'any', flood: 'le15' });
     expect(ok.types.length).toBeGreaterThan(0);
   });
 
   it('suggestAll filters by the flood limit', () => {
     const places = new Map<string, PlaceMeasures>([['a', HAZELWOOD]]);
-    const avoid = suggestAll(places, hud, 'anti_displacement', { level: 50, size: 3, age: 'any', flood: 'avoid', transitMi: 0.5 });
+    const avoid = suggestAll(places, hud, 'anti_displacement', { level: 50, size: 3, age: 'any', flood: 'le5', transitMi: 0.5 });
     const any = suggestAll(places, hud, 'anti_displacement', { level: 50, size: 3, age: 'any', flood: 'any', transitMi: 0.5 });
     expect(avoid.get('a')?.lead).toBeNull();
     expect(any.get('a')?.lead).not.toBeNull();
@@ -113,7 +158,7 @@ describe('flood limit', () => {
 
 describe('recommend with planning inputs (Hazelwood)', () => {
   it('default: 3-person, any age, ≤50% → 2-bedroom at $1,242, 210 small families (fixture)', () => {
-    const r = recommend(HAZELWOOD, hud, 'anti_displacement', { ...base, level: 50, size: 3, age: 'any', flood: 'some' });
+    const r = recommend(HAZELWOOD, hud, 'anti_displacement', { ...base, level: 50, size: 3, age: 'any', flood: 'le15' });
     expect(r.price?.rent).toBe(1242);
     expect(r.price?.formula).toBe('$49,700 × 30% ÷ 12 = $1,242');
     expect(r.types[0].bedrooms).toBe(2);
@@ -130,6 +175,17 @@ describe('recommend with planning inputs (Hazelwood)', () => {
     expect(r.tenants.types[0]).toMatchObject({ type: 'elderly_alone', count: 165 });
     expect(r.twoBedroom?.rent).toBe(745);
     expectArithmetic(r);
+  });
+
+  it('62+ alone and 62+ couple price for 1 and 2 people and keep senior housing allowed', () => {
+    const alone = recommend(HAZELWOOD, hud, 'anti_displacement', { ...base, level: 30, size: 'auto', age: 'senior_alone' });
+    expect(alone.household).toMatchObject({ type: 'elderly_alone', size: 1 });
+    expect(alone.price?.rent).toBe(580);
+    expect(alone.lead).toBe('senior');
+    const couple = recommend(HAZELWOOD, hud, 'anti_displacement', { ...base, level: 50, size: 3, age: 'senior_couple' });
+    expect(couple.household?.size).toBe(2);
+    expect(couple.tenants.types.every((t) => t.type === 'elderly_family')).toBe(true);
+    expect(couple.not.some((n) => n.typology === 'senior' && n.because.includes('under 62'))).toBe(false);
   });
 
   it('under 62: senior housing is never suggested', () => {
@@ -223,7 +279,7 @@ describe('Climate-resilient focus', () => {
   });
 });
 
-describe('household size "Largest group here" (auto)', () => {
+describe('household size "Any" (auto: sized for the largest group here)', () => {
   // CHAS counts at the Central Business District (42003020100): single adults and unrelated households lead.
   const CBD_LIKE = {
     ...HAZELWOOD,
@@ -237,6 +293,7 @@ describe('household size "Largest group here" (auto)', () => {
 
   it('is the first option and prices from the picked type', () => {
     expect(HOUSEHOLD_SIZES[0]).toBe('auto');
+    expect(SIZE_LABEL.auto).toBe('Any');
     expect(sizeIncomeLine(hud, 50, 'auto')).toContain("Uses each place's largest group; e.g. 1 person at 50% AMI: up to $38,650");
   });
 

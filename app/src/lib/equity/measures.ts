@@ -212,6 +212,15 @@ export function classOf(v: number, breaks: number[]): number {
 export const NEED_PALETTE = ['#f4f0fe', '#ddd3fb', '#c0acf5', '#9e82ea', '#7c58d8', '#5a36b0'];
 /** "$0 or less: the market already fits": a calm teal, apart from the need ramp. */
 export const FITS_COLOR = '#9fd8c7';
+/** One hue per measure, light (little need) to dark (most need), so each map reads as its own topic. */
+export const MEASURE_PALETTE: Record<MeasureId, string[]> = {
+  rent_gap: NEED_PALETTE, // violet: money
+  burdened: ['#fdf0f1', '#fbd0d5', '#f5a3ad', '#e8707f', '#cf4257', '#9f1f3a'], // rose: households under strain
+  jobs: ['#eef4fc', '#cfe0f7', '#a3c3ee', '#6e9fe0', '#3f76c9', '#1f4f99'], // blue: work
+  school: ['#fdf6e6', '#f9e3b0', '#f2c76f', '#e3a23a', '#c47a1c', '#8d5410'], // amber: school
+  transit: ['#ebf7f6', '#c4e9e5', '#8fd3cb', '#52b3a9', '#2a8c83', '#135f5a'], // teal: transit
+  services: ['#eef8ec', '#cdebc6', '#a0d696', '#6cb862', '#3f9140', '#22632a'], // green: everyday services
+};
 
 export interface Legend {
   /** Per tract: palette index into `colors`, or null (no data). */
@@ -231,7 +240,7 @@ export function buildLegend(def: MeasureDef, values: number[], k = 5): Legend {
     const pos = xs.filter((v) => v > 0);
     const breaks = quantileBreaks(pos, k - 1, def.step);
     const n = breaks.length + 1;
-    const colors = [FITS_COLOR, ...NEED_PALETTE.slice(NEED_PALETTE.length - n)];
+    const colors = [FITS_COLOR, ...MEASURE_PALETTE.rent_gap.slice(MEASURE_PALETTE.rent_gap.length - n)];
     const items = [{ color: FITS_COLOR, label: '$0 or less: the market already fits' }];
     const lows = [0, ...breaks];
     for (let i = 0; i < n; i++) {
@@ -250,7 +259,8 @@ export function buildLegend(def: MeasureDef, values: number[], k = 5): Legend {
   }
   const breaks = quantileBreaks(xs, k, def.step);
   const n = breaks.length + 1;
-  const ramp = NEED_PALETTE.slice(NEED_PALETTE.length - Math.max(n, 1));
+  const pal = MEASURE_PALETTE[def.id] ?? NEED_PALETTE;
+  const ramp = pal.slice(pal.length - Math.max(n, 1));
   const colors = def.higherIsNeed ? ramp : [...ramp].reverse();
   const items: { color: string; label: string }[] = [];
   for (let i = 0; i < n; i++) {

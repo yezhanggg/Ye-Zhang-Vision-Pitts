@@ -5,7 +5,7 @@ import { typologyById } from '../../lib/data';
 import { isNum } from '../../lib/format';
 import { sumBands, typeBandFor } from '../../lib/place/bands';
 import { fmtDollars, fmtHouseholds } from '../../lib/place/format';
-import { LEVEL_BAND, levelBands, levelPhrase, type PlanLevel } from '../../lib/place/plan';
+import { LEVEL_BAND, LEVEL_LABEL, levelBands, type PlanLevel } from '../../lib/place/plan';
 import type { Recommendation } from '../../lib/place/recommend';
 import { TYPOLOGY_LABEL } from '../../lib/place/thresholds';
 import type { HudTable, PlaceMeasures, Typology } from '../../lib/place/types';
@@ -52,32 +52,33 @@ export default function PlaceFolds({ t, place, hud, rec, level, fitOrder }: { t:
   const z = place.zoning;
   const byRight = z ? (Object.entries(z.by_type) as [Typology, string][]).filter(([, v]) => v === 'yes').map(([k]) => typologyById.get(k)?.label ?? TYPOLOGY_LABEL[k]) : [];
   const suggested = new Set(rec.types.map((x) => x.typology));
+  const lvl = level === 'market' ? '>80% AMI' : LEVEL_LABEL[level];
   const lines = rec.lines.map((l, i) => toRuleLine(l, i, rec.stance, rec)).filter((l) => l.label !== 'You decide');
 
   return (
     <div className="space-y-2">
-      <Fold title="Affordability" headline={c.hh == null ? 'not available' : `${fmtHouseholds(c.hh)} renter households ${levelPhrase(level)}`}>
+      <Fold title="Affordability" headline={c.hh == null ? 'not available' : `${fmtHouseholds(c.hh)} renters ${lvl}`}>
         <Affordability place={place} hud={hud} band={band} above80={level === 'market'} />
       </Fold>
-      <Fold title="Who lives here" headline={lead && lead[1] > 0 ? `largest group ${levelPhrase(level)}: ${fmtHouseholds(lead[1])} ${TYPE_LABEL[lead[0]].toLowerCase()}` : 'not available'}>
+      <Fold title="Who lives here" headline={lead && lead[1] > 0 ? `most: ${fmtHouseholds(lead[1])} ${TYPE_LABEL[lead[0]].toLowerCase()}` : 'not available'}>
         <Tenants place={place} t={t} band={typeBandFor(band)} />
       </Fold>
-      <Fold title="Market" headline={askingShown ? `2-bedroom asking rent ${fmtDollars(m.asking_2br)}` : isNum(m.acs_rent) ? `residents pay a median ${fmtDollars(m.acs_rent)}` : 'not available'}>
+      <Fold title="Market" headline={askingShown ? `2-bed asks ${fmtDollars(m.asking_2br)}` : isNum(m.acs_rent) ? `median rent ${fmtDollars(m.acs_rent)}` : 'not available'}>
         <Market place={place} t={t} hud={hud} />
       </Fold>
-      <Fold title="Transit" headline={isNum(tr.freq_dist_mi) ? `nearest frequent stop ${tr.freq_dist_mi.toFixed(2)} mi` : 'not available'}>
+      <Fold title="Transit" headline={isNum(tr.freq_dist_mi) ? `frequent stop ${tr.freq_dist_mi.toFixed(2)} mi` : 'not available'}>
         <Transit place={place} />
       </Fold>
-      <Fold title="Flood" headline={isNum(f.fema_sfha_pct) ? `${f.fema_sfha_pct.toFixed(1)}% of land in a FEMA flood zone` : 'not available'}>
+      <Fold title="Flood" headline={isNum(f.fema_sfha_pct) ? `${f.fema_sfha_pct.toFixed(1)}% of land in flood zone` : 'not available'}>
         <Flood place={place} t={t} />
       </Fold>
       <Fold title="Land use" headline={landHeadline(t.GEOID)}>
         <LandUse geoid={t.GEOID} />
       </Fold>
-      <Fold title="Zoning and programs" headline={z ? (byRight.length ? `by right: ${byRight.join(', ')} (unverified)` : 'no by-right type on file (unverified)') : 'zoning not checked'}>
+      <Fold title="Zoning" headline={z ? (byRight.length ? `${byRight.length} type${byRight.length === 1 ? '' : 's'} by right (unverified)` : 'none by right (unverified)') : 'not checked'}>
         <ZoningPrograms place={place} />
       </Fold>
-      <Fold title="How the suggestion was made" headline={`${lines.length} rules, each with its numbers`}>
+      <Fold title="Rules" headline={`${lines.length} steps`}>
         <dl className="divide-y divide-stone-100 overflow-hidden rounded-xl bg-white ring-1 ring-stone-200/80">
           {lines.map((l) => (
             <div key={l.key} className="px-3 py-2">

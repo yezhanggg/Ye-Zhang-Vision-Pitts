@@ -481,7 +481,7 @@ export default function MatchView() {
       </RightColumn>
       {(
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="absolute bottom-3 left-3 z-20 w-[340px] xl:w-[360px] max-sm:hidden">
-          <SuggestionLegend focus={focusLabel} level={[plan.size === 'auto' ? '' : sizeWord(plan.size), plan.age === 'any' ? '' : AGE_LABEL[plan.age].toLowerCase(), LEVEL_LABEL[plan.level]].filter(Boolean).join(' · ')} counts={counts} noneLabel={noneLabel} />
+          <SuggestionLegend focus={focusLabel} level={[plan.size === 'auto' ? '' : sizeWord(plan.size), plan.age === 'any' ? '' : AGE_LABEL[plan.age], LEVEL_LABEL[plan.level]].filter(Boolean).join(' · ')} counts={counts} noneLabel={noneLabel} />
         </motion.div>
       )}
     </div>

@@ -368,7 +368,7 @@ export default function ChatBox({ scope, resolve, onGo, compact = false, fill = 
         {showAi && (
           <motion.div key="ai" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={SOFT} className={cx('flex flex-col overflow-hidden', fill && 'min-h-0 flex-1', chat && 'order-1')}>
             {prompts.length > 0 && (
-              <div className={cx('shrink-0 border-t border-stone-200/70 px-2 py-1.5', chat && 'order-2')} aria-label={C.prompts}>
+              <div className={cx('shrink-0 border-t border-stone-200/70 px-2 py-1.5', chat && 'order-2 mt-auto')} aria-label={C.prompts}>
                 {prompts.map((p, i) => (
                   <motion.button key={p} type="button" disabled={busy} onClick={() => send(p)} initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} transition={{ ...SOFT, delay: 0.04 * i }} className="flex w-full items-center gap-2 rounded-lg px-2 py-1 text-left text-small text-slate-500 transition-colors hover:bg-violet-50 hover:text-violet-800 disabled:opacity-50">
                     <Sparkles className="h-3.5 w-3.5 shrink-0 text-violet-400" />

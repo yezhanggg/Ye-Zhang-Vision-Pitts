@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import { hud } from '../../lib/place/data';
 import {
-  AGE_NOTE, FLOOD_LABEL, FLOOD_LIMIT_PCT, FLOOD_RISKS, INCOME_LEVELS, LEVEL_LABEL, MILES_LABEL, PLAN_TYPE_LABEL, SIZE_RULE,
+  AGE_GROUPS, AGE_INFO, AGE_LABEL, AGE_NOTE, FLOOD_LABEL, FLOOD_LIMIT_PCT, FLOOD_RISKS, INCOME_LEVELS, LEVEL_LABEL, MILES_LABEL, PLAN_TYPE_LABEL, SIZE_RULE,
   TRANSIT_MILES, TYPE_PERSONS, TYPE_SIZE, ceilingForSize, sizeHomeWord, type FixedSize,
 } from '../../lib/place/plan';
 import { HOUSEHOLD_TYPE_ORDER } from '../../lib/place/thresholds';
@@ -66,7 +66,7 @@ export default function PlanningInputsDetails() {
         <Item title="Household size">
           <p>Sets the HUD limit and the home size: {SIZE_RULE}.</p>
           <p>
-            <b>Largest group</b> (the default): each place uses its largest CHAS renter household type at your income level and age group, and takes size and home size from it. With no eligible type on file it prices at 3 people.
+            <b>Any</b> (the default): homes are sized for the largest group here. Each place uses its largest CHAS renter household type at your income level and age group, and takes size and home size from it. With no eligible type on file it prices at 3 people.
           </p>
           <ul className="ml-3 list-disc space-y-0.5">
             {HOUSEHOLD_TYPE_ORDER.map((t) => (
@@ -77,20 +77,29 @@ export default function PlanningInputsDetails() {
           </ul>
         </Item>
         <Item title="Age group">
-          <p>Chooses which CHAS household types count. Under 62: single adults, small and large families. 62 and older: seniors living alone and senior families. {AGE_NOTE} CHAS counts every family of 3–4 people as a small family and every household of 5 or more as a large family, whatever the age.</p>
+          <p>Chooses which CHAS household types count. {AGE_NOTE}</p>
+          <ul className="ml-3 list-disc space-y-0.5">
+            {AGE_GROUPS.map((a) => (
+              <li key={a}>
+                <b>{AGE_LABEL[a]}</b>: {AGE_INFO[a]}
+              </li>
+            ))}
+          </ul>
+          <p>62+ alone and 62+ couple fix the household size (1 and 2 people). With a size of 3 or more, CHAS counts every family of 3–4 people as a small family and every household of 5 or more as a large family, whatever the age. Senior housing is never suggested for Under 62.</p>
         </Item>
         <Item title="Homes needed (optional)">
           <p>N homes reach min(N, Q) of the Q qualifying renter households here (min(N, Q) ÷ Q = share served); homes beyond Q are "to spare".</p>
           <p>Yearly rent gap at 2-bedroom prices = (2-bedroom asking rent − 2-bedroom rent that fits) × 12 × N. At market rate there is no rent gap; with no usable asking rent it cannot be measured.</p>
         </Item>
         <Item title="Flood risk you accept">
+          <p>The measure is the share of the tract's land (water excluded) in FEMA's 1%-a-year (100-year) special flood hazard area, from the National Flood Hazard Layer.</p>
           <p>
             {FLOOD_RISKS.map((f, i) => {
               const lim = FLOOD_LIMIT_PCT[f];
               return (
                 <span key={f}>
                   {i > 0 ? '; ' : ''}
-                  <b>{FLOOD_LABEL[f]}</b>: {lim == null ? 'no limit (the flood share is still shown)' : `no suggestion where more than ${lim}% of the tract's land is in a FEMA flood zone`}
+                  <b>{FLOOD_LABEL[f]}</b>: {lim == null ? 'no limit (the flood share is still shown)' : lim === 0 ? "no suggestion where any of the tract's land is in the flood zone" : `no suggestion where more than ${lim}% of the tract's land is in the flood zone`}
                 </span>
               );
             })}

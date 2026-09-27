@@ -4,6 +4,21 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "headers": [
-    { "source": "/data/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=3600, must-revalidate" }] }
+    {
+      "source": "/data/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        }
+      ]
+    }
+  ],
+  "trailingSlash": false,
+  "rewrites": [
+    {
+      "source": "/(explore|place|compare|equity)",
+      "destination": "/index.html"
+    }
   ]
 }

@@ -1,5 +1,5 @@
 // The share link: the current state as a URL, and whether copying it makes sense.
-import { encodeHash } from '../hash';
+import { basePath, encodeHash, pathFromHash } from '../hash';
 import type { AppState } from '../store';
 
 function currentBase(): string {
@@ -10,9 +10,12 @@ function currentBase(): string {
   }
 }
 
-/** `base` (the page URL, default the current one) with the state in the hash. */
+/** A link to the current state: on the web a page path (…/compare?t=…), over file:// the hash form. */
 export function shareUrl(state: AppState, base?: string): string {
-  return `${(base ?? currentBase()).replace(/#.*$/, '')}#${encodeHash(state)}`;
+  const url = (base ?? currentBase()).replace(/#.*$/, '');
+  const m = url.match(/^(https?:\/\/[^/?]+)([^?]*)/);
+  if (!m) return `${url}#${encodeHash(state)}`;
+  return `${m[1]}${basePath(m[2] || '/')}${pathFromHash(encodeHash(state))}`;
 }
 
 /** A link is worth copying only when it opens elsewhere: never over file:// (the URL is a path on this computer). */

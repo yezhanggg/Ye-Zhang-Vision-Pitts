@@ -231,6 +231,8 @@ export default function MeasurePanel({
   reading,
   onPick,
   wide = false,
+  chat,
+  chatOpen = false,
 }: {
   def: MeasureDef;
   ami: AmiPct;
@@ -251,6 +253,9 @@ export default function MeasurePanel({
   onPick: (id: string | null) => void;
   /** The chat is hidden: two columns, larger charts, the ranking at full height. */
   wide?: boolean;
+  /** VisionPitts-Chat, shown in the right column when open (it stays mounted while closed). */
+  chat?: React.ReactNode;
+  chatOpen?: boolean;
 }) {
   const lite = useApp((s) => s.lite);
   const listRef = useRef<HTMLOListElement>(null);
@@ -368,8 +373,19 @@ export default function MeasurePanel({
 
   if (wide) {
     // Four boxes with room between them, so each part reads on its own: what the measure is and says, its charts,
-    // the selected tract against the city, and the ranked list.
+    // the selected tract against the city, and the ranked list. With VisionPitts-Chat open, the tract table and the
+    // list move under the charts and the chat takes the right column.
     const box = 'rounded-xl bg-white ring-1 ring-stone-200/80';
+    const selectedBlock = (
+      <motion.div key="sel" layout="position" transition={move} className={cx('shrink-0 px-1 pb-0.5 pt-1', chatOpen && 'rounded-xl bg-white px-3.5 pb-2.5 pt-3 ring-1 ring-stone-200/80')}>
+        {selected}
+      </motion.div>
+    );
+    const listBlock = (
+      <div key="list" className={cx(box, 'flex min-h-0 flex-col overflow-hidden pt-1', chatOpen ? 'h-[340px] shrink-0' : 'flex-1')}>
+        {list}
+      </div>
+    );
     return (
       <section aria-label="Measure" data-testid="equity-measure" className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] gap-2.5 max-sm:grid-cols-1">
         <div className="scroll-quiet flex min-h-0 flex-col gap-2.5 overflow-y-auto">
@@ -379,16 +395,21 @@ export default function MeasurePanel({
             {policies}
             {readingBlock}
           </div>
-          <div className={cx(box, 'flex min-h-[260px] flex-1 flex-col gap-3 px-4 pb-3 pt-3')}>
+          <div className={cx(box, 'flex min-h-[260px] flex-1 flex-col gap-3 px-4 pb-3 pt-3', chatOpen && 'shrink-0')}>
             {donut}
             {spreadBlock}
           </div>
+          {chatOpen && selectedBlock}
+          {chatOpen && listBlock}
         </div>
         <div className="flex min-h-0 flex-col gap-2.5">
-          <motion.div layout="position" transition={move} className="shrink-0 px-1 pb-0.5 pt-1">
-            {selected}
-          </motion.div>
-          <div className={cx(box, 'flex min-h-0 flex-1 flex-col overflow-hidden pt-1')}>{list}</div>
+          {!chatOpen && selectedBlock}
+          {!chatOpen && listBlock}
+          {chat && (
+            <div key="chat" className={cx('min-h-0 flex-1 flex-col', chatOpen ? 'flex' : 'hidden')}>
+              {chat}
+            </div>
+          )}
         </div>
       </section>
     );

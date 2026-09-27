@@ -146,7 +146,7 @@ export function Explainer({ title, children, defaultOpen = false, className, ton
 }
 
 /** Small (i) button with a hover / focus tooltip. */
-export function InfoTip({ children, label = 'More info', side = 'top', width = 260 }: { children: ReactNode; label?: string; side?: 'top' | 'bottom'; width?: number }) {
+export function InfoTip({ children, label = 'More info', side = 'top', width = 260, align = 'center' }: { children: ReactNode; label?: string; side?: 'top' | 'bottom'; width?: number; align?: 'center' | 'start' | 'end' }) {
   const [open, setOpen] = useState(false);
   return (
     <span className="relative inline-flex align-middle" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
@@ -169,7 +169,7 @@ export function InfoTip({ children, label = 'More info', side = 'top', width = 2
       </button>
       <AnimatePresence>
         {open && (
-          <motion.span role="tooltip" initial={{ opacity: 0, y: side === 'top' ? 4 : -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }} style={{ width }} className={cx('pointer-events-none absolute left-1/2 z-[2500] -translate-x-1/2 rounded-lg bg-slate-900 px-3 py-2 text-left text-small font-normal normal-case tracking-normal text-white shadow-xl', side === 'top' ? 'bottom-[calc(100%+6px)]' : 'top-[calc(100%+6px)]')}>
+          <motion.span role="tooltip" initial={{ opacity: 0, y: side === 'top' ? 4 : -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }} style={{ width }} className={cx('pointer-events-none absolute z-[2500] rounded-lg', align === 'start' ? '-left-2' : align === 'end' ? '-right-2' : 'left-1/2 -translate-x-1/2', ' bg-slate-900 px-3 py-2 text-left text-small font-normal normal-case tracking-normal text-white shadow-xl', side === 'top' ? 'bottom-[calc(100%+6px)]' : 'top-[calc(100%+6px)]')}>
             {children}
           </motion.span>
         )}

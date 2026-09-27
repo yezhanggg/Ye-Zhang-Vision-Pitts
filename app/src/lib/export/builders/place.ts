@@ -5,7 +5,7 @@ import { limitFor, bandLimit4p } from '../../place/afford';
 import { DECIDE, SOURCE_LINES } from '../../place/copy';
 import { capitalize, fmtDollars, fmtHouseholds, fmtPct100d1, isNum, roundHalfEven } from '../../place/format';
 import {
-  AGE_LABEL, FLOOD_LABEL, LEVEL_LABEL, MILES_LABEL, PLAN_TYPE_LABEL, PLAN_TYPE_SHORT, TYPE_PERSONS, homesLines, levelPhrase, personsWord, sizeHomeWord, sizeIncomeLine, sizeWord,
+  AGE_LABEL, AGE_WORDS, FLOOD_LABEL, LEVEL_LABEL, MILES_LABEL, PLAN_TYPE_LABEL, PLAN_TYPE_SHORT, TYPE_PERSONS, homesLines, levelPhrase, personsWord, sizeHomeWord, sizeIncomeLine, sizeWord,
   type AgeGroup, type FixedSize, type FloodRisk, type HouseholdSize, type PlanLevel, type TransitMiles,
 } from '../../place/plan';
 import type { Recommendation } from '../../place/recommend';
@@ -107,7 +107,7 @@ export function answerRows(i: PlaceReportInput): { lead: string | null; headline
   const autoType = auto ? rec.household?.type ?? null : null;
   const eff: FixedSize = size === 'auto' ? rec.household?.size ?? 3 : size;
   const effPersons = autoType ? TYPE_PERSONS[autoType] : personsWord(eff);
-  const ageWord = age === 'any' ? '' : age === 'senior62' ? ', 62+' : ', under 62';
+  const ageWord = age === 'any' ? '' : `, ${AGE_WORDS[age]}`;
   const whoShort = autoType ? `${PLAN_TYPE_SHORT[autoType]} (largest group)${ageWord}` : `${sizeWord(eff)} household${ageWord}`;
   const tenants = rec.tenants.types;
   const tenantTotal = tenants.reduce((a, t) => a + t.count, 0);
@@ -145,7 +145,7 @@ export function answerRows(i: PlaceReportInput): { lead: string | null; headline
       ? homesLines(
           plan.homes,
           rec.tenants.available ? tenantTotal : isNum(rec.band.hh) ? 0 : null,
-          `qualifying ${autoType ? PLAN_TYPE_LABEL[autoType] : `${sizeWord(eff)} households`}${age === 'any' ? '' : age === 'senior62' ? ' 62 and older' : ' under 62'} ${levelPhrase(level)}`,
+          `qualifying ${autoType ? PLAN_TYPE_LABEL[autoType] : `${sizeWord(eff)} households`}${AGE_WORDS[age] ? ` ${AGE_WORDS[age]}` : ''} ${levelPhrase(level)}`,
           level,
           m.askingUsed,
           two?.rent ?? null,
@@ -175,10 +175,10 @@ export function inputRows(plan: PlanInputs): [string, string][] {
   return [
     ['Focusing issue', STANCE_LABEL[plan.focus]],
     ['Income level', LEVEL_LABEL[plan.level]],
-    ['Household size', plan.size === 'auto' ? 'Largest group here' : personsWord(plan.size)],
+    ['Household size', plan.size === 'auto' ? 'Any (sized for the largest group here)' : personsWord(plan.size)],
     ['Age group', AGE_LABEL[plan.age]],
     ['Homes needed', plan.homes != null ? fmtHouseholds(plan.homes) : 'Not set'],
-    ['Flood risk accepted', FLOOD_LABEL[plan.flood]],
+    ['Flood risk accepted', plan.flood === 'any' ? 'Any' : `${FLOOD_LABEL[plan.flood]} of land in FEMA's 1%-a-year flood zone`],
     ['Frequent transit within', MILES_LABEL[plan.transitMi]],
   ];
 }

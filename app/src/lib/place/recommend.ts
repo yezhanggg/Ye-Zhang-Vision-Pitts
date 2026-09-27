@@ -10,7 +10,7 @@ import { DECIDE, G, TYPOLOGY_LABEL } from './copy';
 import { floodNote, lotPattern, zoningNote, type FloodNote, type LotPattern } from './feasibility';
 import { capitalize, fmtCount, fmtDollars, fmtMiles, fmtScore, fmtShare, isNum, joinAnd, NA, roundHalfEven } from './format';
 import {
-  LEVEL_LABEL, ceilingForSize, floodCheck, levelBands, levelPhrase, levelTarget, marketRent, planTenants, resolveHousehold, transitTestMiles,
+  LEVEL_LABEL, ceilingForSize, floodCheck, isSeniorAge, levelBands, levelPhrase, levelTarget, marketRent, planTenants, resolveHousehold, transitTestMiles,
   type AgeGroup, type FloodCheck, type FloodRisk, type HouseholdSize, type MarketRent, type PlanLevel, type ResolvedHousehold,
 } from './plan';
 import { CLIMATE_ORDER, DEFAULT_FIT_ORDER, DENSITY_ORDER, SERVES, STANCES, THRESHOLDS, TYPE_BEDROOMS, TYPOLOGIES, TYPOLOGY_BEDROOMS } from './thresholds';
@@ -136,13 +136,13 @@ function fitToLead(t: Typology, lead: HouseholdType | null): number {
 const isLowBand = (band: BandId) => band === 'le30' || band === 'b30_50';
 
 type Prefer = 'seniors' | 'families' | undefined;
-/** 62 and older → seniors; 3 or more people (or 2 under 62) → families; else no preference. */
+/** Any 62+ option → seniors; 3 or more people (or 2 under 62) → families; else no preference. */
 const preferOf = (h: ResolvedHousehold | null, age: AgeGroup | undefined): Prefer => {
   if (h?.auto) return h.type === 'elderly_alone' || h.type === 'elderly_family' ? 'seniors' : h.type === 'small_family' || h.type === 'large_family' ? 'families' : undefined;
   return preferOfSize(h?.size, age);
 };
 const preferOfSize = (size: HouseholdSize | undefined, age: AgeGroup | undefined): Prefer =>
-  size === 'auto' ? undefined : age === 'senior62' && (size ?? 1) <= 2 ? 'seniors' : size != null && (size >= 3 || (size === 2 && age === 'under62')) ? 'families' : undefined;
+  size === 'auto' ? undefined : isSeniorAge(age) && (size ?? 1) <= 2 ? 'seniors' : size != null && (size >= 3 || (size === 2 && age === 'under62')) ? 'families' : undefined;
 
 /** Seniors: senior housing first when it is in the set; families: the family types (2–4 unit conversion, townhome) first. */
 function preferFor(types: Typology[], household: Prefer): Typology[] {

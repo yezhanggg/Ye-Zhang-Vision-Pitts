@@ -183,6 +183,34 @@ export default function EquityPolicyView({ active = true }: { active?: boolean }
     },
   ];
 
+  // VisionPitts-Chat lives in the measure section's right column (the tract table and the list move under the charts
+  // while it is open). It stays mounted when closed, so the thread and its scroll survive and opening it is instant.
+  const chatPanel = (
+<section
+      id="equity-chat"
+      aria-label="VisionPitts-Chat"
+      aria-hidden={!chatOpen}
+      inert={!chatOpen}
+      className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-white shadow-[0_12px_32px_-14px_rgba(76,29,149,0.35)] ring-1 ring-violet-200/70 transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none starting:translate-x-3 starting:opacity-0"
+    >
+      <div className="flex shrink-0 items-center gap-2 bg-gradient-to-r from-violet-600 to-violet-500 px-3.5 py-2.5 text-white">
+        <Sparkles className="h-4 w-4 shrink-0" />
+        <h2 className="min-w-0 flex-1 text-small font-semibold leading-tight">VisionPitts-Chat</h2>
+        <span className="text-white/85 [&_button]:text-white/85 hover:[&_button]:text-white">
+          <InfoTip label="About VisionPitts-Chat" width={260} side="bottom">
+            Answers questions about this tab's numbers, the four levers and other Pittsburgh housing topics. Numbers in an answer are checked against the tool's data.
+          </InfoTip>
+        </span>
+        <button type="button" onClick={toggleChat} className="grid h-7 w-7 place-items-center rounded-full text-white/90 transition-colors hover:bg-white/15 hover:text-white" aria-label="Close VisionPitts-Chat" title="Close (Esc)">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col bg-gradient-to-b from-violet-50/50 to-white px-2.5 pb-2.5 pt-2 [&>[data-testid=analysis-chat]]:flex [&>[data-testid=analysis-chat]]:min-h-0 [&>[data-testid=analysis-chat]]:flex-1 [&>[data-testid=analysis-chat]]:flex-col">
+        <AnalysisChat compact dock extraFacts={active ? facts : undefined} prompts={prompts} />
+      </div>
+    </section>
+  );
+
   if (!hud || placeById.size === 0) {
     return <div className="grid h-full place-items-center pt-14 text-small text-slate-600">The place measures (place.json and the HUD table) are not built yet, so the equity dashboard cannot run.</div>;
   }
@@ -275,41 +303,14 @@ export default function EquityPolicyView({ active = true }: { active?: boolean }
             allValues={allValues}
             selectedId={selectedId}
             policiesLine={policiesOnLine(levers)}
+            chat={chatPanel}
+            chatOpen={chatOpen}
             policyTexts={policyTexts}
             reading={reading}
             onPick={select}
           />
           </div>
 
-          {/* VisionPitts-Chat: a floating panel over the right of the page. Always mounted (the thread and its scroll
-              survive), shown by opacity and a short slide on the compositor, so opening it never re-lays out the map. */}
-          <section
-            id="equity-chat"
-            aria-label="VisionPitts-Chat"
-            aria-hidden={!chatOpen}
-            inert={!chatOpen}
-            className={cx(
-              'absolute bottom-0 right-0 top-0 z-30 flex w-[min(400px,100%)] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_18px_50px_-12px_rgba(76,29,149,0.35)] ring-1 ring-violet-200/70 will-change-transform',
-              'transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none',
-              chatOpen ? 'translate-x-0 opacity-100' : 'pointer-events-none translate-x-4 opacity-0',
-            )}
-          >
-            <div className="flex shrink-0 items-center gap-2 bg-gradient-to-r from-violet-600 to-violet-500 px-3.5 py-2.5 text-white">
-              <Sparkles className="h-4 w-4 shrink-0" />
-              <h2 className="min-w-0 flex-1 text-small font-semibold leading-tight">VisionPitts-Chat</h2>
-              <span className="text-white/85 [&_button]:text-white/85 hover:[&_button]:text-white">
-                <InfoTip label="About VisionPitts-Chat" width={260} side="bottom">
-                  Answers questions about this tab's numbers, the four levers and other Pittsburgh housing topics. Numbers in an answer are checked against the tool's data.
-                </InfoTip>
-              </span>
-              <button type="button" onClick={toggleChat} className="grid h-7 w-7 place-items-center rounded-full text-white/90 transition-colors hover:bg-white/15 hover:text-white" aria-label="Close VisionPitts-Chat" title="Close (Esc)">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="flex min-h-0 flex-1 flex-col bg-gradient-to-b from-violet-50/50 to-white px-2.5 pb-2.5 pt-2 [&>[data-testid=analysis-chat]]:flex [&>[data-testid=analysis-chat]]:min-h-0 [&>[data-testid=analysis-chat]]:flex-1 [&>[data-testid=analysis-chat]]:flex-col">
-              <AnalysisChat compact dock extraFacts={active ? facts : undefined} prompts={prompts} />
-            </div>
-          </section>
         </div>
       </div>
     </div>

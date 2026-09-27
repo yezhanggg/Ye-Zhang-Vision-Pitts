@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { encodeHash, parseHash } from './hash';
+import { basePath, encodeHash, hashFromPath, parseHash, pathFromHash } from './hash';
 import { defaultLayers, exclusiveLayers, useApp, type AppState } from './store';
 import { tractById, tracts } from './data';
 
@@ -106,22 +106,52 @@ describe('encodeHash', () => {
   it('writes Explore params only for an Explore state', () => {
     const q = new URLSearchParams(encodeHash({ ...base(), mode: 'explore', selectedId: TRACT }));
     expect(q.get('m')).toBe('explore');
-    expect(q.get('L')).toBe('buildings,tracts,city');
+    expect(q.has('L')).toBe(false); // the default boundary set is not written
     for (const k of ['t', 'b', 'w', 's', 'sa', 'sb', 'c', 'g', 'v', 'u', 'lite']) expect(q.has(k)).toBe(false);
   });
 
   it('writes Analysis params only for an Analysis state', () => {
     const state: AppState = { ...base(), mode: 'match', selectedId: TRACT, browse: { level: 'bg', variable: 'pop', selected: null } };
     const q = new URLSearchParams(encodeHash(state));
-    expect(q.get('m')).toBe('match');
+    expect(q.get('m')).toBe('place');
     expect(q.get('t')).toBe(TRACT);
-    for (const k of ['w', 's', 'sa', 'sb', 'c', 'L']) expect(q.has(k)).toBe(true);
+    for (const k of ['w', 's', 'sa', 'sb', 'c', 'L']) expect(q.has(k)).toBe(false); // defaults are not written
     for (const k of ['g', 'v', 'u']) expect(q.has(k)).toBe(false);
     const p = parseHash(q.toString());
     expect(p.mode).toBe('match');
     expect(p.selectedId).toBe(TRACT);
-    expect(p.weights).toEqual(state.weights);
-    expect(p.metric).toEqual(state.metric);
+    expect(p.weights).toBeUndefined(); // absent = the defaults the app starts with
+    expect(p.metric).toBeUndefined();
     expect(p.browse).toBeUndefined();
+  });
+
+  it('keeps links short and readable: a preset by name, custom weights as pairs, no escaped separators', () => {
+    const preset = encodeHash({ ...base(), mode: 'scenarios', selectedId: TRACT, weights: useApp.getState().weights, metric: { kind: 'lens', id: 'pressure' } });
+    expect(preset).toBe(`m=equity&t=${TRACT}&c=lens.pressure`);
+    const custom = encodeHash({ ...base(), mode: 'tracts', selectedId: TRACT, weights: { ...useApp.getState().weights, need: 3 } });
+    expect(custom).toMatch(/^m=compare&t=\d+&w=need:3,/);
+    expect(custom).not.toMatch(/%2C|%3A/);
+    const back = parseHash(custom);
+    expect(back.mode).toBe('tracts');
+    expect(back.weights?.need).toBe(3);
+  });
+
+  it('reads the new and the older page names', () => {
+    expect(parseHash('m=equity').mode).toBe('scenarios');
+    expect(parseHash('m=compare').mode).toBe('tracts');
+    expect(parseHash('m=place').mode).toBe('match');
+    expect(parseHash('m=tracts').mode).toBe('tracts');
+  });
+
+  it('maps states to page paths and back', () => {
+    expect(pathFromHash('m=explore')).toBe('explore');
+    expect(pathFromHash('m=compare&t=1&b=2')).toBe('compare?t=1&b=2');
+    expect(hashFromPath('/compare', '?t=1&b=2')).toBe('m=compare&t=1&b=2');
+    expect(hashFromPath('/equity/', '')).toBe('m=equity');
+    expect(hashFromPath('/', '')).toBe('');
+    expect(hashFromPath('/index.html', '')).toBe('');
+    expect(basePath('/compare')).toBe('/');
+    expect(basePath('/app/place')).toBe('/app/');
+    expect(basePath('/')).toBe('/');
   });
 });

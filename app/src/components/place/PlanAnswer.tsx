@@ -1,6 +1,7 @@
 // The answer card on Analysis > Match (always open), kept short: the suggested type and home size, then at most four
-// one-line rows with a bold number (rent that fits, who it serves, market, flood when it matters) and a one-line
-// "You decide". The long sentences (why, caveats, not-served, homes needed) sit in the collapsed "How we got this".
+// one-line rows with a short label and a bold number (rent, serves, market, flood when it matters). Each row's
+// formula or explanation sits behind a small ⓘ; the long sentences (why, caveats, not-served, homes needed, "you
+// decide") sit in the collapsed "Details".
 // Everything is lib/place (recommend, plan); nothing here is a score.
 import type { ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
@@ -12,6 +13,7 @@ import { bedroomsWord } from "../../lib/place/bands";
 import { fmtDollars, fmtHouseholds, fmtPct100d1, isNum, roundHalfEven } from "../../lib/place/format";
 import {
   AGE_LABEL,
+  AGE_WORDS,
   LEVEL_LABEL,
   PLAN_TYPE_LABEL,
   PLAN_TYPE_SHORT,
@@ -30,13 +32,19 @@ import type { Recommendation } from "../../lib/place/recommend";
 import { STANCE_LABEL, TYPOLOGY_LABEL } from "../../lib/place/thresholds";
 import type { HudTable } from "../../lib/place/types";
 import { UI } from "../../lib/copy";
-import { Dot, readableColor } from "../primitives";
+import { Dot, InfoTip, readableColor } from "../primitives";
 
-function Row({ k, children }: { k: string; children: ReactNode }) {
+/** One line: short label, value, and an optional ⓘ with the formula or the explanation. */
+function Row({ k, info, children }: { k: string; info?: ReactNode; children: ReactNode }) {
   return (
-    <div className="flex items-baseline gap-3 px-3 py-1.5">
-      <dt className="w-24 shrink-0 text-caption font-semibold uppercase tracking-wide text-slate-500">{k}</dt>
-      <dd className="min-w-0 flex-1 text-small leading-snug text-slate-800 tnum">{children}</dd>
+    <div className="flex items-center gap-3 px-3 py-1.5">
+      <dt className="w-16 shrink-0 text-caption font-semibold uppercase tracking-wide text-slate-500">{k}</dt>
+      <dd className="min-w-0 flex-1 truncate text-small text-slate-800 tnum">{children}</dd>
+      {info && (
+        <InfoTip label={`About ${k.toLowerCase()}`} width={250} align="end">
+          {info}
+        </InfoTip>
+      )}
     </div>
   );
 }
@@ -48,7 +56,7 @@ const levelShort = (l: PlanLevel) => (l === "market" ? ">80% AMI" : LEVEL_LABEL[
 /** A short reason (under ~15 words) for "No suggestion here"; the full sentence is in the fold. */
 function shortWhy(rec: Recommendation, level: PlanLevel, marketRule: boolean): string {
   const f = rec.floodLimit;
-  if (f?.blocked && f.pct != null) return `${fmtPct100d1(f.pct)} of the land is in a FEMA flood zone, above your ${f.limit}% limit.`;
+  if (f?.blocked && f.pct != null) return `${fmtPct100d1(f.pct)} of land in the flood zone, over your ${f.limit === 0 ? "none" : `${f.limit}%`} limit.`;
   if (rec.stance === "climate_resilient" && rec.stanceTest.passed !== true && !marketRule) return `${rec.headline}.`;
   if (rec.stance === "transit_first" && rec.stanceTest.passed === false) {
     const d = rec.headline.match(/nearest frequent stop ([\d.]+ miles)/)?.[1];
@@ -93,13 +101,13 @@ export default function PlanAnswer({
   const m = rec.market;
   const mr = rec.marketRent;
   const flood = rec.floodLimit;
-  const ageWord = age === "any" ? "" : age === "senior62" ? ", 62+" : ", under 62";
+  const ageWord = age === "any" ? "" : `, ${AGE_LABEL[age]}`;
   // 'auto': the size this place's largest group sets (rec.household); explicit sizes pass through.
   const auto = size === "auto";
   const autoType = auto ? (rec.household?.type ?? null) : null;
   const eff: FixedSize = size === "auto" ? (rec.household?.size ?? 3) : size;
   const effPersons = autoType ? TYPE_PERSONS[autoType] : personsWord(eff);
-  const whoShort = autoType ? `${PLAN_TYPE_SHORT[autoType]} (largest group)${ageWord}` : `${sizeWord(eff)} household${ageWord}`;
+  const whoShort = autoType ? PLAN_TYPE_SHORT[autoType] : `${sizeWord(eff)} household${ageWord}`;
   const tenants = rec.tenants.types;
   const tenantTotal = tenants.reduce((a, t) => a + t.count, 0);
   const tenantWords = autoType ? PLAN_TYPE_LABEL[autoType] : tenants.length ? tenants.map((t) => PLAN_TYPE_SHORT[t.type]).join(" + ") : "households";
@@ -113,7 +121,7 @@ export default function PlanAnswer({
       ? homesLines(
           homes,
           rec.tenants.available ? tenantTotal : isNum(rec.band.hh) ? 0 : null,
-          `qualifying ${autoType ? PLAN_TYPE_LABEL[autoType] : `${sizeWord(eff)} households`}${age === "any" ? "" : age === "senior62" ? " 62 and older" : " under 62"} ${levelPhrase(level)}`,
+          `qualifying ${autoType ? PLAN_TYPE_LABEL[autoType] : `${sizeWord(eff)} households`}${AGE_WORDS[age] ? ` ${AGE_WORDS[age]}` : ""} ${levelPhrase(level)}`,
           level,
           m.askingUsed,
           two?.rent ?? null,
@@ -138,14 +146,20 @@ export default function PlanAnswer({
     DECIDE,
   ].filter(Boolean);
 
+  const context = [STANCE_LABEL[rec.stance], auto ? "" : personsWord(size as FixedSize), age === "any" ? "" : AGE_LABEL[age], LEVEL_LABEL[level]].filter(Boolean).join(" · ");
+  const over = m.askingUsed != null && two ? m.askingUsed - two.rent : null;
+
   return (
     <div className="overflow-hidden rounded-2xl ring-1" style={{ background: `${color}12`, boxShadow: `inset 0 0 0 1px ${color}45` }}>
       <div className="px-4 pb-3 pt-3.5">
         <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-          <div className="text-small font-semibold text-slate-700">{UI.bestMatch}</div>
-          <div className="text-caption text-slate-600">
-            {STANCE_LABEL[rec.stance]} · {auto ? "largest group" : sizeWord(size)} · {AGE_LABEL[age].toLowerCase()} · {LEVEL_LABEL[level]}
+          <div className="flex items-center gap-1 text-small font-semibold text-slate-700">
+            {UI.bestMatch}
+            <InfoTip label="About this answer" side="bottom" align="start" width={250}>
+              Evidence, not a decision: site, scale, sponsor and financing are yours.
+            </InfoTip>
           </div>
+          <div className="text-caption text-slate-600">{context}</div>
         </div>
         <AnimatePresence mode="wait">
           <motion.div key={`${lead?.typology ?? "none"}-${lead?.bedrooms ?? ""}`} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.16 }}>
@@ -156,8 +170,8 @@ export default function PlanAnswer({
                 </div>
                 <div className="text-small text-slate-700">
                   {marketLedView
-                    ? `${cap(bedroomsWord(lead.bedrooms).replace(/^a /, ""))}${lead.typology === "townhome" ? " for sale" : " homes"} · market rate`
-                    : `${cap(sizeHomeWord(eff).replace(/^a /, ""))} homes · ${whoShort} · ${marketRule ? "market rent" : LEVEL_LABEL[level]}`}
+                    ? `${cap(bedroomsWord(lead.bedrooms).replace(/^a /, ""))}${lead.typology === "townhome" ? " for sale" : ""} · market rate`
+                    : `${cap(sizeHomeWord(eff).replace(/^a /, ""))} · ${whoShort}`}
                 </div>
               </>
             ) : (
@@ -180,83 +194,106 @@ export default function PlanAnswer({
           </div>
         )}
       </div>
-      <dl className="divide-y divide-stone-100 border-t border-stone-200/70 bg-white py-0.5">
-        {!bare && (
-          <>
-            <Row k={marketLedView && lead ? "Price" : "Rent that fits"}>
-              {marketLedView && lead ? (
-                productPrice ? <>{cap(productPrice)} · market rate, no HUD ceiling</> : <>market rate</>
-              ) : atMarket ? (
-                mr.rent != null ? (
-                  <>
-                    <B>{fmtDollars(mr.rent)}/mo</B> market asks · no HUD ceiling
-                  </>
-                ) : (
-                  <>Market rent not available</>
-                )
-              ) : price ? (
+      {!bare && (
+        <dl className="divide-y divide-stone-100 border-t border-stone-200/70 bg-white py-0.5">
+          {marketLedView && lead ? (
+            <Row k="Price" info="Market rate: no HUD rent ceiling applies to what the market builds.">
+              {productPrice ? cap(productPrice.replace(/^at the /, "")) : "market rate"}
+            </Row>
+          ) : atMarket ? (
+            <Row k="Rent" info="Above 80% AMI no HUD ceiling applies: the rent is what the market asks.">
+              {mr.rent != null ? (
                 <>
-                  {fmtDollars(price.limit)} × 30% ÷ 12 = <B>{fmtDollars(price.rent)}/mo</B>, {effPersons}
+                  <B>{fmtDollars(mr.rent)}/mo</B> market
                 </>
               ) : (
-                <>HUD limits not available</>
+                "not available"
               )}
             </Row>
-            <Row k="Who it serves">
-              {marketLedView && lead ? (
-                <>households {servesWords ?? "the market price reaches"}; not the {fmtHouseholds(tenantTotal)} {tenantWords} {levelShort(level)}</>
-              ) : rec.tenants.available ? (
+          ) : (
+            <Row
+              k="Rent"
+              info={
+                price ? (
+                  <>
+                    Rent that fits: {fmtDollars(price.limit)} × 30% ÷ 12 = {fmtDollars(price.rent)}. HUD {price.pct}% AMI limit for {effPersons}; gross rent (utilities not known).
+                  </>
+                ) : undefined
+              }
+            >
+              {price ? (
                 <>
-                  <B>{fmtHouseholds(tenantTotal)}</B> {tenantWords} {levelShort(level)}
-                  {autoType ? " (the largest group here)" : ""}
+                  <B>{fmtDollars(price.rent)}/mo</B> fits
                 </>
               ) : (
-                <>
-                  <B>0</B> {tenantWords} {levelShort(level)} on file
-                </>
+                "HUD limits not available"
               )}
             </Row>
-            <Row k="Market">
-              {atMarket ? (
-                mr.rent != null && floor80 != null ? (
-                  <>
-                    asks <B>{fmtDollars(mr.rent)}</B> · needs <B>{fmtDollars(mr.rent * 40)}</B> a year ({fmtDollars(mr.rent)} × 12 ÷ 30%)
-                  </>
-                ) : (
-                  <>not available</>
-                )
-              ) : m.askingUsed != null && two ? (
-                m.askingUsed <= two.rent ? (
-                  <>
-                    asks <B>{fmtDollars(m.askingUsed)}</B> · <B>{fmtDollars(two.rent - m.askingUsed)}</B> below what fits
-                    {price && price.bedrooms !== 2 ? " a 2-bedroom" : ""}
-                  </>
-                ) : (
-                  <>
-                    asks <B>{fmtDollars(m.askingUsed)}</B> · gap <B>{fmtDollars(m.askingUsed - two.rent)}/mo</B> over {fmtDollars(two.rent)} (utilities not included, so the real gap is larger)
-                    {price && price.bedrooms !== 2 ? " (2-bedroom)" : ""}
-                    {m.verdict === "needs_subsidy" ? " · needs subsidy" : ""}
-                  </>
-                )
-              ) : (
-                <>asking rent not available</>
-              )}
-            </Row>
-            {showFlood && flood?.pct != null && (
-              <Row k="Flood">
-                <B>{fmtPct100d1(flood.pct)}</B> of land in a flood zone · {flood.blocked ? `above your ${flood.limit}% limit` : flood.limit != null ? `within your ${flood.limit}% limit` : "no limit set"}
-              </Row>
+          )}
+          <Row
+            k="Serves"
+            info={
+              marketLedView && lead
+                ? `Households ${servesWords ?? "the market price reaches"}; not the ${fmtHouseholds(tenantTotal)} ${tenantWords} ${levelShort(level)}.`
+                : autoType
+                  ? `The largest group here: ${PLAN_TYPE_LABEL[autoType]} ${levelShort(level)} (HUD CHAS renter households).`
+                  : "HUD CHAS renter households of this size and age."
+            }
+          >
+            {marketLedView && lead ? (
+              <>households {servesWords ? servesWords.replace(/^households /, "") : "the market price reaches"}</>
+            ) : (
+              <>
+                <B>{rec.tenants.available ? fmtHouseholds(tenantTotal) : "0"}</B> {autoType ? PLAN_TYPE_SHORT[autoType] : tenantWords} {levelShort(level)}
+              </>
             )}
-          </>
-        )}
-        <Row k="You decide">
-          <span className="italic text-slate-700">Site, scale, sponsor and financing are yours; this shows the evidence.</span>
-        </Row>
-      </dl>
+          </Row>
+          <Row
+            k="Market"
+            info={
+              atMarket
+                ? mr.rent != null
+                  ? `Income needed: ${fmtDollars(mr.rent)} × 12 ÷ 30% = ${fmtDollars(mr.rent * 40)} a year. ${mr.words}.`
+                  : undefined
+                : over != null && two
+                  ? `2-bedroom asking rent vs. the ${fmtDollars(two.rent)} that fits a 2-bedroom${over > 0 ? "; utilities not included, so the real gap is larger" : ""}.`
+                  : undefined
+            }
+          >
+            {atMarket ? (
+              mr.rent != null ? (
+                <>
+                  needs <B>{fmtDollars(mr.rent * 40)}</B>/yr income
+                </>
+              ) : (
+                "not available"
+              )
+            ) : over != null && m.askingUsed != null ? (
+              over <= 0 ? (
+                <>
+                  asks <B>{fmtDollars(m.askingUsed)}</B> · <B>{fmtDollars(-over)}</B> under
+                </>
+              ) : (
+                <>
+                  asks <B>{fmtDollars(m.askingUsed)}</B> · gap <B>{fmtDollars(over)}/mo</B>
+                  {m.verdict === "needs_subsidy" ? " · subsidy" : ""}
+                </>
+              )
+            ) : (
+              "asking rent not available"
+            )}
+          </Row>
+          {showFlood && flood?.pct != null && (
+            <Row k="Flood" info="Share of the tract's land in FEMA's 1%-a-year (100-year) flood zone, against the limit you chose.">
+              <B>{fmtPct100d1(flood.pct)}</B> of land · {flood.blocked ? `over ${flood.limit === 0 ? "none" : `${flood.limit}%`} limit` : flood.limit != null ? `within ${flood.limit}%` : "no limit"}
+            </Row>
+          )}
+        </dl>
+      )}
       <details className="group border-t border-stone-200/70 bg-white">
         <summary className="flex cursor-pointer list-none items-center gap-1.5 px-3 py-2 text-caption font-semibold text-slate-600 hover:text-slate-900">
           <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" aria-hidden />
-          How we got this
+          Details
         </summary>
         <ul className="space-y-1.5 px-4 pb-3 text-caption leading-snug text-slate-700">
           {details.map((d, i) => (
@@ -267,4 +304,3 @@ export default function PlanAnswer({
     </div>
   );
 }
-

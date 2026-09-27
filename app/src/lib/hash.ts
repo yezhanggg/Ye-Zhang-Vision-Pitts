@@ -1,11 +1,15 @@
-// The shareable part of the state lives in the URL hash.
+// The shareable part of the state lives in the URL hash, kept short and readable: only what differs from the
+// defaults is written, and separators (, : ~ |) stay unescaped.
 //   Explore:  m=explore  L=<layers on>  g=<level>  v=<variable>  u=<level:geoid>  p=<pin>  lite=1
 //             (one boundary is open at a time: the level being browsed decides which; `city` in L = "Pittsburgh only")
-//   Analysis: m=match|tracts|scenarios  t  b  w  s  sa  sb  c  L  p  lite
+//   Analysis: m=place|compare|equity (older links: match|tracts|scenarios)  t  b  w (a preset id or factor:weight
+//             pairs)  s  sa  sb  c  L  p  lite
 // parseHash / encodeHash are pure so they can be unit-tested; readHash / startHashSync wire them to the store.
 import { activeFactorIds, scoring, tractById } from './data';
 import {
   defaultLayers,
+  matchPreset,
+  presetWeights,
   exclusiveLayers,
   isAnalysisId,
   LAYER_FOR_LEVEL,
@@ -28,6 +32,7 @@ import type { Pin, Scenario, Weights } from './types';
 const encW = (w: Weights) => activeFactorIds.map((f) => `${f}:${+(w[f] ?? 0).toFixed(2)}`).join(',');
 function decW(s: string | null): Weights | null {
   if (!s) return null;
+  if (scoring.presets.some((p) => p.id === s)) return presetWeights(s);
   const w: Weights = {};
   for (const part of s.split(',')) {
     const [k, v] = part.split(':');
@@ -84,7 +89,7 @@ export function parseHash(h: string): Partial<AppState> {
   const q = new URLSearchParams(h.replace(/^#/, ''));
   const patch: Partial<AppState> = {};
   const hasExplore = ['L', 'g', 'v', 'u'].some((k) => q.has(k));
-  let mode = q.get('m') as Mode | null;
+  let mode = (READ_MODE[q.get('m') ?? ''] ?? q.get('m')) as Mode | null;
   // Links written before the Explore/Analysis split used m=explore for the matchmaker.
   if (mode === 'explore' && !hasExplore && (q.has('c') || q.has('w'))) mode = 'match';
   if (mode && MODES.includes(mode)) {
@@ -153,35 +158,86 @@ export function parseHash(h: string): Partial<AppState> {
   return patch;
 }
 
-/** Pure: state → hash string (without '#'). Explore and Analysis write only the params they use. */
+/** The page names written in links (readable), and the names read back (both the new and the older ones). */
+const WRITE_MODE: Record<Mode, string> = { explore: 'explore', match: 'place', tracts: 'compare', scenarios: 'equity' };
+const READ_MODE: Record<string, Mode> = { place: 'match', compare: 'tracts', equity: 'scenarios' };
+
+/** Encode a value but keep the separators this format uses readable. */
+const enc = (v: string) => encodeURIComponent(v).replace(/%2C/gi, ',').replace(/%3A/gi, ':').replace(/%7C/gi, '|').replace(/%7E/gi, '~');
+
+const sameLayers = (a: Layers, b: Layers) => LAYER_IDS.every((id) => !!a[id] === !!b[id]);
+const sameWeights = (a: Weights, b: Weights) => activeFactorIds.every((f) => Math.abs((a[f] ?? 0) - (b[f] ?? 0)) < 1e-6);
+const sameScenarios = (a: Scenario[], b: Scenario[]) => a.length === b.length && a.every((x, i) => x.name === b[i].name && sameWeights(x.weights, b[i].weights));
+
+/** Pure: state → hash string (without '#'). Only what differs from the app's defaults is written. */
 export function encodeHash(s: AppState): string {
-  const q = new URLSearchParams();
-  q.set('m', s.mode);
+  const d = useApp.getInitialState();
+  const q: [string, string][] = [['m', WRITE_MODE[s.mode] ?? s.mode]];
   if (sectionOf(s.mode) === 'explore') {
-    q.set('L', encLayers(s.layers));
-    if (s.browse.level !== 'tract') q.set('g', s.browse.level);
-    if (s.browse.variable) q.set('v', s.browse.variable);
-    if (s.browse.selected) q.set('u', `${s.browse.selected.level}:${s.browse.selected.geoid}`);
+    if (!sameLayers(s.layers, exclusiveLayers(defaultLayers(s.lite), LAYER_FOR_LEVEL[s.browse.level]))) q.push(['L', encLayers(s.layers)]);
+    if (s.browse.level !== 'tract') q.push(['g', s.browse.level]);
+    if (s.browse.variable) q.push(['v', s.browse.variable]);
+    if (s.browse.selected) q.push(['u', `${s.browse.selected.level}:${s.browse.selected.geoid}`]);
   } else {
-    if (s.selectedId) q.set('t', s.selectedId);
-    if (s.compareId) q.set('b', s.compareId);
-    q.set('w', encW(s.weights));
-    q.set('s', s.scenarios.map((x) => `${encodeURIComponent(x.name)}~${encW(x.weights)}`).join('|'));
-    q.set('sa', String(Math.max(0, s.scenarios.findIndex((x) => x.id === s.scenA))));
-    q.set('sb', String(Math.max(0, s.scenarios.findIndex((x) => x.id === s.scenB))));
-    q.set('c', encMetric(s.metric));
-    q.set('L', encLayers(s.layers));
+    if (s.selectedId) q.push(['t', s.selectedId]);
+    if (s.compareId && s.mode === 'tracts') q.push(['b', s.compareId]); // place B only matters on Compare places
+    if (!sameWeights(s.weights, d.weights)) q.push(['w', matchPreset(s.weights) ?? encW(s.weights)]);
+    const defaultScen = sameScenarios(s.scenarios, d.scenarios);
+    if (!defaultScen) q.push(['s', s.scenarios.map((x) => `${encodeURIComponent(x.name)}~${encW(x.weights)}`).join('|')]);
+    const ia = Math.max(0, s.scenarios.findIndex((x) => x.id === s.scenA));
+    const ib = Math.max(0, s.scenarios.findIndex((x) => x.id === s.scenB));
+    const da = Math.max(0, d.scenarios.findIndex((x) => x.id === d.scenA));
+    const db = Math.max(0, d.scenarios.findIndex((x) => x.id === d.scenB));
+    if (!defaultScen || ia !== da) q.push(['sa', String(ia)]);
+    if (!defaultScen || ib !== db) q.push(['sb', String(ib)]);
+    if (encMetric(s.metric) !== encMetric(d.metric)) q.push(['c', encMetric(s.metric)]);
+    if (!sameLayers(s.layers, defaultLayers(s.lite))) q.push(['L', encLayers(s.layers)]);
   }
-  if (s.pin) q.set('p', encPin(s.pin));
-  if (s.lite) q.set('lite', '1');
-  return q.toString();
+  if (s.pin) q.push(['p', encPin(s.pin)]);
+  if (s.lite) q.push(['lite', '1']);
+  return q.map(([k, v]) => `${k}=${k === 's' || k === 'p' ? v.replace(/&/g, '%26').replace(/#/g, '%23').replace(/=/g, '%3D') : enc(v)}`).join('&');
 }
 
-/** Restore state from the hash. Returns true when the hash carried any state. */
+// ---------------------------------------------------------------- page paths on the web
+// On the web the state reads as a normal path: /explore, /place, /compare?t=…&b=…, /equity. The offline file
+// (file://) keeps the hash form, since a path there would point at a file on disk. Old #m=… links still open.
+const PAGES = ['explore', 'place', 'compare', 'equity'] as const;
+const PAGE_RE = new RegExp(`(?:^|/)(${PAGES.join('|')})/?$`);
+
+/** The site's base path: "/" on the deployment, or a folder prefix, without the page name. */
+export function basePath(pathname: string): string {
+  const b = pathname.replace(PAGE_RE, '/');
+  return b.endsWith('/') ? b : `${b}/`;
+}
+
+/** "m=compare&t=1&b=2" → "compare?t=1&b=2" (relative to the base path). */
+export function pathFromHash(hash: string): string {
+  const [first, ...rest] = hash.split('&');
+  const page = first.startsWith('m=') ? first.slice(2) : 'explore';
+  return rest.length ? `${page}?${rest.join('&')}` : page;
+}
+
+/** The hash-form state carried by a path URL ("/compare" + "?t=1" → "m=compare&t=1"), or "" when the path names no page. */
+export function hashFromPath(pathname: string, search: string): string {
+  const m = pathname.match(PAGE_RE);
+  if (!m) return '';
+  const q = search.replace(/^\?/, '');
+  return q ? `m=${m[1]}&${q}` : `m=${m[1]}`;
+}
+
+const onWeb = () => {
+  try {
+    return window.location.protocol === 'http:' || window.location.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
+
+/** Restore state from the URL (a page path on the web, or the hash). Returns true when the URL carried any state. */
 export function readHash(): boolean {
   let h = '';
   try {
-    h = window.location.hash.replace(/^#/, '');
+    h = window.location.hash.replace(/^#/, '') || (onWeb() ? hashFromPath(window.location.pathname, window.location.search) : '');
   } catch {
     return false;
   }
@@ -198,15 +254,17 @@ export function startHashSync() {
     window.clearTimeout(timer);
     timer = window.setTimeout(() => {
       try {
+        const web = onWeb();
+        const base = basePath(window.location.pathname);
         if (s.view === 'landing') {
-          if (last !== '') history.replaceState(null, '', window.location.pathname + window.location.search);
+          if (last !== '' || window.location.hash || (web && hashFromPath(window.location.pathname, window.location.search))) history.replaceState(null, '', web ? base : window.location.pathname + window.location.search);
           last = '';
           return;
         }
         const next = encodeHash(s);
         if (next === last) return;
         last = next;
-        history.replaceState(null, '', `#${next}`);
+        history.replaceState(null, '', web ? `${base}${pathFromHash(next)}` : `#${next}`);
       } catch {
         /* file:// in some browsers */
       }

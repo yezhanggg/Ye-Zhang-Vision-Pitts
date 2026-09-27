@@ -60,7 +60,7 @@ export default function AnalysisCalculations() {
           Place tab: no HUD ceiling applies above 80% AMI; the market rent is the price. Compare and Equity: a household at the area median, <F>median × {pct(HUD_3P_ADJ)} (HUD's 3-person adjustment) × 30% ÷ 12</F> = {mkt?.formula ?? 'not available'}.
         </Calc>
         <Calc name="Household size">
-          Your chosen size, or "largest group": the CHAS household type with the most renters at your level sets it (seniors alone and single adults 1; senior families 2; small families 2–4, priced at 3; large families 5 or more, priced at 5). Home size: 1–2 people a 1-bedroom (1 person may use a studio), 3–4 a 2-bedroom, 5+ a 3-bedroom.
+          Your chosen size, or "Any" (sized for the largest group here): the CHAS household type with the most renters at your level sets it (seniors alone and single adults 1; senior families 2; small families 2–4, priced at 3; large families 5 or more, priced at 5). Age group keeps CHAS types (CHAS splits age only at 62): under 62 = single adults, small and large families (no senior housing); 62+ = seniors alone and senior couples; 62+ alone = seniors alone (1 person); 62+ couple = senior families (2 people). Home size: 1–2 people a 1-bedroom (1 person may use a studio), 3–4 a 2-bedroom, 5+ a 3-bedroom.
         </Calc>
         <Calc name="Renters by income">
           HUD CHAS 2018–22 Table 8 renter households by band (≤30, 30–50, 50–80, 80–100, &gt;100% of HUD area median). A level counts <F>every band at or below it</F>; market rate counts the two bands above 80%. Burdened = paying more than 30% of income (includes those paying more than half).
@@ -70,7 +70,7 @@ export default function AnalysisCalculations() {
           A stop is frequent with at least <F>{T.frequent_stop_departures} weekday departures</F> (about every 15 minutes over 16 hours; PRT GTFS June 2026). Distance = straight-line miles from each 2020 census block to its nearest frequent stop, averaged over the tract's residents.
         </Calc>
         <Calc name="Flood">
-          <F>FEMA special flood hazard area ÷ tract land area</F> (National Flood Hazard Layer). Words: none at 0%, minor under {T.flood_minor_below_pct}%, moderate up to {T.flood_moderate_upto_pct}%, high above. Your flood limit: "avoid" {FLOOD_LIMIT_PCT.avoid}%, "some is OK" {FLOOD_LIMIT_PCT.some}%.
+          <F>FEMA special flood hazard area ÷ tract land area</F> (FEMA's 1%-a-year, or 100-year, flood zone; National Flood Hazard Layer; land only). Words: none at 0%, minor under {T.flood_minor_below_pct}%, moderate up to {T.flood_moderate_upto_pct}%, high above. Your flood limit (no suggestion above it): None {FLOOD_LIMIT_PCT.none}%, ≤{FLOOD_LIMIT_PCT.le5}%, ≤{FLOOD_LIMIT_PCT.le15}%, or Any (no limit).
         </Calc>
         <Calc name="Lot pattern">
           Conversions and ADUs fit when at least <F>{pct(T.lot_units_2_4_share)}</F> of homes are in 2–4 unit buildings or at least <F>{T.lot_parcels_2_4}</F> parcels hold 2–4 units. New buildings can go on empty land with at least <F>{T.lot_vacant_parcels}</F> vacant parcels; otherwise "infill only". Annotations, never a gate.

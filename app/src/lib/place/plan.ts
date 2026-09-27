@@ -10,8 +10,11 @@
 //   asks (the tract's 2-bedroom asking rent, else the ACS median rent), and the suggestion follows the Market-led test.
 // Household size → the HUD income limit for that many persons and the home size (1 → studio/1-bedroom, 2 → 1-bedroom,
 // 3–4 → 2-bedroom, 5+ → 3-bedroom). Size × age → the CHAS household types counted as "who it serves" (CHAS splits age
-// only at 62). "Largest group here" ('auto', the default) picks, per tract, the largest CHAS renter household type
-// within the chosen bands and age group, and takes size and home size from it (TYPE_SIZE).
+// only at 62; "62+ alone" and "62+ couple" are one CHAS type each and fix the size at 1 and 2). "Any" ('auto', the
+// default) picks, per tract, the largest CHAS renter household type within the chosen bands and age group, and takes
+// size and home size from it (TYPE_SIZE).
+// Flood risk → the most of a tract's land that may sit in FEMA's 1%-a-year (100-year) flood zone: none (0%), 5%, 15%
+// or any.
 import { bandsUpTo, confUsable, limitFor, type Ceiling } from './afford';
 import { bedroomsWord, sumBands, type TargetBand, type TenantProfile, type TenantType } from './bands';
 import { capitalize, fmtDollars, fmtEst, fmtHouseholds, fmtMiles, fmtPct100d1, isNum, joinAnd, NA, roundHalfEven } from './format';
@@ -26,15 +29,17 @@ export type PlanLevel = IncomeLevel | 'market';
 export type FixedSize = 1 | 2 | 3 | 4 | 5;
 /** A size, or 'auto': each tract's largest CHAS renter household type sets it. */
 export type HouseholdSize = FixedSize | 'auto';
-export type AgeGroup = 'any' | 'under62' | 'senior62';
-export type FloodRisk = 'avoid' | 'some' | 'any';
+/** CHAS splits age only at 62: any, under 62, 62 and older, and its two senior types (one person 62+; two people, one 62+). */
+export type AgeGroup = 'any' | 'under62' | 'senior62' | 'senior_alone' | 'senior_couple';
+/** The most land in FEMA's 1%-a-year flood zone the reader accepts: none (0%), up to 5%, up to 15%, or any. */
+export type FloodRisk = 'none' | 'le5' | 'le15' | 'any';
 export type TransitMiles = 0.25 | 0.5 | 1;
 
 export const INCOME_LEVELS: IncomeLevel[] = [30, 50, 80];
 export const PLAN_LEVELS: PlanLevel[] = [30, 50, 80, 'market'];
 export const HOUSEHOLD_SIZES: HouseholdSize[] = ['auto', 1, 2, 3, 4, 5];
-export const AGE_GROUPS: AgeGroup[] = ['any', 'under62', 'senior62'];
-export const FLOOD_RISKS: FloodRisk[] = ['avoid', 'some', 'any'];
+export const AGE_GROUPS: AgeGroup[] = ['any', 'under62', 'senior62', 'senior_alone', 'senior_couple'];
+export const FLOOD_RISKS: FloodRisk[] = ['none', 'le5', 'le15', 'any'];
 export const TRANSIT_MILES: TransitMiles[] = [0.25, 0.5, 1];
 
 export const isAmiLevel = (l: PlanLevel): l is IncomeLevel => l !== 'market';
@@ -45,14 +50,40 @@ export const amiOf = (l: PlanLevel): IncomeLevel => (l === 'market' ? 80 : l);
 export const LEVEL_BAND: Record<PlanLevel, BandId> = { 30: 'le30', 50: 'b30_50', 80: 'b50_80', market: 'gt100' };
 export const LEVEL_LABEL: Record<PlanLevel, string> = { 30: '≤30% AMI', 50: '≤50% AMI', 80: '≤80% AMI', market: 'Market rate' };
 export const levelPhrase = (level: PlanLevel): string => (level === 'market' ? 'above 80% AMI' : `at or below ${level}% AMI`);
-export const SIZE_LABEL: Record<HouseholdSize, string> = { auto: 'Largest group', 1: '1', 2: '2', 3: '3', 4: '4', 5: '5+' };
+export const SIZE_LABEL: Record<HouseholdSize, string> = { auto: 'Any', 1: '1', 2: '2', 3: '3', 4: '4', 5: '5+' };
+/** The ⓘ text for the size control. */
+export const SIZE_INFO = 'Any: homes are sized for the largest household group here (CHAS). 1–5+: people in the household; sets the HUD income limit and the home size.';
 export const sizeWord = (s: HouseholdSize): string => (s === 'auto' ? 'largest group' : s === 5 ? '5+-person' : `${s}-person`);
 /** "1 person", "3 people", "5+ people". */
 export const personsWord = (s: FixedSize): string => (s === 1 ? '1 person' : s === 5 ? '5+ people' : `${s} people`);
-export const AGE_LABEL: Record<AgeGroup, string> = { any: 'Any age', under62: 'Under 62', senior62: '62 and older' };
-export const FLOOD_LABEL: Record<FloodRisk, string> = { avoid: 'Avoid flood zones', some: 'Some is OK', any: 'Any' };
-/** Most of a tract's land that may sit in a FEMA flood zone (percent); null = no limit. */
-export const FLOOD_LIMIT_PCT: Record<FloodRisk, number | null> = { avoid: 5, some: 15, any: null };
+export const AGE_LABEL: Record<AgeGroup, string> = { any: 'Any age', under62: 'Under 62', senior62: '62+', senior_alone: '62+ alone', senior_couple: '62+ couple' };
+/** The age group inside a sentence: "households 62 and older", "households 62+ living alone". Empty for any age. */
+export const AGE_WORDS: Record<AgeGroup, string> = { any: '', under62: 'under 62', senior62: '62 and older', senior_alone: '62+ living alone', senior_couple: '62+ couples' };
+/** The ⓘ text per age option: the CHAS household types it keeps. */
+export const AGE_INFO: Record<AgeGroup, string> = {
+  any: 'Every CHAS household type.',
+  under62: 'Single adults, small and large families (no one 62+ in the 1–2 person types). No senior housing.',
+  senior62: 'Seniors living alone and senior couples (2 people, one 62+).',
+  senior_alone: 'One person 62 or older (CHAS "elderly non-family"). Priced for 1.',
+  senior_couple: 'Two people, one or both 62 or older (CHAS "elderly family"). Priced for 2.',
+};
+/** The CHAS household types each age group keeps (CHAS splits age only at 62). */
+export const AGE_TYPES: Record<AgeGroup, HouseholdType[]> = {
+  any: [...HOUSEHOLD_TYPE_ORDER],
+  under62: ['other', 'small_family', 'large_family'],
+  senior62: ['elderly_alone', 'elderly_family'],
+  senior_alone: ['elderly_alone'],
+  senior_couple: ['elderly_family'],
+};
+/** Age groups that are one CHAS type fix the household size (seniors alone 1, senior couples 2). */
+export const AGE_SIZE: Partial<Record<AgeGroup, FixedSize>> = { senior_alone: 1, senior_couple: 2 };
+/** Any of the 62+ options (senior housing stays allowed). */
+export const isSeniorAge = (a: AgeGroup | undefined): boolean => a === 'senior62' || a === 'senior_alone' || a === 'senior_couple';
+export const FLOOD_LABEL: Record<FloodRisk, string> = { none: 'None', le5: '≤5%', le15: '≤15%', any: 'Any' };
+/** The ⓘ text for the flood control. */
+export const FLOOD_INFO = "Most of the tract's land that may sit in FEMA's 1%-a-year (100-year) flood zone. Above it, no suggestion.";
+/** Most of a tract's land that may sit in FEMA's 1%-a-year flood zone (percent); null = no limit. */
+export const FLOOD_LIMIT_PCT: Record<FloodRisk, number | null> = { none: 0, le5: 5, le15: 15, any: null };
 export const MILES_LABEL: Record<TransitMiles, string> = { 0.25: '¼ mile', 0.5: '½ mile', 1: '1 mile' };
 
 /** The CHAS bands each level reads (market rate: the two bands above 80% AMI). */
@@ -149,9 +180,7 @@ export const TYPE_PERSONS: Record<HouseholdType, string> = {
 };
 /** The types "Largest group here" chooses among, by age group (CHAS splits only at 62). */
 export function autoTypes(age: AgeGroup): HouseholdType[] {
-  if (age === 'senior62') return ['elderly_alone', 'elderly_family'];
-  if (age === 'under62') return ['other', 'small_family', 'large_family'];
-  return [...HOUSEHOLD_TYPE_ORDER];
+  return [...(AGE_TYPES[age] ?? HOUSEHOLD_TYPE_ORDER)];
 }
 
 /** A plan's household, resolved for one place: the size used for the HUD limit and home size, and the CHAS type when 'auto' picked one. */
@@ -180,9 +209,9 @@ export function largestType(p: PlaceMeasures, bands: BandId[], age: AgeGroup): {
   return best && best.count > 0 ? best : null;
 }
 
-/** Resolve 'auto' for one place (explicit sizes pass through). With no eligible type on file, auto prices at 3 people. */
+/** Resolve 'auto' for one place (explicit sizes pass through, unless the age group fixes the size). With no eligible type on file, auto prices at 3 people. */
 export function resolveHousehold(p: PlaceMeasures, bands: BandId[], size: HouseholdSize, age: AgeGroup): ResolvedHousehold {
-  if (size !== 'auto') return { size, auto: false, type: null, count: null };
+  if (size !== 'auto') return { size: AGE_SIZE[age] ?? size, auto: false, type: null, count: null };
   const best = largestType(p, bands, age);
   return best ? { size: TYPE_SIZE[best.type], auto: true, type: best.type, count: best.count } : { size: 3, auto: true, type: null, count: null };
 }
@@ -193,7 +222,7 @@ export function resolveHousehold(p: PlaceMeasures, bands: BandId[], size: Househ
  * 5 or more at any age; other = single adults under 62 and unrelated households.
  */
 export function typesFor(size: HouseholdSize, age: AgeGroup): HouseholdType[] {
-  if (size === 'auto') return autoTypes(age);
+  if (size === 'auto' || AGE_SIZE[age]) return autoTypes(age);
   if (size >= 5) return ['large_family'];
   if (size === 1) return age === 'senior62' ? ['elderly_alone'] : age === 'under62' ? ['other'] : ['elderly_alone', 'other'];
   if (size === 2) return age === 'senior62' ? ['elderly_family'] : age === 'under62' ? ['small_family'] : ['elderly_family', 'small_family'];
@@ -203,6 +232,8 @@ export function typesFor(size: HouseholdSize, age: AgeGroup): HouseholdType[] {
 /** Why a size/age pair maps as it does, when CHAS cannot separate it. */
 export function typesNote(size: HouseholdSize, age: AgeGroup): string | null {
   if (size === 'auto') return null;
+  const fixed = AGE_SIZE[age];
+  if (fixed) return fixed === size ? null : `${AGE_LABEL[age]} sets the size: priced for ${personsWord(fixed)}.`;
   if (size >= 5 && age !== 'any') return 'CHAS counts every household of 5 or more as a large family, whatever the age.';
   if (size >= 3 && size <= 4 && age !== 'any') return 'CHAS counts every family of 3–4 people as a small family, whatever the age.';
   return null;
@@ -217,12 +248,12 @@ const TYPE_BAND_SHORT: Record<TypeBandId, string> = { le30: '≤30%', b30_50: '3
  */
 export function planTenants(p: PlaceMeasures, bands: BandId[], sizeIn: HouseholdSize, age: AgeGroup, phrase: string): TenantProfile {
   if (sizeIn === 'auto') return autoTenants(p, bands, age, phrase);
-  const size = sizeIn;
+  const size: FixedSize = AGE_SIZE[age] ?? sizeIn;
   const tbs = Array.from(new Set(bands.map((b) => TYPE_BAND[b])));
   const bedrooms = sizeBedrooms(size);
-  const seniorAlone = size === 1 && age === 'senior62';
+  const seniorAlone = size === 1 && isSeniorAge(age);
   const keep = typesFor(size, age);
-  const who = `${sizeWord(size)} households${age === 'any' ? '' : age === 'senior62' ? ' 62 and older' : ' under 62'}`;
+  const who = `${sizeWord(size)} households${AGE_WORDS[age] ? ` ${AGE_WORDS[age]}` : ''}`;
   const anyNum = tbs.some((tb) => keep.some((t) => isNum(p?.types?.[tb]?.[t])));
   if (!anyNum) return { types: [], bedrooms, seniorAlone, sentence: `CHAS household types ${phrase} are ${NA}.`, available: false };
   const types: TenantType[] = [];
@@ -247,7 +278,7 @@ export function planTenants(p: PlaceMeasures, bands: BandId[], sizeIn: Household
 function autoTenants(p: PlaceMeasures, bands: BandId[], age: AgeGroup, phrase: string): TenantProfile {
   const tbs = Array.from(new Set(bands.map((b) => TYPE_BAND[b])));
   const keep = autoTypes(age);
-  const ageWords = age === 'any' ? '' : age === 'senior62' ? ' 62 and older' : ' under 62';
+  const ageWords = AGE_WORDS[age] ? ` ${AGE_WORDS[age]}` : '';
   const totals = typeTotals(p, bands, keep);
   const best = largestType(p, bands, age);
   if (!totals) return { types: [], bedrooms: 2, seniorAlone: false, sentence: `CHAS household types ${phrase} are ${NA}.`, available: false };
@@ -305,10 +336,12 @@ export interface FloodCheck {
 export function floodCheck(p: PlaceMeasures, risk: FloodRisk): FloodCheck {
   const limit = FLOOD_LIMIT_PCT[risk];
   const pct = isNum(p?.flood?.fema_sfha_pct) ? p.flood.fema_sfha_pct : null;
+  const lim = limit === 0 ? 'none (0%)' : `${limit}%`;
   if (limit == null) return { blocked: false, limit, pct, sentence: pct == null ? `FEMA flood-zone share ${NA}; you set no flood limit.` : `${fmtPct100d1(pct)} of the land is in a FEMA flood zone; you set no flood limit.` };
-  if (pct == null) return { blocked: false, limit, pct, sentence: `FEMA flood-zone share ${NA}, so your ${limit}% limit cannot be checked here.` };
-  return pct > limit
-    ? { blocked: true, limit, pct, sentence: `${fmtPct100d1(pct)} of the land is in a FEMA flood zone (above your limit of ${limit}%).` }
+  if (pct == null) return { blocked: false, limit, pct, sentence: `FEMA flood-zone share ${NA}, so your ${lim} limit cannot be checked here.` };
+  if (pct > limit) return { blocked: true, limit, pct, sentence: `${fmtPct100d1(pct)} of the land is in a FEMA flood zone (above your limit of ${lim}).` };
+  return limit === 0
+    ? { blocked: false, limit, pct, sentence: 'None of the land is in a FEMA flood zone, within your limit of none (0%).' }
     : { blocked: false, limit, pct, sentence: `${fmtPct100d1(pct)} of the land is in a FEMA flood zone, within your limit of ${limit}% (${limit}% − ${fmtPct100d1(pct)} = ${(limit - pct).toFixed(1)} points to spare).` };
 }
 
