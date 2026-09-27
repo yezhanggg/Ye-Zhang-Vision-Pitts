@@ -8,7 +8,7 @@ import { InfoTip, SlideBg, useSlide } from '../primitives';
 import { useApp } from '../../lib/store';
 import { hud } from '../../lib/place/data';
 import {
-  AGE_GROUPS, AGE_INFO, AGE_LABEL, FLOOD_INFO, FLOOD_LABEL, FLOOD_RISKS, HOUSEHOLD_SIZES, LEVEL_LABEL, MILES_LABEL, PLAN_LEVELS, SIZE_INFO, SIZE_LABEL,
+  AGE_CONTROL_INFO, AGE_GROUPS, AGE_INFO, AGE_SHORT, FLOOD_INFO, FLOOD_LABEL, FLOOD_RISKS, HOUSEHOLD_SIZES, LEVEL_LABEL, MILES_LABEL, PLAN_LEVELS, SIZE_INFO, SIZE_LABEL,
   TRANSIT_MILES, ceilingForSize, personsWord, type HouseholdSize, type PlanLevel,
 } from '../../lib/place/plan';
 import { usePlan } from '../../lib/place/planStore';
@@ -65,19 +65,10 @@ export default function PlanInputs() {
         options={AGE_GROUPS}
         value={age}
         onChange={(v) => setPlan({ age: v })}
-        text={(v) => AGE_LABEL[v]}
-        cols={3}
+        text={(v) => AGE_SHORT[v] ?? String(v)}
+        cols={4}
         tip={(v) => AGE_INFO[v]}
-        info={
-          <span className="block space-y-0.5">
-            {AGE_GROUPS.map((a) => (
-              <span key={a} className="block">
-                <b>{AGE_LABEL[a]}</b>: {AGE_INFO[a]}
-              </span>
-            ))}
-            <span className="block text-slate-300">CHAS splits age only at 62.</span>
-          </span>
-        }
+        info={AGE_CONTROL_INFO}
       />
       <div>
         <Segmented label="Income level" options={PLAN_LEVELS} value={level} onChange={(v) => setPlan({ level: v })} text={(v) => LEVEL_LABEL[v]} cols={2} />

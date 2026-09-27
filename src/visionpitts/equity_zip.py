@@ -84,10 +84,10 @@ def _num(v) -> float | None:
     return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and v == v else None
 
 
-def burdened(p: dict | None, bands: tuple[str, ...]) -> float | None:
-    """Sum of bands.<id>.burden30 over `bands`, or None when any is missing."""
+def burdened(p: dict | None, bands: tuple[str, ...], field: str = "burden30") -> float | None:
+    """Sum of bands.<id>.<field> (burden30, or hh for all renters) over `bands`, or None when any is missing."""
     got = (p or {}).get("bands") or {}
-    xs = [_num((got.get(b) or {}).get("burden30")) for b in bands]
+    xs = [_num((got.get(b) or {}).get(field)) for b in bands]
     return None if any(x is None for x in xs) else float(sum(x for x in xs if x is not None))
 
 
@@ -98,6 +98,8 @@ def aggregate(xw: pd.DataFrame, zip_total: pd.Series, place: dict[str, dict], re
     rents_by = {} if rents is None else {str(r["GEOID"]).zfill(5): r for _, r in rents.iterrows()}
     out: dict[str, dict] = {}
     groups = {str(z): g for z, g in xw.groupby("zcta")}
+    # each tract's main ZIP: the one holding most of its 2020 homes (ties: the first ZIP in code order)
+    main_zip = xw.sort_values(["tract", "hu", "zcta"], ascending=[True, False, True]).drop_duplicates("tract").set_index("tract")["zcta"].astype(str)
     for z in sorted(set(groups) | set(all_zips or [])):
         g = groups.get(z, xw.iloc[0:0])
         city_hu = float(g["hu"].sum())
@@ -107,6 +109,7 @@ def aggregate(xw: pd.DataFrame, zip_total: pd.Series, place: dict[str, dict], re
             "share": round(min(1.0, city_hu / total), 3) if total else 0.0,
             "n": int(len(g)),
             "t": {t: round(float(w), 3) for t, w in zip(g["tract"], g["w"])},
+            "main": sorted(t for t in g["tract"] if main_zip.get(t) == z),
         }
         rec["edge"] = rec["share"] < EDGE_SHARE
         b: dict[str, int | None] = {}
@@ -115,6 +118,12 @@ def aggregate(xw: pd.DataFrame, zip_total: pd.Series, place: dict[str, dict], re
             have = [v * w for v, w in parts if v is not None]
             b[lvl] = int(round(sum(have))) if have else None
         rec["burdened"] = b
+        rn: dict[str, int | None] = {}
+        for lvl, ids in BURDEN_LEVELS.items():
+            parts = [(burdened(place.get(t), ids, "hh"), w) for t, w in zip(g["tract"], g["w"])]
+            have = [v * w for v, w in parts if v is not None]
+            rn[lvl] = int(round(sum(have))) if have else None
+        rec["renters"] = rn
         for key, (block, field, nd) in MEANS.items():
             num = den = 0.0
             for t, hu in zip(g["tract"], g["hu"]):
@@ -138,16 +147,25 @@ def aggregate(xw: pd.DataFrame, zip_total: pd.Series, place: dict[str, dict], re
 def compact(zips: dict[str, dict]) -> dict[str, dict]:
     """The bundled form, as small as possible: h city homes, p share of the ZIP's homes in the city, t city tracts
     (county tract codes as integers, most of the tract inside the ZIP first), b burdened renters at 30/50/80/100,
-    j jobs, s school mi, tr transit mi, sv services, a the 2-bedroom asking rent (only when high or medium confidence).
+    j jobs, s school mi, tr transit mi, sv services, a the 2-bedroom asking rent (only when high or medium confidence),
+    m the positions in t of the tracts whose main ZIP (most of their 2020 homes) this is, r renter households at
+    30/50/80/100 (same weighting as b).
     Missing values are left out; edge ZIPs are p < 0.5; the SAFMR stays in hud_2026.json."""
     out: dict[str, dict] = {}
     for z, r in zips.items():
         c: dict = {"h": r["hu"], "p": r["share"]}
         if r["t"]:
-            c["t"] = [int(t[5:]) for t, _ in sorted(r["t"].items(), key=lambda kv: -kv[1])]
+            order = [t for t, _ in sorted(r["t"].items(), key=lambda kv: -kv[1])]
+            c["t"] = [int(t[5:]) for t in order]
+            main = set(r.get("main") or [])
+            if main:
+                c["m"] = [i for i, t in enumerate(order) if t in main]
         b = [r["burdened"][k] for k in BURDEN_LEVELS]
         if any(v is not None for v in b):
             c["b"] = b
+        rn = [(r.get("renters") or {}).get(k) for k in BURDEN_LEVELS]
+        if any(v is not None for v in rn):
+            c["r"] = rn
         for key, short in (("jobs", "j"), ("school", "s"), ("transit", "tr"), ("services", "sv")):
             if r[key] is not None:
                 c[short] = r[key]

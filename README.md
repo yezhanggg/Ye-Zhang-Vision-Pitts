@@ -7,7 +7,7 @@ VisionPitts is a free, map-based tool about housing in Pittsburgh and Allegheny 
 Solo entry for the **AI Horizons 2026 · AI for Housing Hackathon**, Track 3 (Housing Typology, Equity & Climate Matchmaker).
 
 - **Try it:** [ye-zhang-vision-pitts.vercel.app](https://ye-zhang-vision-pitts.vercel.app)
-- **Demo video:** link added at submission
+- **Demo video:** [watch on Google Drive](https://drive.google.com/drive/folders/1sGpKEhHjHAfOVwkX1uGUhARW7VnUAS8f?usp=sharing) (a copy is also in this repository)
 - **No internet needed:** double-click `export/index.html` for a one-file copy of the tool
 - **Technical notes:** [docs/TECHNICAL.md](docs/TECHNICAL.md) (how to rebuild the data, every source, the method)
 

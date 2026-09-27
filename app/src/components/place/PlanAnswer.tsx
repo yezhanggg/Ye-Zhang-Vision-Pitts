@@ -14,6 +14,7 @@ import { fmtDollars, fmtHouseholds, fmtPct100d1, isNum, roundHalfEven } from "..
 import {
   AGE_LABEL,
   AGE_WORDS,
+  isAgeBracket,
   LEVEL_LABEL,
   PLAN_TYPE_LABEL,
   PLAN_TYPE_SHORT,
@@ -101,7 +102,7 @@ export default function PlanAnswer({
   const m = rec.market;
   const mr = rec.marketRent;
   const flood = rec.floodLimit;
-  const ageWord = age === "any" ? "" : `, ${AGE_LABEL[age]}`;
+  const ageWord = age === "any" ? "" : `, ${isAgeBracket(age) ? AGE_WORDS[age] : (AGE_LABEL[age] ?? "")}`;
   // 'auto': the size this place's largest group sets (rec.household); explicit sizes pass through.
   const auto = size === "auto";
   const autoType = auto ? (rec.household?.type ?? null) : null;
@@ -128,10 +129,15 @@ export default function PlanAnswer({
         )
       : null;
 
+  // The reader's householder age bracket: its renter householders here, all incomes (ACS), beside the CHAS counts.
+  const ab = rec.ageBracket;
+  const ageLine = ab ? `${ab.label}: ${ab.renters != null ? fmtHouseholds(ab.renters) : "not available"} renter householders here, all incomes (ACS 2020–2024). The counts by income use CHAS ${AGE_WORDS[age] || "all ages"}.` : "";
+
   // The long form, for the fold: every sentence the rules wrote, plus the size rule and caveats.
   const details: string[] = [
     rec.band.reason,
     rec.tenants.sentence,
+    ageLine,
     atMarket
       ? `Rent: ${mr.words}. No HUD rent ceiling applies above 80% AMI; the market rent is the price.${floor80 != null && isNum(l80) ? ` A ${sizeWord(eff)} household above 80% AMI earns more than ${fmtDollars(l80)}, so 30% of income is more than ${fmtDollars(l80)} × 30% ÷ 12 = ${fmtDollars(floor80)} a month.` : ""}`
       : price
@@ -146,7 +152,7 @@ export default function PlanAnswer({
     DECIDE,
   ].filter(Boolean);
 
-  const context = [STANCE_LABEL[rec.stance], auto ? "" : personsWord(size as FixedSize), age === "any" ? "" : AGE_LABEL[age], LEVEL_LABEL[level]].filter(Boolean).join(" · ");
+  const context = [STANCE_LABEL[rec.stance], auto ? "" : personsWord(size as FixedSize), age === "any" ? "" : (AGE_LABEL[age] ?? ""), LEVEL_LABEL[level]].filter(Boolean).join(" · ");
   const over = m.askingUsed != null && two ? m.askingUsed - two.rent : null;
 
   return (
@@ -233,11 +239,18 @@ export default function PlanAnswer({
           <Row
             k="Serves"
             info={
-              marketLedView && lead
-                ? `Households ${servesWords ?? "the market price reaches"}; not the ${fmtHouseholds(tenantTotal)} ${tenantWords} ${levelShort(level)}.`
-                : autoType
-                  ? `The largest group here: ${PLAN_TYPE_LABEL[autoType]} ${levelShort(level)} (HUD CHAS renter households).`
-                  : "HUD CHAS renter households of this size and age."
+              <>
+                {marketLedView && lead
+                  ? `Households ${servesWords ?? "the market price reaches"}; not the ${fmtHouseholds(tenantTotal)} ${tenantWords} ${levelShort(level)}.`
+                  : autoType
+                    ? `The largest group here: ${PLAN_TYPE_LABEL[autoType]} ${levelShort(level)} (HUD CHAS renter households).`
+                    : "HUD CHAS renter households of this size and age."}
+                {ab && (
+                  <span className="mt-1 block">
+                    {ab.label}: <b>{ab.renters != null ? fmtHouseholds(ab.renters) : "not available"}</b> renter householders here, all incomes (ACS). CHAS splits age only at 62, so the count above uses {AGE_WORDS[age] || "all ages"}.
+                  </span>
+                )}
+              </>
             }
           >
             {marketLedView && lead ? (
@@ -248,6 +261,11 @@ export default function PlanAnswer({
               </>
             )}
           </Row>
+          {ab && (
+            <Row k="Age" info={`Renter householders aged ${ab.label.replace(/^Age /, "")}, all incomes (ACS 2020–2024, table B25007). Not limited to the income level: the census does not cross householder age with income here.`}>
+              <B>{ab.renters != null ? fmtHouseholds(ab.renters) : "n/a"}</B> renters {ab.label.replace(/^Age /, "")} · all incomes
+            </Row>
+          )}
           <Row
             k="Market"
             info={

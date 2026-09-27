@@ -77,7 +77,7 @@ export default function PlanningInputsDetails() {
           </ul>
         </Item>
         <Item title="Age group">
-          <p>Chooses which CHAS household types count. {AGE_NOTE}</p>
+          <p>Age of the householder, in census brackets (ACS 2020–2024, table B25007). Under 18 is not shown: householders under 15 are not counted and 15–17 are rare, so the youngest bracket is 15–24. The bracket chooses which CHAS household types count. {AGE_NOTE}</p>
           <ul className="ml-3 list-disc space-y-0.5">
             {AGE_GROUPS.map((a) => (
               <li key={a}>
@@ -85,7 +85,7 @@ export default function PlanningInputsDetails() {
               </li>
             ))}
           </ul>
-          <p>62+ alone and 62+ couple fix the household size (1 and 2 people). With a size of 3 or more, CHAS counts every family of 3–4 people as a small family and every household of 5 or more as a large family, whatever the age. Senior housing is never suggested for Under 62.</p>
+          <p>With a size of 3 or more, CHAS counts every family of 3–4 people as a small family and every household of 5 or more as a large family, whatever the age. Senior housing is never suggested for brackets under 65 (15–24 to 55–64); 65–74 and 75+ allow it. The answer card also shows the bracket's renter householders here, all incomes (ACS): the census does not cross householder age with income by tract.</p>
         </Item>
         <Item title="Homes needed (optional)">
           <p>N homes reach min(N, Q) of the Q qualifying renter households here (min(N, Q) ÷ Q = share served); homes beyond Q are "to spare".</p>

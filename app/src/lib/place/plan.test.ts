@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FIXTURE_CITY_MEDIAN_VALUE, FIXTURE_HUD as hud, HAZELWOOD, HOMEWOOD_NORTH, SQUIRREL_HILL_NORTH, ZERO_PLACE } from './fixture';
 import {
-  amiOf, ceilingForSize, floodCheck, homesLines, largestType, levelIncomeLine, levelTarget, marketRent, planTenants, resolveHousehold, sizeBedrooms, sizeIncomeLine, transitTestMiles, typesFor, typesNote, AGE_GROUPS, AGE_LABEL, AGE_TYPES, FLOOD_LABEL, FLOOD_LIMIT_PCT, FLOOD_RISKS, HOUSEHOLD_SIZES, SIZE_LABEL,
+  amiOf, ceilingForSize, floodCheck, homesLines, largestType, levelIncomeLine, levelTarget, marketRent, planTenants, resolveHousehold, sizeBedrooms, sizeIncomeLine, transitTestMiles, typesFor, typesNote, bracketLine, bracketRenters, chasAge, isSeniorAge, AGE_GROUPS, AGE_LABEL, AGE_SHORT, AGE_TYPES, FLOOD_LABEL, FLOOD_LIMIT_PCT, FLOOD_RISKS, HOUSEHOLD_SIZES, SIZE_LABEL,
 } from './plan';
 import { CLIMATE_WHY, climateTest, recommend, type Recommendation } from './recommend';
 import { suggestAll } from './suggest';
@@ -46,15 +46,44 @@ describe('age × size → CHAS household type', () => {
     expect(typesFor(2, 'any')).toEqual(['elderly_family', 'small_family']);
   });
 
-  it('five age options, each keeping the CHAS types it can support', () => {
-    expect(AGE_GROUPS).toEqual(['any', 'under62', 'senior62', 'senior_alone', 'senior_couple']);
-    expect(AGE_GROUPS.map((a) => AGE_LABEL[a])).toEqual(['Any age', 'Under 62', '62+', '62+ alone', '62+ couple']);
+  it('age brackets: Any and seven householder brackets, each on its side of 62', () => {
+    expect(AGE_GROUPS).toEqual(['any', 'a15_24', 'a25_34', 'a35_44', 'a45_54', 'a55_64', 'a65_74', 'a75plus']);
+    expect(AGE_GROUPS.map((a) => AGE_SHORT[a])).toEqual(['Any', '15–24', '25–34', '35–44', '45–54', '55–64', '65–74', '75+']);
+    for (const a of ['a15_24', 'a25_34', 'a35_44', 'a45_54', 'a55_64'] as const) {
+      expect(chasAge(a)).toBe('under62');
+      expect(AGE_TYPES[a]).toEqual(['other', 'small_family', 'large_family']);
+      expect(isSeniorAge(a)).toBe(false);
+    }
+    for (const a of ['a65_74', 'a75plus'] as const) {
+      expect(chasAge(a)).toBe('senior62');
+      expect(AGE_TYPES[a]).toEqual(['elderly_alone', 'elderly_family']);
+      expect(isSeniorAge(a)).toBe(true);
+    }
+    expect(typesFor(1, 'a25_34')).toEqual(['other']);
+    expect(typesFor(2, 'a75plus')).toEqual(['elderly_family']);
+    expect(chasAge('bogus' as never)).toBe('any');
+    for (const a of AGE_GROUPS) expect(typesFor('auto', a)).toEqual(AGE_TYPES[a]);
+  });
+
+  it("the bracket's renter householders (ACS, all incomes) read from renter_age", () => {
+    const p = { ...HAZELWOOD, renter_age: [39, 85, 134, 64, 70, 196, 88] };
+    expect(bracketRenters(p, 'a65_74')).toBe(196);
+    expect(bracketRenters(p, 'a15_24')).toBe(39);
+    expect(bracketRenters(p, 'any')).toBeNull();
+    expect(bracketRenters(HAZELWOOD, 'a25_34')).toBeNull();
+    expect(bracketLine(p, 'a55_64')).toBe('70 renter householders aged 55–64 here (all incomes, ACS 2020–2024).');
+    const r = recommend(p, hud, 'anti_displacement', { ...base, level: 30, size: 'auto', age: 'a75plus' });
+    expect(r.ageBracket).toEqual({ label: 'Age 75+', renters: 88 });
+    expect(recommend(p, hud, 'anti_displacement', { ...base, level: 30, size: 'auto', age: 'any' }).ageBracket).toBeNull();
+  });
+
+  it('older CHAS-only age values still work', () => {
+    expect(AGE_LABEL.under62).toBe('Under 62');
     expect(AGE_TYPES.any).toHaveLength(5);
     expect(AGE_TYPES.under62).toEqual(['other', 'small_family', 'large_family']);
     expect(AGE_TYPES.senior62).toEqual(['elderly_alone', 'elderly_family']);
     expect(AGE_TYPES.senior_alone).toEqual(['elderly_alone']);
     expect(AGE_TYPES.senior_couple).toEqual(['elderly_family']);
-    for (const a of AGE_GROUPS) expect(typesFor('auto', a)).toEqual(AGE_TYPES[a]);
   });
 
   it('62+ alone and 62+ couple fix the size (1 and 2) whatever size is chosen', () => {
@@ -186,6 +215,19 @@ describe('recommend with planning inputs (Hazelwood)', () => {
     expect(couple.household?.size).toBe(2);
     expect(couple.tenants.types.every((t) => t.type === 'elderly_family')).toBe(true);
     expect(couple.not.some((n) => n.typology === 'senior' && n.because.includes('under 62'))).toBe(false);
+  });
+
+  it('brackets under 65 remove senior housing; 65–74 and 75+ use the senior types and allow it', () => {
+    for (const age of ['a15_24', 'a25_34', 'a35_44', 'a45_54', 'a55_64'] as const) {
+      const r = recommend(HAZELWOOD, hud, 'anti_displacement', { ...base, level: 30, size: 1, age });
+      expect(r.types.map((t) => t.typology)).not.toContain('senior');
+      expect(r.tenants.types.every((t) => t.type === 'other')).toBe(true);
+    }
+    const old = recommend(HAZELWOOD, hud, 'anti_displacement', { ...base, level: 30, size: 1, age: 'a65_74' });
+    const ref = recommend(HAZELWOOD, hud, 'anti_displacement', { ...base, level: 30, size: 1, age: 'senior62' });
+    expect(old.types).toEqual(ref.types);
+    expect(old.tenants.types).toEqual(ref.tenants.types);
+    expect(old.not.some((n) => n.typology === 'senior')).toBe(false);
   });
 
   it('under 62: senior housing is never suggested', () => {

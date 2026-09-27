@@ -99,6 +99,8 @@ export interface PlaceMeasures {
   zoning: PlaceZoning | null;
   programs: PlacePrograms;
   displacement: { score: number | null; conf: Conf | null };
+  /** Renter householders by age (ACS 2020–2024 B25007, all incomes): 15–24, 25–34, 35–44, 45–54, 55–64, 65–74, 75+. */
+  renter_age?: (number | null)[] | null;
 }
 
 /** HUD FY2026 income limits for the Pittsburgh HMFA, by household size (index 0 = 1 person … 7 = 8 persons), and FMR / SAFMR by bedrooms (index 0 = studio … 4 = 4BR). */

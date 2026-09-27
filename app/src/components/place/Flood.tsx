@@ -22,7 +22,7 @@ export default function Flood({ place, t }: { place: PlaceMeasures; t: TractProp
       {word ? (
         <>
           <span className={`mr-1.5 inline-block rounded-full px-2 py-px text-caption font-semibold ring-1 ${WORD_TONE[word]}`}>{WORD_TEXT[word]}</span>
-          <b className="text-slate-900">{pct(f.fema_sfha_pct as number, 1)}</b> of the land is in a FEMA special flood hazard area{f.fema_zone ? ` (zone ${f.fema_zone})` : ''}.
+          <b className="text-slate-900">{pct(f.fema_sfha_pct as number, 1)}</b> of the land is in a FEMA special flood hazard area (FEMA's 1%-a-year, or 100-year, flood zone){f.fema_zone ? ` (zone ${f.fema_zone})` : ''}.
         </>
       ) : (
         <>FEMA flood-zone share: {NA} for this tract.</>

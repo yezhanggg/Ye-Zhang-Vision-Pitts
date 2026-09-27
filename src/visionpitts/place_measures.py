@@ -124,6 +124,12 @@ ACS_CURRENT = 2024                     # vintage behind acs_tract.csv
 ACS_FILL_YEARS = (2023, 2022, 2021, 2020)  # earlier 5-year vintages on 2020 tract geography, most recent first
 CENSUS_2BR_VARS = ("B25031_004E", "B25031_004M")  # median gross rent, 2 bedrooms, renter-occupied units paying cash rent
 CENSUS_2BR_CACHE = ACS_RAW_DIR / f"acs5_{ACS_CURRENT}_tract_b25031_2br.csv"
+# B25007 tenure by age of householder, renter-occupied: 013 15-24, 014 25-34, 015 35-44, 016 45-54, 017 55-59,
+# 018 60-64, 019 65-74, 020 75-84, 021 85+. place.json keeps 7 brackets: 55-64 = 017+018, 75+ = 020+021.
+RENTER_AGE_VARS = tuple(f"B25007_{i:03d}E" for i in range(13, 22))
+RENTER_AGE_BRACKETS = ("15_24", "25_34", "35_44", "45_54", "55_64", "65_74", "75plus")
+RENTER_AGE_SUMS = ((13,), (14,), (15,), (16,), (17, 18), (19,), (20, 21))
+RENTER_AGE_CACHE = ACS_RAW_DIR / f"acs5_{ACS_CURRENT}_tract_b25007_renter_age.csv"
 
 TRACTS_CSV = PROCESSED / "tracts.csv"
 ACS_TRACT_CSV = PROCESSED / "acs_tract.csv"
@@ -434,6 +440,31 @@ def census_2br(refresh: bool = False, cache: Path | None = None) -> pd.DataFrame
     raw = pd.read_csv(path, dtype=str).set_index("GEOID")
     clean_ = _clean_estimates(raw[list(CENSUS_2BR_VARS)])
     return clean_.rename(columns={"B25031_004E": "census_2br", "B25031_004M": "census_2br_moe"})
+
+
+def renter_age(refresh: bool = False, cache: Path | None = None) -> pd.DataFrame:
+    """ACS 2020-2024 B25007 renter-occupied households by age of householder for Allegheny County tracts, fetched once
+    from the Census API and cached raw under data/raw/acs/ (git-ignored). Columns renter_age_<bracket> for the 7
+    RENTER_AGE_BRACKETS (55-64 and 75+ are sums of two ACS cells); a suppressed cell leaves its bracket NaN."""
+    from visionpitts import acs_levels as al  # request_rows redacts the key from every message
+
+    path = cache or RENTER_AGE_CACHE
+    if refresh or not path.exists():
+        from visionpitts.config import CENSUS_API_KEY, COUNTY_FIPS, STATE_FIPS
+
+        params = {"get": ",".join(RENTER_AGE_VARS), "for": "tract:*", "in": f"state:{STATE_FIPS} county:{COUNTY_FIPS}"}
+        if CENSUS_API_KEY:
+            params["key"] = CENSUS_API_KEY
+        rows = al.request_rows(requests.Session(), params, url=f"https://api.census.gov/data/{ACS_CURRENT}/acs/acs5")
+        raw = al.rows_to_frame(rows, "tract")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        raw.to_csv(path, index_label="GEOID")
+    raw = pd.read_csv(path, dtype=str).set_index("GEOID")
+    est = _clean_estimates(raw[list(RENTER_AGE_VARS)])
+    out = pd.DataFrame(index=est.index)
+    for name, cells in zip(RENTER_AGE_BRACKETS, RENTER_AGE_SUMS):
+        out[f"renter_age_{name}"] = est[[f"B25007_{i:03d}E" for i in cells]].sum(axis=1, min_count=len(cells))
+    return out
 
 
 def market(tr: pd.DataFrame, acs: pd.DataFrame, nbrs: dict[str, list[str]], safmr: dict | None,
@@ -1097,6 +1128,9 @@ def to_place_json(df: pd.DataFrame, rules: dict | None = None) -> dict:
             "programs": {k: _bool(get(k)) for k in ("qct", "dda", "oz", "cdbg")},
             "displacement": {"score": _num(get("displacement_score"), 4), "conf": _str(get("displacement_conf"))},
         }
+        # renter householders by age (ACS B25007, all incomes), RENTER_AGE_BRACKETS order; null until built
+        ages = [_int(get(f"renter_age_{k}")) for k in RENTER_AGE_BRACKETS]
+        out[str(g)]["renter_age"] = None if all(v is None for v in ages) else ages
     return out
 
 
@@ -1118,7 +1152,7 @@ def to_hud_json(limits: dict | None, safmr: dict | None, fy: int = 2026, city: d
     return {"metro": metro, "safmr": dict(sorted((safmr or {}).get("safmr", {}).items())), "city": city or {"sale_median": None, "sale_n": None}}
 
 
-PLACE_KEYS = ["renter_hh", "bands", "types", "market", "stock", "transit", "access", "flood", "zoning", "land_use", "programs", "displacement"]
+PLACE_KEYS = ["renter_hh", "bands", "types", "market", "stock", "transit", "access", "flood", "zoning", "land_use", "programs", "displacement", "renter_age"]
 
 
 def coverage(place: dict) -> dict[str, int]:

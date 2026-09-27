@@ -7,7 +7,7 @@ from visionpitts.config import APP_DATA
 
 
 def _bands(le30, b30_50, b50_80, b80_100, gt100):
-    return {k: {"burden30": v} for k, v in zip(["le30", "b30_50", "b50_80", "b80_100", "gt100"], [le30, b30_50, b50_80, b80_100, gt100])}
+    return {k: {"burden30": v, "hh": 2 * v} for k, v in zip(["le30", "b30_50", "b50_80", "b80_100", "gt100"], [le30, b30_50, b50_80, b80_100, gt100])}
 
 
 def _blocks():
@@ -57,6 +57,9 @@ def test_tract_split_across_two_zips():
     assert two["school"] == 0.5
     assert two["transit"] == round((0.2 * 40 + 0.8 * 50) / 90, 2)
     assert one["jobs"] == 1000 and one["n"] == 1 and two["n"] == 2
+    # each tract is listed under its main ZIP (most of its homes): A 60 of 100 in 11111, B all in 22222
+    assert one["renters"]["30"] == 2 * 100 * 0.6 and two["renters"]["100"] == 2 * round(20 * 0.4 + 10)
+    assert one["main"] == ["A"] and two["main"] == ["B"] and z["33333"]["main"] == []
     # share of the ZIP's homes in the city; under half is an edge ZIP
     assert one["share"] == 1.0 and not one["edge"]
     assert two["hu"] == 90 and two["share"] == 0.45 and two["edge"]
@@ -77,6 +80,7 @@ def test_compact_form_is_short_and_drops_missing():
            "jobs": 3000, "school": None, "transit": 0.53, "services": 4.1, "asking_2br": 1500, "asking_n": 30, "asking_conf": "low", "safmr_2br": 1300}
     c = ez.compact({"22222": rec})["22222"]
     assert c == {"h": 90, "p": 0.45, "t": [20300, 100], "b": [50, 70, 90, None], "j": 3000, "tr": 0.53, "sv": 4.1}
+    assert ez.compact({"22222": {**rec, "main": ["42003020300"]}})["22222"]["m"] == [0]
 
 
 def test_bundled_file_is_small_and_consistent():

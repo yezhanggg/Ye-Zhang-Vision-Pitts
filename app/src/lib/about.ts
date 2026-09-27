@@ -57,7 +57,7 @@ export const LIMITS: { title: string; items: string[] }[] = [
       'Eviction counts come by ZIP code and are split among neighborhoods by how many homes each has, so they are estimates. We lower our confidence where a neighborhood sits across several ZIP codes and none holds at least 80% of it.',
       'The government hides housing-voucher counts where 10 or fewer families hold one (33 of the 114 ranked tracts), so the risk of being pushed out rests on less information there.',
       'The housing-market study only tells us whether a market got stronger or weaker, not by how much, and 20 city neighborhoods have no market rating (mostly parks and industrial land).',
-      'The flood measure looks at how low the ground is, not at official flood maps, and it misses flooding from storms and overflowing sewers. Our confidence is medium at best, and low in the 14 tracts where more than half the land reads as flooded.',
+      'The flood measure looks at how low the ground is (a terrain screen, not FEMA maps); the Place panel also shows the share of land in the FEMA 100-year flood zone, and it misses flooding from storms and overflowing sewers. Our confidence is medium at best, and low in the 14 tracts where more than half the land reads as flooded.',
       'Transit counts how often buses and the T are scheduled nearby, not whether they run on time. To stop a nearly empty neighborhood from ranking first, households are floored at 400.',
       'The count of renters with low incomes includes students, and nothing adjusts for that. For a sense of scale: the 50% income limit for a family of four in the Pittsburgh area is $55,200 a year.',
       'The share of residents aged 65 and over shows where older people live now, not how many more homes they need.',

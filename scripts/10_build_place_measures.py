@@ -73,12 +73,15 @@ def main() -> None:
     safmr = step("HUD FMR / SAFMR (API)", pm.hud_safmr, failures, 2026, args.refresh)
     older = step("ACS 2020-2023 vintages on disk (fill null 2024 rent / value)", pm.acs_older_vintages, failures)
     rent2br = step("ACS B25031 2-bedroom gross rent (API, cached)", pm.census_2br, failures, args.refresh)
+    ages = step("ACS B25007 renter householders by age (API, cached)", pm.renter_age, failures, args.refresh)
     mkt = step("market", pm.market, failures, tr, acs, nbrs, safmr, older, rent2br)
     stk = step("stock (ACS shares)", pm.stock, failures, acs, geoids)
     tra = step("transit (GTFS + 2020 blocks)", pm.transit_measures, failures, tracts)
     acc = step("access (LODES jobs, NCES schools, OSM services + 2020 blocks)", pm.access_measures, failures, tracts)
     hand = step("flood (HAND)", pm.hand_share, failures, geoids)
-    for p in (bands, types, mkt, stk):
+    if ages is not None:
+        ages = ages.reindex(geoids)
+    for p in (bands, types, mkt, stk, ages):
         if p is not None:
             parts.append(p)
     if tra is not None:

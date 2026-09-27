@@ -9,8 +9,10 @@
 //   Market rate → the 80–100% and >100% bands (CHAS types read ">80%"); no HUD ceiling: the price is what the market
 //   asks (the tract's 2-bedroom asking rent, else the ACS median rent), and the suggestion follows the Market-led test.
 // Household size → the HUD income limit for that many persons and the home size (1 → studio/1-bedroom, 2 → 1-bedroom,
-// 3–4 → 2-bedroom, 5+ → 3-bedroom). Size × age → the CHAS household types counted as "who it serves" (CHAS splits age
-// only at 62; "62+ alone" and "62+ couple" are one CHAS type each and fix the size at 1 and 2). "Any" ('auto', the
+// 3–4 → 2-bedroom, 5+ → 3-bedroom). Size × age → the CHAS household types counted as "who it serves". The age input
+// is a householder age bracket (ACS B25007: 15–24 … 75+); CHAS splits age only at 62, so each bracket maps onto a
+// CHAS age group (AGE_CHAS: under-62 brackets and 55–64 → under 62; 65–74 and 75+ → 62+). The older CHAS-only values
+// ('under62', 'senior62', "62+ alone", "62+ couple") still work; the last two fix the size at 1 and 2. "Any" ('auto', the
 // default) picks, per tract, the largest CHAS renter household type within the chosen bands and age group, and takes
 // size and home size from it (TYPE_SIZE).
 // Flood risk → the most of a tract's land that may sit in FEMA's 1%-a-year (100-year) flood zone: none (0%), 5%, 15%
@@ -29,8 +31,12 @@ export type PlanLevel = IncomeLevel | 'market';
 export type FixedSize = 1 | 2 | 3 | 4 | 5;
 /** A size, or 'auto': each tract's largest CHAS renter household type sets it. */
 export type HouseholdSize = FixedSize | 'auto';
-/** CHAS splits age only at 62: any, under 62, 62 and older, and its two senior types (one person 62+; two people, one 62+). */
-export type AgeGroup = 'any' | 'under62' | 'senior62' | 'senior_alone' | 'senior_couple';
+/** The CHAS age groups (CHAS splits age only at 62): any, under 62, 62 and older, and its two senior types. */
+export type ChasAge = 'any' | 'under62' | 'senior62' | 'senior_alone' | 'senior_couple';
+/** Householder age brackets (ACS B25007, renter-occupied); place.json renter_age holds them in this order. */
+export type AgeBracket = 'a15_24' | 'a25_34' | 'a35_44' | 'a45_54' | 'a55_64' | 'a65_74' | 'a75plus';
+/** The age input: 'any', a householder bracket, or (older state) a CHAS age group. */
+export type AgeGroup = ChasAge | AgeBracket;
 /** The most land in FEMA's 1%-a-year flood zone the reader accepts: none (0%), up to 5%, up to 15%, or any. */
 export type FloodRisk = 'none' | 'le5' | 'le15' | 'any';
 export type TransitMiles = 0.25 | 0.5 | 1;
@@ -38,7 +44,9 @@ export type TransitMiles = 0.25 | 0.5 | 1;
 export const INCOME_LEVELS: IncomeLevel[] = [30, 50, 80];
 export const PLAN_LEVELS: PlanLevel[] = [30, 50, 80, 'market'];
 export const HOUSEHOLD_SIZES: HouseholdSize[] = ['auto', 1, 2, 3, 4, 5];
-export const AGE_GROUPS: AgeGroup[] = ['any', 'under62', 'senior62', 'senior_alone', 'senior_couple'];
+export const AGE_BRACKETS: AgeBracket[] = ['a15_24', 'a25_34', 'a35_44', 'a45_54', 'a55_64', 'a65_74', 'a75plus'];
+/** The options the age control shows. */
+export const AGE_GROUPS: AgeGroup[] = ['any', ...AGE_BRACKETS];
 export const FLOOD_RISKS: FloodRisk[] = ['none', 'le5', 'le15', 'any'];
 export const TRANSIT_MILES: TransitMiles[] = [0.25, 0.5, 1];
 
@@ -56,9 +64,26 @@ export const SIZE_INFO = 'Any: homes are sized for the largest household group h
 export const sizeWord = (s: HouseholdSize): string => (s === 'auto' ? 'largest group' : s === 5 ? '5+-person' : `${s}-person`);
 /** "1 person", "3 people", "5+ people". */
 export const personsWord = (s: FixedSize): string => (s === 1 ? '1 person' : s === 5 ? '5+ people' : `${s} people`);
-export const AGE_LABEL: Record<AgeGroup, string> = { any: 'Any age', under62: 'Under 62', senior62: '62+', senior_alone: '62+ alone', senior_couple: '62+ couple' };
-/** The age group inside a sentence: "households 62 and older", "households 62+ living alone". Empty for any age. */
-export const AGE_WORDS: Record<AgeGroup, string> = { any: '', under62: 'under 62', senior62: '62 and older', senior_alone: '62+ living alone', senior_couple: '62+ couples' };
+const BRACKET_RANGE: Record<AgeBracket, string> = { a15_24: '15–24', a25_34: '25–34', a35_44: '35–44', a45_54: '45–54', a55_64: '55–64', a65_74: '65–74', a75plus: '75+' };
+/** Each age option → the CHAS age group whose household types and rules it uses (55–64 straddles 62: under 62). */
+export const AGE_CHAS: Record<AgeGroup, ChasAge> = {
+  any: 'any', under62: 'under62', senior62: 'senior62', senior_alone: 'senior_alone', senior_couple: 'senior_couple',
+  a15_24: 'under62', a25_34: 'under62', a35_44: 'under62', a45_54: 'under62', a55_64: 'under62', a65_74: 'senior62', a75plus: 'senior62',
+};
+/** The CHAS age group an age option uses; unknown values (old state) read as any age. */
+export const chasAge = (a: AgeGroup | undefined): ChasAge => (a ? (AGE_CHAS[a] ?? 'any') : 'any');
+export const isAgeBracket = (a: AgeGroup | undefined): a is AgeBracket => !!a && a in BRACKET_RANGE;
+/** Short text on the control's buttons. */
+export const AGE_SHORT: Record<AgeGroup, string> = { any: 'Any', under62: 'Under 62', senior62: '62+', senior_alone: '62+ alone', senior_couple: '62+ couple', ...BRACKET_RANGE };
+export const AGE_LABEL: Record<AgeGroup, string> = {
+  any: 'Any age', under62: 'Under 62', senior62: '62+', senior_alone: '62+ alone', senior_couple: '62+ couple',
+  ...(Object.fromEntries(Object.entries(BRACKET_RANGE).map(([k, v]) => [k, `Age ${v}`])) as Record<AgeBracket, string>),
+};
+const CHAS_WORDS: Record<ChasAge, string> = { any: '', under62: 'under 62', senior62: '62 and older', senior_alone: '62+ living alone', senior_couple: '62+ couples' };
+/** The CHAS age group inside a sentence: "households 62 and older", "households 62+ living alone". Empty for any age. A bracket reads as its CHAS group (the counts behind it). */
+export const AGE_WORDS: Record<AgeGroup, string> = Object.fromEntries(Object.entries(AGE_CHAS).map(([k, c]) => [k, CHAS_WORDS[c]])) as Record<AgeGroup, string>;
+const UNDER62_INFO = 'uses the CHAS under-62 types (single adults, small and large families). No senior housing.';
+const SENIOR_INFO = 'uses the CHAS 62+ types (seniors living alone and senior couples). Senior housing allowed.';
 /** The ⓘ text per age option: the CHAS household types it keeps. */
 export const AGE_INFO: Record<AgeGroup, string> = {
   any: 'Every CHAS household type.',
@@ -66,19 +91,53 @@ export const AGE_INFO: Record<AgeGroup, string> = {
   senior62: 'Seniors living alone and senior couples (2 people, one 62+).',
   senior_alone: 'One person 62 or older (CHAS "elderly non-family"). Priced for 1.',
   senior_couple: 'Two people, one or both 62 or older (CHAS "elderly family"). Priced for 2.',
+  a15_24: `Householders 15–24; ${UNDER62_INFO}`,
+  a25_34: `Householders 25–34; ${UNDER62_INFO}`,
+  a35_44: `Householders 35–44; ${UNDER62_INFO}`,
+  a45_54: `Householders 45–54; ${UNDER62_INFO}`,
+  a55_64: `Householders 55–64 (straddles 62); ${UNDER62_INFO}`,
+  a65_74: `Householders 65–74; ${SENIOR_INFO}`,
+  a75plus: `Householders 75 and older; ${SENIOR_INFO}`,
 };
-/** The CHAS household types each age group keeps (CHAS splits age only at 62). */
-export const AGE_TYPES: Record<AgeGroup, HouseholdType[]> = {
+/** The ⓘ for the age control as a whole. */
+export const AGE_CONTROL_INFO =
+  'Age of the householder, from the census. Under 18 is not shown: householders under 15 are not counted and 15–17 are rare, so the youngest bracket is 15–24. The income-band counts behind the suggestion only split ages at 62, so brackets 65+ use the senior rules and brackets under 62 the non-senior rules; 55–64 straddles 62 and uses the non-senior rules.';
+
+/** Renter householders in the bracket (ACS B25007, all incomes); null for non-bracket options or when not on file. */
+export function bracketRenters(p: PlaceMeasures | undefined, age: AgeGroup | undefined): number | null {
+  if (!isAgeBracket(age)) return null;
+  const v = p?.renter_age?.[AGE_BRACKETS.indexOf(age)];
+  return isNum(v) ? v : null;
+}
+/** "35 renter householders aged 55–64 (all incomes, ACS 2020–2024)". */
+export function bracketLine(p: PlaceMeasures | undefined, age: AgeGroup | undefined): string | null {
+  if (!isAgeBracket(age)) return null;
+  const n = bracketRenters(p, age);
+  const range = BRACKET_RANGE[age];
+  return n == null ? `Renter householders aged ${range}: ${NA}.` : `${fmtHouseholds(n)} renter householders aged ${range} here (all incomes, ACS 2020–2024).`;
+}
+
+/** The CHAS household types each CHAS age group keeps (CHAS splits age only at 62). */
+const CHAS_TYPES: Record<ChasAge, HouseholdType[]> = {
   any: [...HOUSEHOLD_TYPE_ORDER],
   under62: ['other', 'small_family', 'large_family'],
   senior62: ['elderly_alone', 'elderly_family'],
   senior_alone: ['elderly_alone'],
   senior_couple: ['elderly_family'],
 };
+/** The CHAS household types each age option keeps, through its CHAS age group. */
+export const AGE_TYPES: Record<AgeGroup, HouseholdType[]> = Object.fromEntries(Object.entries(AGE_CHAS).map(([k, c]) => [k, CHAS_TYPES[c]])) as Record<AgeGroup, HouseholdType[]>;
+const CHAS_SIZE: Partial<Record<ChasAge, FixedSize>> = { senior_alone: 1, senior_couple: 2 };
 /** Age groups that are one CHAS type fix the household size (seniors alone 1, senior couples 2). */
 export const AGE_SIZE: Partial<Record<AgeGroup, FixedSize>> = { senior_alone: 1, senior_couple: 2 };
-/** Any of the 62+ options (senior housing stays allowed). */
-export const isSeniorAge = (a: AgeGroup | undefined): boolean => a === 'senior62' || a === 'senior_alone' || a === 'senior_couple';
+const ageSize = (a: AgeGroup): FixedSize | undefined => CHAS_SIZE[chasAge(a)];
+/** Any option that uses the 62+ rules (senior housing stays allowed). */
+export const isSeniorAge = (a: AgeGroup | undefined): boolean => {
+  const c = chasAge(a);
+  return c === 'senior62' || c === 'senior_alone' || c === 'senior_couple';
+};
+/** Any option that uses the under-62 rules (senior housing removed). */
+export const isUnder62Age = (a: AgeGroup | undefined): boolean => chasAge(a) === 'under62';
 export const FLOOD_LABEL: Record<FloodRisk, string> = { none: 'None', le5: '≤5%', le15: '≤15%', any: 'Any' };
 /** The ⓘ text for the flood control. */
 export const FLOOD_INFO = "Most of the tract's land that may sit in FEMA's 1%-a-year (100-year) flood zone. Above it, no suggestion.";
@@ -150,7 +209,7 @@ export function levelIncomeLine(hud: HudTable | null, level: IncomeLevel): strin
 }
 
 // ---------------------------------------------------------------- size × age → CHAS household types
-export const AGE_NOTE = 'CHAS splits households only at age 62 (its "elderly"), so finer age groups are not available.';
+export const AGE_NOTE = 'CHAS splits households only at age 62 (its "elderly"), so each householder age bracket uses the CHAS group on its side of 62 (55–64 straddles 62 and uses under 62).';
 export const PLAN_TYPE_LABEL: Record<HouseholdType, string> = {
   elderly_alone: 'seniors (62+) living alone',
   elderly_family: 'senior families (2 people, one 62+)',
@@ -180,7 +239,7 @@ export const TYPE_PERSONS: Record<HouseholdType, string> = {
 };
 /** The types "Largest group here" chooses among, by age group (CHAS splits only at 62). */
 export function autoTypes(age: AgeGroup): HouseholdType[] {
-  return [...(AGE_TYPES[age] ?? HOUSEHOLD_TYPE_ORDER)];
+  return [...(AGE_TYPES[age] ?? CHAS_TYPES[chasAge(age)] ?? HOUSEHOLD_TYPE_ORDER)];
 }
 
 /** A plan's household, resolved for one place: the size used for the HUD limit and home size, and the CHAS type when 'auto' picked one. */
@@ -211,7 +270,7 @@ export function largestType(p: PlaceMeasures, bands: BandId[], age: AgeGroup): {
 
 /** Resolve 'auto' for one place (explicit sizes pass through, unless the age group fixes the size). With no eligible type on file, auto prices at 3 people. */
 export function resolveHousehold(p: PlaceMeasures, bands: BandId[], size: HouseholdSize, age: AgeGroup): ResolvedHousehold {
-  if (size !== 'auto') return { size: AGE_SIZE[age] ?? size, auto: false, type: null, count: null };
+  if (size !== 'auto') return { size: ageSize(age) ?? size, auto: false, type: null, count: null };
   const best = largestType(p, bands, age);
   return best ? { size: TYPE_SIZE[best.type], auto: true, type: best.type, count: best.count } : { size: 3, auto: true, type: null, count: null };
 }
@@ -222,20 +281,21 @@ export function resolveHousehold(p: PlaceMeasures, bands: BandId[], size: Househ
  * 5 or more at any age; other = single adults under 62 and unrelated households.
  */
 export function typesFor(size: HouseholdSize, age: AgeGroup): HouseholdType[] {
-  if (size === 'auto' || AGE_SIZE[age]) return autoTypes(age);
+  if (size === 'auto' || ageSize(age)) return autoTypes(age);
+  const c = chasAge(age);
   if (size >= 5) return ['large_family'];
-  if (size === 1) return age === 'senior62' ? ['elderly_alone'] : age === 'under62' ? ['other'] : ['elderly_alone', 'other'];
-  if (size === 2) return age === 'senior62' ? ['elderly_family'] : age === 'under62' ? ['small_family'] : ['elderly_family', 'small_family'];
+  if (size === 1) return c === 'senior62' ? ['elderly_alone'] : c === 'under62' ? ['other'] : ['elderly_alone', 'other'];
+  if (size === 2) return c === 'senior62' ? ['elderly_family'] : c === 'under62' ? ['small_family'] : ['elderly_family', 'small_family'];
   return ['small_family'];
 }
 
 /** Why a size/age pair maps as it does, when CHAS cannot separate it. */
 export function typesNote(size: HouseholdSize, age: AgeGroup): string | null {
   if (size === 'auto') return null;
-  const fixed = AGE_SIZE[age];
+  const fixed = ageSize(age);
   if (fixed) return fixed === size ? null : `${AGE_LABEL[age]} sets the size: priced for ${personsWord(fixed)}.`;
-  if (size >= 5 && age !== 'any') return 'CHAS counts every household of 5 or more as a large family, whatever the age.';
-  if (size >= 3 && size <= 4 && age !== 'any') return 'CHAS counts every family of 3–4 people as a small family, whatever the age.';
+  if (size >= 5 && chasAge(age) !== 'any') return 'CHAS counts every household of 5 or more as a large family, whatever the age.';
+  if (size >= 3 && size <= 4 && chasAge(age) !== 'any') return 'CHAS counts every family of 3–4 people as a small family, whatever the age.';
   return null;
 }
 
@@ -248,7 +308,7 @@ const TYPE_BAND_SHORT: Record<TypeBandId, string> = { le30: '≤30%', b30_50: '3
  */
 export function planTenants(p: PlaceMeasures, bands: BandId[], sizeIn: HouseholdSize, age: AgeGroup, phrase: string): TenantProfile {
   if (sizeIn === 'auto') return autoTenants(p, bands, age, phrase);
-  const size: FixedSize = AGE_SIZE[age] ?? sizeIn;
+  const size: FixedSize = ageSize(age) ?? sizeIn;
   const tbs = Array.from(new Set(bands.map((b) => TYPE_BAND[b])));
   const bedrooms = sizeBedrooms(size);
   const seniorAlone = size === 1 && isSeniorAge(age);

@@ -24,7 +24,8 @@ type Row =
   | { kind: 'ask'; key: string; text: string };
 
 /** The thinking mark: an orb whose motion and words change as the seconds pass. */
-function Thinking({ since }: { since: number }) {
+/** The chat's thinking mark (orb + rotating status words); also used by VisionPitts Insight on Equity & policy. */
+export function Thinking({ since }: { since: number }) {
   const [i, setI] = useState(0);
   useEffect(() => {
     const timers = C.phases.map((p, k) => window.setTimeout(() => setI(k), Math.max(0, p.at - (Date.now() - since))));

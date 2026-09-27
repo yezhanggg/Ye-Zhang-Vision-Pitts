@@ -1,4 +1,4 @@
-// "In plain words": a short reading of the Equity & policy tab written by VisionPitts-Chat (DeepSeek) from the same
+// VisionPitts Insight: a short reading of the Equity & policy tab written by VisionPitts-Chat (DeepSeek) from the same
 // facts the chat gets. It is shown only when the service answers and every number in it was matched to those facts;
 // otherwise nothing is shown and the deterministic sentences stand alone. Cached per facts text for the session.
 import { useEffect, useState } from 'react';

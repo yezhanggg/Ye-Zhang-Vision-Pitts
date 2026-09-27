@@ -178,6 +178,18 @@ def test_census_2br_reads_the_cached_raw_response(tmp_path):
     assert math.isnan(got.loc["b", "census_2br"]) and math.isnan(got.loc["b", "census_2br_moe"])
 
 
+def test_renter_age_sums_brackets_from_the_cached_raw_response(tmp_path):
+    cache = tmp_path / "b25007.csv"
+    row_a = {f"B25007_{i:03d}E": str(i) for i in range(13, 22)}
+    row_b = dict(row_a, B25007_017E="-666666666")
+    pd.DataFrame([dict(GEOID="a", **row_a), dict(GEOID="b", **row_b)]).to_csv(cache, index=False)
+    got = pm.renter_age(cache=cache)                                  # cache exists: no network
+    assert list(got.loc["a"]) == [13, 14, 15, 16, 17 + 18, 19, 20 + 21]
+    assert math.isnan(got.loc["b", "renter_age_55_64"]) and got.loc["b", "renter_age_75plus"] == 41
+    place = pm.to_place_json(got.rename_axis("GEOID"))
+    assert place["a"]["renter_age"] == [13, 14, 15, 16, 35, 19, 41] and place["b"]["renter_age"][4] is None
+
+
 def test_market_fills_older_vintages_and_adds_census_2br_without_moving_the_neighbor_median():
     tr = pd.DataFrame({"rent_2br_2025_26": [np.nan, 1300.0], "n_units_2025_26": [5, 40], "asking_rents_conf": ["low", "high"],
                        "zcta": ["15207", "15217"]}, index=pd.Index(["a", "b"], name="GEOID"))
@@ -456,6 +468,7 @@ CONTRACT = {
     "land_use": None,
     "programs": {"qct", "dda", "oz", "cdbg"},
     "displacement": {"score", "conf"},
+    "renter_age": None,
 }
 
 

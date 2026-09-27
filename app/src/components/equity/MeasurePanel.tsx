@@ -14,6 +14,7 @@ import { classCounts, explainMeasure, needPercentile, type TractValue } from '..
 import { DRAW, SERIES, SPIN } from '../charts';
 import { InfoTip, SPRING_PANEL } from '../primitives';
 import type { ReadingState } from '../../lib/equity/reading';
+import { Thinking } from '../explore/ChatBox';
 import { Sparkles } from 'lucide-react';
 import { nameOf } from './names';
 
@@ -143,7 +144,7 @@ function Spread({ def, legend, values, median, selected, width, height, many = '
   const h = useMemo(() => histogram(values.map((v) => v.value), 16), [values]);
   const W = Math.max(120, width),
     H = Math.max(52, Math.min(220, height)),
-    P = { l: 2, r: 2, t: 13, b: 14 };
+    P = { l: 2, r: 2, t: 25, b: 14 };
   if (h.edges.length < 2) return <div className="hatch rounded-md px-2 py-3 text-caption text-slate-600">Too few values to draw.</div>;
   const lo = h.edges[0],
     hi = h.edges[h.edges.length - 1];
@@ -175,7 +176,8 @@ function Spread({ def, legend, values, median, selected, width, height, many = '
         return (
           <g key={m.label}>
             <line x1={x} x2={x} y1={P.t - 1} y2={H - P.b} stroke={m.color} strokeWidth="1.5" strokeDasharray={i === 0 ? '3 2' : undefined} />
-            <text x={x + (near ? (i === 0 ? -3 : 3) : 0)} y={P.t - 4} textAnchor={near ? (i === 0 ? 'end' : 'start') : anchor} fontSize="9.5" fontWeight="600" fill={m.color}>
+            {/* Two close markers: the labels stack on two lines instead of overlapping. */}
+            <text x={x} y={near && i === 1 ? P.t - 15 : P.t - 4} textAnchor={anchor} fontSize="9.5" fontWeight="600" fill={m.color}>
               {m.label}
             </text>
           </g>
@@ -308,6 +310,16 @@ export default function MeasurePanel({
 }) {
   const lite = useApp((s) => s.lite);
   const listRef = useRef<HTMLOListElement>(null);
+  // The middle column goes back to the top whenever a new measure is picked (with or without the chat open).
+  const colRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    colRef.current?.scrollTo({ top: 0 });
+  }, [def.id]);
+  // When the Insight started writing (the thinking mark's status words run from here, as in the chat).
+  const loadingSince = useRef(Date.now());
+  const wasLoading = useRef(false);
+  if (reading?.status === 'loading' && !wasLoading.current) loadingSince.current = Date.now();
+  wasLoading.current = reading?.status === 'loading';
   // Keep the selected tract's row in view.
   useEffect(() => {
     const el = selectedId ? listRef.current?.querySelector<HTMLElement>(`[data-id="${selectedId}"]`) : null;
@@ -359,17 +371,13 @@ export default function MeasurePanel({
     reading && reading.status !== 'idle' && reading.status !== 'off' ? (
       <div className="shrink-0 border-t border-stone-100 pt-2.5" data-testid="equity-reading">
         <h3 className="mb-1 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-          <Sparkles className="h-3 w-3 text-violet-500" /> In plain words
-          <InfoTip label="About this reading" width={250}>
+          <Sparkles className="h-3 w-3 text-violet-500" /> VisionPitts Insight
+          <InfoTip label="About VisionPitts Insight" width={250}>
             Written by VisionPitts-Chat (DeepSeek) from this tab's numbers. It is shown only when every number in it matches the tool's data.
           </InfoTip>
         </h3>
         {reading.status === 'loading' ? (
-          <div className="space-y-1.5" aria-label="Writing">
-            <div className="h-3 w-full animate-pulse rounded bg-stone-100" />
-            <div className="h-3 w-11/12 animate-pulse rounded bg-stone-100" />
-            <div className="h-3 w-4/5 animate-pulse rounded bg-stone-100" />
-          </div>
+          <Thinking since={loadingSince.current} />
         ) : (
           <p className="text-small leading-relaxed text-slate-700">{reading.status === 'ok' ? reading.text : ''}</p>
         )}
@@ -392,9 +400,9 @@ export default function MeasurePanel({
     </div>
   );
   const spreadBlock = (
-    <div className={cx('flex flex-col', wide ? 'min-h-[180px] flex-1' : 'min-h-[70px] flex-1')}>
+    <div className={cx('flex flex-col', wide ? 'h-[210px] shrink-0' : 'min-h-[70px] flex-1')}>
       <Heading right={`How the ${area.level === 'tract' ? 'tracts' : 'ZIP codes'} spread across values; ${def.higherIsNeed ? 'further right' : 'further left'} means more need. The dashed line is the city median; the violet line is the selected ${area.level === 'tract' ? 'tract' : 'ZIP'}.`}>{area.level === 'tract' ? 'Spread across tracts' : 'Spread across ZIP codes'}</Heading>
-      <div ref={spreadRef} className="min-h-[52px] flex-1 overflow-hidden">
+      <div ref={spreadRef} className="min-h-0 flex-1 overflow-hidden">
         {spread.w > 0 && <Spread key={`s-${replay}`} def={def} legend={legend} values={values} median={median} selected={selValue} width={spread.w} height={spread.h} many={area.level === 'tract' ? 'tracts' : 'ZIP codes'} />}
       </div>
     </div>
@@ -446,7 +454,7 @@ export default function MeasurePanel({
     );
     return (
       <section aria-label="Measure" data-testid="equity-measure" className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] gap-2.5 max-sm:grid-cols-1">
-        <div className="scroll-quiet flex min-h-0 flex-col gap-2.5 overflow-y-auto">
+        <div ref={colRef} className="scroll-quiet flex min-h-0 flex-col gap-2.5 overflow-y-auto">
           <div className={cx(box, 'flex shrink-0 flex-col gap-2.5 px-4 pb-3.5 pt-3')}>
             {header}
             {explain}
@@ -454,7 +462,7 @@ export default function MeasurePanel({
             {policies}
             {readingBlock}
           </div>
-          <div className={cx(box, 'flex min-h-[260px] flex-1 flex-col gap-3 px-4 pb-3 pt-3', chatOpen && 'shrink-0')}>
+          <div className={cx(box, 'flex shrink-0 flex-col gap-3 overflow-hidden px-4 pb-3 pt-3')}>
             {donut}
             {spreadBlock}
           </div>

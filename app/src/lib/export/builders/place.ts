@@ -126,6 +126,7 @@ export function answerRows(i: PlaceReportInput): { lead: string | null; headline
     atMarket ? (mr.rent != null ? `${fmtDollars(mr.rent)}/mo market asks · no HUD ceiling` : 'Market rent not available') : price ? `${fmtDollars(price.limit)} × 30% ÷ 12 = ${fmtDollars(price.rent)}/mo, ${effPersons}` : 'HUD limits not available',
   ]);
   rows.push(['Who it serves', rec.tenants.available ? `${fmtHouseholds(tenantTotal)} ${tenantWords} ${levelShort}${autoType ? ' (the largest group here)' : ''}` : `0 ${tenantWords} ${levelShort} on file`]);
+  if (rec.ageBracket) rows.push([rec.ageBracket.label, `${rec.ageBracket.renters != null ? fmtHouseholds(rec.ageBracket.renters) : 'Not available'} renter householders, all incomes (ACS B25007); the CHAS counts above use ${AGE_WORDS[age] || 'all ages'}`]);
   rows.push([
     'Market',
     atMarket
@@ -176,7 +177,7 @@ export function inputRows(plan: PlanInputs): [string, string][] {
     ['Focusing issue', STANCE_LABEL[plan.focus]],
     ['Income level', LEVEL_LABEL[plan.level]],
     ['Household size', plan.size === 'auto' ? 'Any (sized for the largest group here)' : personsWord(plan.size)],
-    ['Age group', AGE_LABEL[plan.age]],
+    ['Age group', AGE_LABEL[plan.age] ?? 'Any age'],
     ['Homes needed', plan.homes != null ? fmtHouseholds(plan.homes) : 'Not set'],
     ['Flood risk accepted', plan.flood === 'any' ? 'Any' : `${FLOOD_LABEL[plan.flood]} of land in FEMA's 1%-a-year flood zone`],
     ['Frequent transit within', MILES_LABEL[plan.transitMi]],

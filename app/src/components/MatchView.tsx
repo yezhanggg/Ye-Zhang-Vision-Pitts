@@ -32,15 +32,16 @@ import { mapPadding, usePhoneTakeTurns, useViewport } from '../lib/viewport';
 import { useTour } from '../lib/tour';
 import AnalysisChat from './AnalysisChat';
 import PanelFrame, { RightColumn } from './PanelFrame';
-import DataLimitsPanel from './DataLimitsPanel';
 import FactorTable from './analysis/FactorTable';
 import FitOrder from './place/FitOrder';
 import AdvancedSettings from './place/AdvancedSettings';
 import FocusPicker from './place/FocusPicker';
 import PlanAnswer from './place/PlanAnswer';
 import PlanInputs from './place/PlanInputs';
-import PlaceFolds, { Fold } from './place/PlaceFolds';
+import PlaceFolds from './place/PlaceFolds';
 import SuggestionLegend, { FLOOD_FILL } from './place/SuggestionLegend';
+import ZipPanel, { AreaSwitch, useZipOverlays } from './place/ZipPanel';
+import { useZipView } from '../lib/place/zipView';
 import { ConfChip, Dot, Explainer, InfoTip, ObservedBadge, SectionTitle } from './primitives';
 
 /** Map hover card. `weights` (the Match view passes them) lets it tell "every factor is zero" from "no data". */
@@ -332,9 +333,6 @@ export function TractDetail({ t, r, weights, rec, fitOrder, onClose }: { t: Trac
         <div className="space-y-3 p-5">
           <PlanAnswer rec={rec} hud={hud} level={plan.level} size={plan.size} age={plan.age} homes={plan.homes} />
           <PlaceFolds t={t} place={place} hud={hud} rec={rec} level={plan.level} fitOrder={fitOrder ?? (r.ranking as Typology[])} />
-          <Fold title="Data limits" headline="what these numbers cannot tell you">
-            <DataLimitsPanel t={t} />
-          </Fold>
         </div>
       </div>
     );
@@ -349,7 +347,6 @@ export function TractDetail({ t, r, weights, rec, fitOrder, onClose }: { t: Trac
         </Explainer>
         <PressureCard t={t} />
         <AboutPlace t={t} />
-        <DataLimitsPanel t={t} />
       </div>
     </div>
   );
@@ -416,6 +413,10 @@ export default function MatchView() {
     return { paint, counts };
   }, [suggestions]);
 
+  // Tracts | ZIPs: at ZIP level the map shows ZIP outlines over the tract colors and the panel lists each ZIP's tracts.
+  const zipMode = useZipView((s) => s.area) === 'zip';
+  const zipOverlays = useZipOverlays(zipMode, paint);
+
   const t = selectedId ? tractById.get(selectedId) : null;
   const r = selectedId ? results.get(selectedId) ?? { scores: [], ranking: [], top: null, topScore: null } : null;
   const rec = selectedId ? suggestions.get(selectedId) ?? null : null;
@@ -443,7 +444,9 @@ export default function MatchView() {
       {view !== undefined && (
         <MapView
           paint={paint}
-          selectedId={selectedId}
+          selectedId={zipMode ? null : selectedId}
+          baseTracts={!zipMode}
+          overlays={zipOverlays}
           buildingColor={buildingColor}
           lite={lite}
           terrain={layers.terrain}
@@ -461,6 +464,7 @@ export default function MatchView() {
         />
       )}
       <Rail float title={UI.matchTab} maxHeightClass="max-h-[calc(100%-4.75rem-12.5rem)]">
+        <AreaSwitch />
         <RailSection id="priorities" title="Focusing issue">
           <FocusPicker
             value={focus}
@@ -477,7 +481,7 @@ export default function MatchView() {
       </Rail>
       <RightColumn>
         <AnalysisChat />
-        <PanelFrame inline>{t && r ? <TractDetail t={t} r={r} weights={weights} rec={rec} fitOrder={fitOrders.get(t.GEOID)} onClose={() => select(null)} /> : <StartCard />}</PanelFrame>
+        <PanelFrame inline>{zipMode ? <ZipPanel suggestions={suggestions} hud={hudTable} level={plan.level} /> : t && r ? <TractDetail t={t} r={r} weights={weights} rec={rec} fitOrder={fitOrders.get(t.GEOID)} onClose={() => select(null)} /> : <StartCard />}</PanelFrame>
       </RightColumn>
       {(
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="absolute bottom-3 left-3 z-20 w-[340px] xl:w-[360px] max-sm:hidden">

@@ -10,7 +10,7 @@ import { DECIDE, G, TYPOLOGY_LABEL } from './copy';
 import { floodNote, lotPattern, zoningNote, type FloodNote, type LotPattern } from './feasibility';
 import { capitalize, fmtCount, fmtDollars, fmtMiles, fmtScore, fmtShare, isNum, joinAnd, NA, roundHalfEven } from './format';
 import {
-  LEVEL_LABEL, ceilingForSize, floodCheck, isSeniorAge, levelBands, levelPhrase, levelTarget, marketRent, planTenants, resolveHousehold, transitTestMiles,
+  AGE_LABEL, LEVEL_LABEL, bracketRenters, ceilingForSize, floodCheck, isAgeBracket, isSeniorAge, isUnder62Age, levelBands, levelPhrase, levelTarget, marketRent, planTenants, resolveHousehold, transitTestMiles,
   type AgeGroup, type FloodCheck, type FloodRisk, type HouseholdSize, type MarketRent, type PlanLevel, type ResolvedHousehold,
 } from './plan';
 import { CLIMATE_ORDER, DEFAULT_FIT_ORDER, DENSITY_ORDER, SERVES, STANCES, THRESHOLDS, TYPE_BEDROOMS, TYPOLOGIES, TYPOLOGY_BEDROOMS } from './thresholds';
@@ -62,6 +62,8 @@ export interface Recommendation {
   level: PlanLevel | null;
   /** The household size used here (with 'auto', the largest CHAS type's size); null when no size was passed. */
   household: ResolvedHousehold | null;
+  /** The reader's householder age bracket and its renter householders here (ACS B25007, all incomes); null for other age options. */
+  ageBracket: { label: string; renters: number | null } | null;
 }
 
 export interface RecommendOptions {
@@ -142,7 +144,7 @@ const preferOf = (h: ResolvedHousehold | null, age: AgeGroup | undefined): Prefe
   return preferOfSize(h?.size, age);
 };
 const preferOfSize = (size: HouseholdSize | undefined, age: AgeGroup | undefined): Prefer =>
-  size === 'auto' ? undefined : isSeniorAge(age) && (size ?? 1) <= 2 ? 'seniors' : size != null && (size >= 3 || (size === 2 && age === 'under62')) ? 'families' : undefined;
+  size === 'auto' ? undefined : isSeniorAge(age) && (size ?? 1) <= 2 ? 'seniors' : size != null && (size >= 3 || (size === 2 && isUnder62Age(age))) ? 'families' : undefined;
 
 /** Seniors: senior housing first when it is in the set; families: the family types (2–4 unit conversion, townhome) first. */
 function preferFor(types: Typology[], household: Prefer): Typology[] {
@@ -494,10 +496,10 @@ export function recommend(p: PlaceMeasures, hud: HudTable, stance: Stance, opts:
     not.length = 0;
     notServed = { bands: [], why: noHousehold && target.available ? `nothing is recommended, because CHAS counts no renter households of this size and age ${phrase} here` : 'nothing is recommended, because no band is under-served on the evidence' };
   }
-  // Senior housing is age-restricted: never suggested for households under 62.
-  if (opts.age === 'under62' && types.includes('senior')) {
+  // Senior housing is age-restricted: never suggested for households under 62 (brackets under 65 included).
+  if (isUnder62Age(opts.age) && types.includes('senior')) {
     types = types.filter((t) => t !== 'senior');
-    not.push({ typology: 'senior', because: 'age-restricted to 62 and older; you chose under 62' });
+    not.push({ typology: 'senior', because: `age-restricted to 62 and older; you chose ${opts.age === 'under62' ? 'under 62' : AGE_LABEL[opts.age!].replace(/^Age /, 'ages ')}` });
   }
   // Above the reader's flood limit: no suggestion here, and the reason is the flood share.
   if (floodLimit?.blocked) {
@@ -552,6 +554,7 @@ export function recommend(p: PlaceMeasures, hud: HudTable, stance: Stance, opts:
     stance, band: target, tenants, price, market, types: recTypes, not, notServed: notServed.bands, stanceTest, lines, decide: DECIDE,
     lead, headline, servedBands: served, notServedWhy: notServed.why, priceAlso, twoBedroom, lot, flood, branch, fitOrder,
     floodLimit, marketRent: mRent, level: level ?? null, household: resolved,
+    ageBracket: isAgeBracket(opts.age) ? { label: AGE_LABEL[opts.age], renters: bracketRenters(p, opts.age) } : null,
   };
 }
 
