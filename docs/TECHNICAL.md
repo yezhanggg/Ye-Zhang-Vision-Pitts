@@ -6,7 +6,7 @@ The full technical README: how to rebuild the data, the database, every source, 
 
 A census data browser and an anti-displacement housing matchmaker for the **City of Pittsburgh**. Solo entry for the **AI Horizons 2026 · AI for Housing Hackathon**, Track 3, built Sep 26–27, 2026. Every line of code was written after the Saturday 9:00 a.m. ET kickoff.
 
-**Live app:** [ye-zhang-vision-pitts.vercel.app](https://ye-zhang-vision-pitts.vercel.app) · **Offline:** double-click `export/index.html` · **Docs:** [plan](PLAN.md) · [methods](../data/factor_methods.md) · [value judgments](assumptions.md) · [sources](../data/processed/sources.md)
+**Live app:** [ye-zhang-vision-pitts.vercel.app](https://ye-zhang-vision-pitts.vercel.app) · **Offline:** double-click `export/index.html` · **Docs:** [plan](PLAN.md) · [methods](data/factor_methods.md) · [value judgments](assumptions.md) · [sources](../data/processed/sources.md)
 
 ![Landing page: a live 3D map of Downtown and the four doors](screenshots/00-landing.png)
 
@@ -120,7 +120,7 @@ All scoring data is public. Full registry with links, retrieval dates and checks
 | Residents 65+ · 2–4 unit homes | ACS 5-year 2020–2024, tables B01001 and B25024 (shares, scored as percentiles) | tract |
 | Dollar scale for "50% AMI" · FMR line | HUD FY2026 income limits and Fair Market Rents, Pittsburgh HMFA (information only) | metro area |
 | Explore browser | ACS 5-year 2020–2024, 37 variables | tract, block group, ZCTA, municipality, county, city |
-| Explore history | ACS 5-year, end years 2014–2024, same 37 variables; 2010-vintage tracts carried to 2020 tracts by housing units ([method](../data/acs_history.md)) | tract, ZCTA, municipality, county, city |
+| Explore history | ACS 5-year, end years 2014–2024, same 37 variables; 2010-vintage tracts carried to 2020 tracts by housing units ([method](data/acs_history.md)) | tract, ZCTA, municipality, county, city |
 | Municipal boundaries | Census cartographic county subdivisions 2023 (129 cities, boroughs and townships outside Pittsburgh) | municipality |
 | Boundaries, names | Census TIGER and cartographic files · WPRDC neighborhoods | 2020 geography |
 | 3D buildings | Overture footprints · WPRDC assessments (stories only) | demo tracts |
@@ -138,7 +138,7 @@ No individual-level data is used anywhere.
 - **Older geographies are carried forward by housing units**: 2010 block groups to 2020 tracts, ZIP filings to tracts. Each carry drops the confidence tag one level.
 - **Nothing is imputed.** A missing factor is dropped and the remaining weights renormalize.
 - **Explore is description only.** Sums use root-sum-square margins; shares use the ACS proportion formula; reliability is high below 15% CV, medium to 30%, low above. Two block-group substitutions (C17002 for poverty, B25044 for vehicles) are noted in the app.
-- Details: [methods](../data/factor_methods.md), [value judgments](assumptions.md).
+- Details: [methods](data/factor_methods.md), [value judgments](assumptions.md).
 
 ## Limitations
 
