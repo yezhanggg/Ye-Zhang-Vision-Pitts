@@ -4,11 +4,12 @@
 // Opportunity Zone / CDBG, which are what the subsidy factor reads; they are not zoning and are never called so.
 import { isNum } from '../../lib/format';
 import { scoring } from '../../lib/data';
-import type { PlaceMeasures, Typology, ZoningStatus } from '../../lib/place/types';
+import type { PlaceMeasures, Typology } from '../../lib/place/types';
 import { Block, NA, SourceLine, Table } from './shared';
+import { InfoTip } from '../primitives';
+import { cx } from '../../lib/format';
+import { landByGroup, landForType, multiUnitLand } from '../../lib/place/zoningAnalysis';
 
-const STATUS_TEXT: Record<ZoningStatus, string> = { yes: 'by right', conditional: 'conditional use', no: 'not by right on most of the land', unknown: 'unknown' };
-const STATUS_TONE: Record<ZoningStatus, string> = { yes: 'text-emerald-800', conditional: 'text-amber-900', no: 'text-rose-800', unknown: 'text-slate-500' };
 const TYPES: Typology[] = ['adu', 'duplex_triplex', 'townhome', 'small_apartment', 'senior'];
 const typeLabel = (k: Typology) => scoring.typologies.find((t) => t.id === k)?.label ?? k;
 const yn = (v: boolean | null) => (v == null ? NA : v ? 'yes' : 'no');
@@ -26,36 +27,71 @@ export function districtText(shares: Record<string, number>): string {
   return rows.length ? rows.map(([k, v]) => `${k} ${Math.round(v)}%`).join(' · ') : NA;
 }
 
-export default function ZoningPrograms({ place }: { place: PlaceMeasures }) {
+const pct = (x: number) => `${Math.round(x * 100)}%`;
+
+/** Zoning analysis (land by plain group, where each type is allowed, what it means for the suggestion) and programs. */
+export default function ZoningPrograms({ place, lead = null }: { place: PlaceMeasures; lead?: Typology | null }) {
   const z = place.zoning;
   const p = place.programs;
-  const byRight = z ? TYPES.filter((k) => z.by_type[k] === 'yes') : [];
+  const groups = z ? landByGroup(z.shares) : [];
+  const byType = z ? TYPES.map((k) => ({ k, land: landForType(z.shares, k) })) : [];
+  const leadLand = lead && z ? landForType(z.shares, lead) : null;
+  const res = groups.find((g) => g.id === 'res')?.share ?? 0;
+  const multi = z ? multiUnitLand(z.shares) : 0;
+  const top = groups[0];
   return (
     <Block
       title="Zoning and programs"
-      sub="Two separate facts: what the zoning map says, and which federal or city programs apply."
+      sub="What the land is zoned for, where each type is allowed, and which programs apply."
       tone="observed"
-      source={<>Source · Zoning: City of Pittsburgh zoning districts via WPRDC (share of tract land by district); by-right annotations from a 16-row reading of Title 9, unverified · Programs: HUD QCT and DDA 2026 · U.S. Treasury Opportunity Zones · City of Pittsburgh CDBG areas 2018 · Programs are what the subsidy factor reads; they are not zoning.</>}
+      source={<>Source · City of Pittsburgh zoning districts (WPRDC), share of tract land by district · Which types each district allows: a 17-row reading of Title 9, unverified · Programs: HUD QCT and DDA 2026 · U.S. Treasury Opportunity Zones · City CDBG areas 2018.</>}
     >
       <div className="mt-1 space-y-2">
-        <div className="rounded-xl bg-white px-3 py-2 ring-1 ring-stone-200/80">
-          {z ? (
+        <div className="rounded-xl bg-white px-3 py-2.5 ring-1 ring-stone-200/80">
+          {z && top ? (
             <>
-              <div className="text-small text-slate-800">
-                <b className="text-slate-900">Zoning here:</b> {districtText(z.shares)}
-                {byRight.length > 0 && (
+              <p className="text-small leading-snug text-slate-800">
+                Most land here is <b className="text-slate-900">{top.label.toLowerCase()}</b> ({pct(top.share)}). Residential districts cover {pct(res)}, and {pct(multi)} of the land allows three or more homes on a lot.
+                {lead && leadLand && (
                   <>
-                    ; {byRight.map(typeLabel).join(', ')} by right <span className="text-slate-500">(unverified)</span>
+                    {' '}
+                    The suggested <b className="text-slate-900">{typeLabel(lead).toLowerCase()}</b> is allowed by right on {pct(leadLand.yes)} of the land
+                    {leadLand.conditional > 0.005 ? <> and with a hearing on {pct(leadLand.conditional)} more</> : null}.
                   </>
                 )}
-                .
+              </p>
+              <div className="mt-2 flex h-3 overflow-hidden rounded-sm ring-1 ring-black/5" role="img" aria-label={groups.map((g) => `${g.label} ${pct(g.share)}`).join(', ')}>
+                {groups.map((g) => (
+                  <span key={g.id} style={{ width: `${g.share * 100}%`, background: g.color }} title={`${g.label}: ${pct(g.share)}`} />
+                ))}
+              </div>
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-caption text-slate-600">
+                {groups.map((g) => (
+                  <span key={g.id} className="inline-flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-sm" style={{ background: g.color }} />
+                    {g.label} <span className="tnum text-slate-500">{pct(g.share)}</span>
+                  </span>
+                ))}
+                <InfoTip label="Zoning districts" width={260}>
+                  Districts by share of land: {districtText(z.shares)}.
+                </InfoTip>
               </div>
               <Table
-                className="mt-1.5"
-                caption="By-right annotation per housing type (unverified)"
-                rows={TYPES.map((k) => ({ key: k, cells: [typeLabel(k), <span className={STATUS_TONE[z.by_type[k] ?? 'unknown']}>{STATUS_TEXT[z.by_type[k] ?? 'unknown']} (unverified)</span>] }))}
+                className="mt-2"
+                caption="Share of land where each type is allowed (unverified)"
+                rows={[
+                  { key: 'h', cells: [<span className="text-slate-500">Type</span>, <span className="text-slate-500">By right</span>, <span className="text-slate-500">With a hearing</span>] },
+                  ...byType.map(({ k, land }) => ({
+                    key: k,
+                    cells: [
+                      <span className={k === lead ? 'font-semibold text-slate-900' : ''}>{typeLabel(k)}</span>,
+                      <span className={cx('tnum', land.yes > 0.05 ? 'text-emerald-800' : 'text-slate-500')}>{pct(land.yes)}</span>,
+                      <span className={cx('tnum', land.conditional > 0.05 ? 'text-amber-900' : 'text-slate-500')}>{pct(land.conditional)}</span>,
+                    ],
+                  })),
+                ]}
               />
-              <SourceLine className="mt-1">Annotations only, never a gate: confirm in Title 9 of the Pittsburgh Code before relying on them.</SourceLine>
+              <SourceLine className="mt-1">Annotations, never a gate: confirm in Title 9 of the Pittsburgh Code before relying on them.</SourceLine>
             </>
           ) : (
             <div className="text-small text-slate-800">

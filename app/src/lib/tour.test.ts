@@ -4,9 +4,9 @@ import { defaultBrowse, useApp } from './store';
 import { tractById } from './data';
 
 describe('the steps', () => {
-  it('are five in Explore and six in Analysis, each with a target, a title and a short text', () => {
+  it('are five in Explore and ten in Analysis, each with a target, a title and a short text', () => {
     expect(PART_STEPS('explore')).toHaveLength(5);
-    expect(PART_STEPS('analysis')).toHaveLength(6);
+    expect(PART_STEPS('analysis')).toHaveLength(10);
     for (const s of STEPS) {
       expect(s.target).toBeTruthy();
       expect(s.title.length).toBeGreaterThan(0);
@@ -61,6 +61,8 @@ describe('the tour store', () => {
     expect(useApp.getState().selectedId).toBe(TOUR_TRACT);
     useTour.getState().next();
     expect(useApp.getState().mode).toBe('tracts');
+    for (let i = 0; i < 4; i++) useTour.getState().next(); // places, focus, income, side by side
+    expect(STEPS[useTour.getState().step].id).toBe('compare-glance');
     useTour.getState().next();
     expect(useApp.getState().mode).toBe('scenarios');
     useTour.getState().next();

@@ -487,7 +487,12 @@ function getsCells(s: SideInfo, level: PlanLevel): GetsCells {
       </>
     ) : (
       <>
-        <span className="font-medium text-slate-900">No suggestion here</span>
+        <span className="font-medium text-slate-900">
+          No suggestion here{" "}
+          <span className="font-normal text-slate-500">
+            · {rec.stanceTest.passed === null && !rec.floodLimit?.blocked ? "data missing" : "rule not met"}
+          </span>
+        </span>
         {why && note(why)}
       </>
     ),

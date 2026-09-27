@@ -51,9 +51,19 @@ const LEVER_SHORT: Record<LeverId, string> = { adu: 'ADU by right', bonus: 'Dens
 /** Below 1800 px, one word each (the full name stays the button's tooltip and accessible name). */
 const LEVER_TINY: Record<LeverId, string> = { adu: 'ADU', bonus: 'Density', voucher: 'Subsidy', transit: 'Transit' };
 
-function LeverChips({ on, onToggle, homesText, onHomes }: { on: Record<LeverId, boolean>; onToggle: (id: LeverId) => void; homesText: string; onHomes: (v: string) => void }) {
+/** Why the lever chips are off at ZIP level. */
+export const LEVERS_TRACT_ONLY = 'Policies are computed for census tracts. Switch to Tracts to use them.';
+
+function LeverChips({ on, onToggle, homesText, onHomes, disabled = false }: { on: Record<LeverId, boolean>; onToggle: (id: LeverId) => void; homesText: string; onHomes: (v: string) => void; disabled?: boolean }) {
   return (
-    <div role="group" aria-label="Policy levers" data-tour="equity-levers" className="scroll-quiet flex h-8 w-full items-stretch gap-0.5 overflow-x-auto rounded-lg bg-stone-100 p-1 ring-1 ring-stone-200/70 [&>div]:shrink-0">
+    <div
+      role="group"
+      aria-label="Policy levers"
+      aria-disabled={disabled || undefined}
+      title={disabled ? LEVERS_TRACT_ONLY : undefined}
+      data-tour="equity-levers"
+      className={cx('scroll-quiet flex h-8 w-full items-stretch gap-0.5 overflow-x-auto rounded-lg bg-stone-100 p-1 ring-1 ring-stone-200/70 [&>div]:shrink-0', disabled && 'cursor-not-allowed opacity-50')}
+    >
       {LEVER_IDS.map((id) => {
         const v = on[id];
         return (
@@ -64,8 +74,9 @@ function LeverChips({ on, onToggle, homesText, onHomes }: { on: Record<LeverId, 
               aria-checked={v}
               aria-label={LEVER_NAME[id]}
               onClick={() => onToggle(id)}
-              title={LEVER_NAME[id]}
-              className={cx('flex h-full flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-md px-1 text-caption font-semibold transition-colors min-[2100px]:gap-1.5 min-[2100px]:px-2 min-[2100px]:text-small', v ? 'text-violet-800' : 'text-slate-600 hover:bg-white/60 hover:text-slate-900')}
+              disabled={disabled}
+              title={disabled ? `${LEVER_NAME[id]}: ${LEVERS_TRACT_ONLY}` : LEVER_NAME[id]}
+              className={cx('flex h-full flex-1 disabled:pointer-events-none items-center justify-center gap-1 whitespace-nowrap rounded-md px-1 text-caption font-semibold transition-colors min-[2100px]:gap-1.5 min-[2100px]:px-2 min-[2100px]:text-small', v ? 'text-violet-800' : 'text-slate-600 hover:bg-white/60 hover:text-slate-900')}
             >
               <span aria-hidden className={cx('h-2 w-2 rounded-full min-[1800px]:hidden', v ? 'bg-violet-700' : 'ring-[1.5px] ring-inset ring-slate-400')} />
               <span className={cx('grid h-3.5 w-3.5 place-items-center rounded-[4px] ring-1 max-[1799px]:hidden', v ? 'bg-violet-700 ring-violet-700' : 'bg-white ring-stone-300')}>{v && <Check className="h-2.5 w-2.5 text-white" strokeWidth={3.5} />}</span>
@@ -81,6 +92,7 @@ function LeverChips({ on, onToggle, homesText, onHomes }: { on: Record<LeverId, 
                   max={10000}
                   value={homesText}
                   onChange={(e) => onHomes(e.target.value)}
+                  disabled={disabled}
                   aria-label="Homes per tract"
                   className="h-5 w-10 rounded bg-stone-50 px-1 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none text-right text-caption font-semibold text-slate-900 ring-1 ring-stone-300 tnum focus:outline-none focus:ring-violet-400"
                 />
@@ -95,12 +107,48 @@ function LeverChips({ on, onToggle, homesText, onHomes }: { on: Record<LeverId, 
 }
 
 /** A step's number and name on the same line as its controls, so a first-time reader knows what each group sets. */
-function Step({ n, word, children }: { n: number; word: string; children?: ReactNode }) {
+function Step({ n, word, children, wordClass }: { n: number; word: string; children?: ReactNode; wordClass?: string }) {
   return (
     <div className="flex shrink-0 items-center gap-1 text-[10.5px] font-semibold uppercase tracking-wide text-slate-600">
-      <span className="grid h-4 w-4 place-items-center rounded-full bg-slate-900 text-[10px] font-bold leading-none text-white">{n}</span>
-      <span>{word}</span>
+      <span className="grid h-4 w-4 place-items-center rounded-full bg-slate-900 text-[10px] font-bold leading-none text-white" title={wordClass ? word : undefined}>{n}</span>
+      <span className={wordClass}>{word}</span>
       {children}
+    </div>
+  );
+}
+
+export type AreaLevel = 'tract' | 'zip';
+
+/** Tracts | ZIP codes: which areas the map and the measure section show (the levers always run on tracts). */
+const AREA_OPTIONS: { value: AreaLevel; label: string; wide: string; title: string }[] = [
+  { value: 'tract', label: 'Tracts', wide: 'Tracts', title: 'Census tracts: the level every measure is built at' },
+  { value: 'zip', label: 'ZIPs', wide: 'ZIP codes', title: "ZIP codes: aggregates of the city's census tracts, weighted by housing units; edge ZIPs cover only their city part" },
+];
+
+/** Tracts | ZIP codes, in the measure picker's look (tight padding so the bar stays on one row at 1440 px). */
+function AreaSeg({ value, onChange }: { value: AreaLevel; onChange: (v: AreaLevel) => void }) {
+  const [ref, box] = useSlide(value);
+  return (
+    <div ref={ref} role="radiogroup" aria-label="Areas to show" data-testid="equity-area" className="relative flex h-8 shrink-0 items-stretch gap-0.5 rounded-lg bg-stone-100 p-1 ring-1 ring-stone-200/70">
+      <SlideBg box={box} className="rounded-md bg-white shadow-sm ring-1 ring-violet-300" />
+      {AREA_OPTIONS.map((o) => {
+        const on = o.value === value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            data-slide-on={on}
+            title={o.title}
+            onClick={() => onChange(o.value)}
+            className={cx('relative whitespace-nowrap rounded-md px-1 text-caption font-semibold transition-colors min-[2100px]:px-2 min-[2100px]:text-small', on ? 'text-violet-800' : 'text-slate-600 hover:bg-white/60 hover:text-slate-900')}
+          >
+            <span className="min-[1800px]:hidden">{o.label}</span>
+            <span className="max-[1799px]:hidden">{o.wide}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -122,6 +170,9 @@ export default function EquityToolbar({
   policySlot,
   exportSlot,
   chatSlot,
+  incomeApplies = true,
+  area,
+  onArea,
 }: {
   measure: MeasureId;
   onMeasure: (m: MeasureId) => void;
@@ -139,7 +190,13 @@ export default function EquityToolbar({
   exportSlot: ReactNode;
   /** Show or hide the chat column, beside Export. */
   chatSlot?: ReactNode;
+  /** False for measures that do not depend on income (jobs, school, transit, services): the control dims. */
+  incomeApplies?: boolean;
+  /** Tracts or ZIP codes; the switch shows only when `onArea` is given. At ZIP level the lever chips are disabled. */
+  area?: AreaLevel;
+  onArea?: (v: AreaLevel) => void;
 }) {
+  const leversOff = area === 'zip';
   return (
     <div className="flex shrink-0 flex-nowrap items-center gap-x-1.5 gap-y-1.5 min-[1600px]:gap-x-2 overflow-x-auto rounded-xl max-[1399px]:flex-wrap max-[1399px]:overflow-visible bg-white px-3 py-1.5 shadow-sm ring-1 ring-stone-200/80 min-[1800px]:gap-x-4" aria-label="Equity and policy settings">
       <div className="flex min-w-fit flex-[6_1_0%] items-center gap-1 min-[1600px]:gap-1.5">
@@ -148,15 +205,16 @@ export default function EquityToolbar({
             {about}
           </InfoTip>
         </Step>
+        {onArea && <AreaSeg value={area ?? 'tract'} onChange={onArea} />}
         <div className="min-w-fit flex-1">
           <MeasureSeg value={measure} onChange={onMeasure} />
         </div>
       </div>
       <Divider />
-      <div className="flex shrink-0 items-center gap-1 min-[1600px]:gap-1.5">
+      <div className={cx('flex shrink-0 items-center gap-1 transition-opacity min-[1600px]:gap-1.5', !incomeApplies && 'opacity-50')} title={incomeApplies ? undefined : 'This measure does not depend on income; income still sets the rent-gap subsidy'}>
         <Step n={2} word="Income">
           <InfoTip label="About the income level" side="bottom" width={280}>
-            <span className="block">Shared with the Place tab. The rent gap and the subsidy use the 2-bedroom rent a 3-person household at this level can pay.</span>
+            <span className="block">Shared with the Place tab. It changes the rent gap (the rent a 3-person household at this level can pay), the cost-burdened renters counted, and the rent-gap subsidy. Jobs, school, transit and services do not depend on income.</span>
             {fitsFormula && <span className="mt-1 block text-white/80">At {level === 100 ? 'market rate (the area median income)' : `${level}% AMI`}: {fitsFormula} a month.</span>}
             {marketAs80 && <span className="mt-1 block text-amber-200">The Place tab is on market rate (no HUD ceiling), so this tab reads it as 80% AMI.</span>}
           </InfoTip>
@@ -173,12 +231,13 @@ export default function EquityToolbar({
       <div className="flex min-w-fit flex-[7_1_0%] items-center gap-1 min-[1600px]:gap-1.5">
         <Step n={3} word="Policies">{policySlot}</Step>
         <div className="min-w-fit flex-1">
-          <LeverChips on={on} onToggle={onToggle} homesText={homesText} onHomes={onHomes} />
+          <LeverChips on={on} onToggle={onToggle} homesText={homesText} onHomes={onHomes} disabled={leversOff} />
         </div>
       </div>
       <Divider />
       <div className="flex shrink-0 items-center gap-1 min-[1600px]:gap-1.5">
-        <Step n={4} word="Export" />
+        {/* With the Tracts | ZIPs switch in ①, the word "Export" hides below 1600 px (the button keeps its name and icon). */}
+        <Step n={4} word="Export" wordClass={onArea ? 'max-[1599px]:sr-only' : undefined} />
         {exportSlot}
         {chatSlot}
       </div>

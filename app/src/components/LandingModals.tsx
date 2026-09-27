@@ -37,6 +37,13 @@ const LinkedInMark = () => (
   </svg>
 );
 
+/** The GitHub mark, for the same reason. */
+const GitHubMark = () => (
+  <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+    <path fill="#181717" d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.6 18.3 5 18.3 5c.7 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3" />
+  </svg>
+);
+
 function Heading({ children }: { children: ReactNode }) {
   return <h3 className="mb-2 text-caption font-semibold uppercase tracking-wide text-slate-500">{children}</h3>;
 }
@@ -74,6 +81,10 @@ export function AboutModal({ open, onClose }: { open: boolean; onClose: () => vo
         <a href={ABOUT.contact.linkedin.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl bg-white px-3.5 py-2 text-small font-semibold text-slate-800 ring-1 ring-stone-300 transition hover:ring-violet-300">
           <LinkedInMark />
           {ABOUT.contact.linkedin.label}
+        </a>
+        <a href={ABOUT.contact.github.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl bg-white px-3.5 py-2 text-small font-semibold text-slate-800 ring-1 ring-stone-300 transition hover:ring-violet-300">
+          <GitHubMark />
+          {ABOUT.contact.github.label}
         </a>
       </div>
       <section>

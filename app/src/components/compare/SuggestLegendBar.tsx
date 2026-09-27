@@ -37,9 +37,15 @@ export default function SuggestLegendBar({
           className="h-2.5 w-3.5 rounded-sm ring-1 ring-stone-300"
           style={{ background: NO_DATA }}
         />
-        No suggestion{" "}
+        No suggestion: rule not met{" "}
         <span className="text-slate-400 tnum">{counts.none ?? 0}</span>
       </span>
+      {(counts.missing ?? 0) > 0 && (
+        <span className="inline-flex items-center gap-1.5" title="The focus's test could not run because a value is missing (usually a reliable asking rent or home value).">
+          <span className="h-2.5 w-3.5 rounded-sm ring-1 ring-stone-300 [background:repeating-linear-gradient(45deg,#e7e5e4_0_2px,#fafaf9_2px_4px)]" />
+          data missing <span className="text-slate-400 tnum">{counts.missing}</span>
+        </span>
+      )}
       <span
         className="inline-flex items-center gap-1.5"
         title="Fewer than 25 households: not ranked"

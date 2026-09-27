@@ -137,6 +137,66 @@ def test_market_reads_safmr_by_zip_and_neighbor_values():
     assert math.isnan(m.loc["b", "asking_2br"]) and m.loc["a", "asking_n"] == 66
 
 
+def _vintage(rows: dict[str, tuple]) -> pd.DataFrame:
+    """A cleaned older-vintage frame: GEOID -> (B25077E, B25077M, B25064E, B25064M)."""
+    return pd.DataFrame(rows, index=["B25077_001E", "B25077_001M", "B25064_001E", "B25064_001M"]).T.astype(float)
+
+
+def test_fill_from_older_takes_the_most_recent_vintage_with_a_value_and_records_its_year():
+    est = pd.Series({"a": 100.0, "b": np.nan, "c": np.nan, "d": np.nan})
+    moe = pd.Series({"a": 10.0, "b": np.nan, "c": np.nan, "d": np.nan})
+    older = {
+        2023: _vintage({"a": (1, 1, 1, 1), "b": (np.nan, np.nan, 7, 7), "c": (np.nan, np.nan, 7, 7), "d": (np.nan, np.nan, 7, 7)}),
+        2022: _vintage({"a": (2, 2, 2, 2), "b": (220, 22, 7, 7), "c": (np.nan, np.nan, 7, 7), "d": (np.nan, np.nan, 7, 7)}),
+        2021: _vintage({"a": (3, 3, 3, 3), "b": (210, 21, 7, 7), "c": (330, 33, 7, 7), "d": (np.nan, np.nan, 7, 7)}),
+    }
+    v, m, y = pm.fill_from_older(est, moe, older, "B25077_001")
+    assert v["a"] == 100 and m["a"] == 10 and math.isnan(y["a"])      # a 2024 value is never replaced
+    assert (v["b"], m["b"], y["b"]) == (220, 22, 2022)                # most recent earlier vintage wins
+    assert (v["c"], m["c"], y["c"]) == (330, 33, 2021)
+    assert math.isnan(v["d"]) and math.isnan(m["d"]) and math.isnan(y["d"])  # no vintage: stays null, nothing invented
+
+
+def test_acs_vintage_cleans_sentinels_and_skips_missing_files(tmp_path):
+    pd.DataFrame({"GEOID": ["42003000100", "42003000200"], "B25077_001E": ["250000", "-666666666"],
+                  "B25077_001M": ["30000", "-222222222"], "B25064_001E": ["900", "800"], "B25064_001M": ["50", "40"]}
+                 ).to_csv(tmp_path / "acs5_2023_tract.csv", index=False)
+    got = pm.acs_older_vintages(years=(2023, 2022), directory=tmp_path)
+    assert list(got) == [2023]                                        # 2022 file absent: skipped
+    df = got[2023]
+    assert df.loc["42003000100", "B25077_001E"] == 250000 and math.isnan(df.loc["42003000200", "B25077_001E"])
+    assert math.isnan(df.loc["42003000200", "B25077_001M"]) and df.loc["42003000200", "B25064_001E"] == 800
+    assert pm.acs_vintage(2023, ["B25031_004"], tmp_path) is None     # column not in the file
+
+
+def test_census_2br_reads_the_cached_raw_response(tmp_path):
+    cache = tmp_path / "b25031.csv"
+    pd.DataFrame({"GEOID": ["a", "b"], "B25031_004E": ["1142", "-666666666"], "B25031_004M": ["210", "-222222222"]}
+                 ).to_csv(cache, index=False)
+    got = pm.census_2br(cache=cache)                                  # cache exists: no network
+    assert got.loc["a", "census_2br"] == 1142 and got.loc["a", "census_2br_moe"] == 210
+    assert math.isnan(got.loc["b", "census_2br"]) and math.isnan(got.loc["b", "census_2br_moe"])
+
+
+def test_market_fills_older_vintages_and_adds_census_2br_without_moving_the_neighbor_median():
+    tr = pd.DataFrame({"rent_2br_2025_26": [np.nan, 1300.0], "n_units_2025_26": [5, 40], "asking_rents_conf": ["low", "high"],
+                       "zcta": ["15207", "15217"]}, index=pd.Index(["a", "b"], name="GEOID"))
+    acs = pd.DataFrame({"med_gross_rent": [np.nan, 900], "med_gross_rent_moe": [np.nan, 80], "med_home_value": [np.nan, 200000],
+                        "med_home_value_moe": [np.nan, 20000]}, index=pd.Index(["a", "b"], name="GEOID"))
+    older = {2023: _vintage({"a": (150000, 40000, 536, 120), "b": (1, 1, 1, 1)})}
+    rent2br = pd.DataFrame({"census_2br": [1142.0, np.nan], "census_2br_moe": [210.0, np.nan]}, index=["a", "b"])
+    m = pm.market(tr, acs, {"a": ["b"], "b": ["a"]}, None, older, rent2br)
+    assert (m.loc["a", "value_acs"], m.loc["a", "value_acs_moe"], m.loc["a", "value_acs_year"]) == (150000, 40000, 2023)
+    assert (m.loc["a", "acs_rent"], m.loc["a", "acs_rent_year"]) == (536, 2023)
+    assert m.loc["b", "value_acs"] == 200000 and math.isnan(m.loc["b", "value_acs_year"])
+    assert math.isnan(m.loc["b", "value_nbr_acs"])                    # neighbor median stays on 2024 values only
+    assert m.loc["a", "census_2br"] == 1142 and math.isnan(m.loc["b", "census_2br"])
+    place = pm.to_place_json(m.assign(name="x"))
+    assert place["a"]["market"]["value_acs_year"] == 2023 and place["a"]["market"]["acs_rent_year"] == 2023
+    assert "value_acs_year" not in place["b"]["market"] and place["b"]["market"]["census_2br"] is None
+    assert place["a"]["market"]["census_2br"] == 1142 and place["a"]["market"]["census_2br_moe"] == 210
+
+
 # ------------------------------------------------------------------------------------------------ transit geometry
 def _transit_layout():
     # two square tracts of 5280 ft (one mile) side by side; block points on a grid; stops along the shared edge
@@ -387,7 +447,7 @@ CONTRACT = {
     "bands": {b: {"hh", "moe", "burden30", "burden50"} for b in pm.BANDS},
     "types": {b: set(pm.TYPES) for b in pm.TYPE_BANDS},
     "market": {"asking_2br", "asking_n", "asking_conf", "acs_rent", "acs_rent_moe", "zip", "safmr_2br", "value_acs", "value_acs_moe",
-               "value_nbr_acs", "sale_median", "sale_n", "sale_nbr_median", "sale_nbr_n"},
+               "value_nbr_acs", "sale_median", "sale_n", "sale_nbr_median", "sale_nbr_n", "census_2br", "census_2br_moe"},
     "stock": {"sfd_share", "units_2_4_share", "units_5_19_share", "units_20plus_share", "vacancy_share", "parcels_2_4", "vacant_parcels"},
     "transit": {"freq_share_qmi", "freq_dist_mi", "any_dist_mi", "departures_qmi", "departures_pct"},
     "access": {"jobs_1mi", "jobs_1mi_pct", "school_mi", "elem_mi", "grocery_mi", "services_halfmi"},

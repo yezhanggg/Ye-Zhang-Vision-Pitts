@@ -328,11 +328,14 @@ export default function CompareTractsView({
   ]);
   const { paint, counts } = useMemo(() => {
     const values = new Map<string, number | null>();
-    const counts: Record<string, number> = { none: 0 };
+    // "No suggestion" splits into a rule that is not met and a test that could not run for missing data.
+    const counts: Record<string, number> = { none: 0, missing: 0 };
     for (const t of rankedTracts) {
-      const lead = suggestions.get(t.GEOID)?.types[0]?.typology ?? null;
+      const rec = suggestions.get(t.GEOID);
+      const lead = rec?.types[0]?.typology ?? null;
       values.set(t.GEOID, lead ? (TYPOLOGY_INDEX.get(lead) ?? null) : null);
-      counts[lead ?? "none"] = (counts[lead ?? "none"] ?? 0) + 1;
+      const key = lead ?? (rec && rec.stanceTest.passed === null && !rec.floodLimit?.blocked ? "missing" : "none");
+      counts[key] = (counts[key] ?? 0) + 1;
     }
     return {
       paint: { kind: "cat", palette: TYPOLOGY_COLORS, values } as MapPaint,
@@ -544,7 +547,7 @@ export default function CompareTractsView({
                 data-tour="compare"
                 aria-label="Compare settings"
               >
-                <div className="min-w-0 flex-1 basis-[520px]">
+                <div className="min-w-0 flex-1 basis-[520px]" data-tour="compare-places">
                   <StepLabel n={1}>Places</StepLabel>
                   <div className="flex items-center gap-1.5">
                     <div className="min-w-0 max-w-[440px] flex-1">
@@ -582,11 +585,11 @@ export default function CompareTractsView({
                     </div>
                   </div>
                 </div>
-                <div>
+                <div data-tour="compare-focus">
                   <StepLabel n={2}>Focus</StepLabel>
                   <FocusSegmented value={focus} onChange={pickFocus} />
                 </div>
-                <div>
+                <div data-tour="compare-income">
                   <StepLabel n={3}>Income</StepLabel>
                   <ToolSeg
                     label="Income level"
@@ -751,7 +754,7 @@ export default function CompareTractsView({
                 differ on the right (stacked below 1440 px). Hairline rules and whitespace separate sections. */}
             <div className="mt-6 grid gap-x-8 gap-y-6 border-t border-stone-200/80 pt-5 min-[1440px]:grid-cols-[minmax(0,55fr)_minmax(0,45fr)]">
               {(ta || tb) && (
-                <section className="min-w-0" aria-label="At a glance">
+                <section className="min-w-0" aria-label="At a glance" data-tour="compare-glance">
                   <SectionHead
                     n={1}
                     title="At a glance"

@@ -1,6 +1,6 @@
-// The quick tour: eleven short steps that dim the screen except one part of the interface and say what it does,
+// The quick tour: fifteen short steps that dim the screen except one part of the interface and say what it does,
 // while the map moves on its own to show what the tool can do. Explore first (5 steps); Analysis only if the
-// visitor asks for it (6 steps: Place, Compare places, Equity & policy). Whatever the tour changes (painted variable, selected place, open panels) is put
+// visitor asks for it (10 steps: Place, Compare places, Equity & policy). Whatever the tour changes (painted variable, selected place, open panels) is put
 // back when it ends, so it leaves nothing behind.
 import { create } from 'zustand';
 import { PGH_CENTER, PGH_VIEW } from './mapStyle';
@@ -9,7 +9,7 @@ import { useApp, type AppState } from './store';
 /** Hazelwood, one of the bundled demo tracts. */
 export const TOUR_TRACT = '42003562300';
 
-export type TourTarget = 'sections' | 'rail' | 'summary' | 'ask' | 'subtabs' | 'right' | 'compare' | 'equity-bar' | 'equity-levers';
+export type TourTarget = 'sections' | 'rail' | 'summary' | 'ask' | 'subtabs' | 'right' | 'compare' | 'compare-places' | 'compare-focus' | 'compare-income' | 'compare-glance' | 'equity-bar' | 'equity-levers';
 export type Placement = 'bottom' | 'right' | 'left';
 export type Part = 'explore' | 'analysis';
 
@@ -145,6 +145,43 @@ export const STEPS: TourStep[] = [
     title: 'Compare places',
     text: 'Pick two places and read them side by side: the same measures, the same focus, and what differs.',
     enter: () => useApp.getState().setMode('tracts'),
+  },
+  {
+    id: 'compare-places',
+    part: 'analysis',
+    target: 'compare-places',
+    placement: 'bottom',
+    title: 'Choose two places',
+    text: 'Search a neighborhood, tract or address for place A and place B. The arrows between them swap the two.',
+  },
+  {
+    id: 'compare-focus',
+    part: 'analysis',
+    target: 'compare-focus',
+    placement: 'bottom',
+    title: 'One focus for both',
+    text: 'Pick what matters most, such as keeping renters housed. Both places are judged by the same focus, so the comparison is fair.',
+  },
+  {
+    id: 'compare-income',
+    part: 'analysis',
+    target: 'compare-income',
+    placement: 'bottom',
+    title: 'Who you plan for',
+    text: 'Set the income level of the household you have in mind. It is shared with the Place tab.',
+  },
+  {
+    id: 'compare-glance',
+    part: 'analysis',
+    target: 'compare-glance',
+    placement: 'right',
+    title: 'Side by side',
+    text: 'The same measures for both places, row by row. The place with more need or better access is shaded.',
+    enter: () => {
+      // The rows sit below the maps: bring them into view first.
+      if (typeof window === 'undefined') return;
+      window.setTimeout(() => document.querySelector('[data-tour="compare-glance"]')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 350);
+    },
   },
   {
     id: 'equity',

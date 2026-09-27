@@ -19,6 +19,7 @@ import { BareBlock, SourceLine } from './shared';
 import Tenants, { typesUpTo, TYPE_LABEL } from './Tenants';
 import Transit from './Transit';
 import ZoningPrograms from './ZoningPrograms';
+import { landByGroup, landForType } from '../../lib/place/zoningAnalysis';
 import LandUse, { landHeadline } from './LandUse';
 
 export function Fold({ title, headline, children }: { title: string; headline: ReactNode; children: ReactNode }) {
@@ -39,6 +40,17 @@ export function Fold({ title, headline, children }: { title: string; headline: R
 
 const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
+/** "Mostly residential (62%) · duplex / triplex by right on 20%" */
+function zoningHeadline(place: PlaceMeasures, lead: Typology | null): string {
+  const z = place.zoning;
+  if (!z) return 'not checked';
+  const top = landByGroup(z.shares)[0];
+  if (!top) return 'not available';
+  const head = `mostly ${top.label.toLowerCase()} (${Math.round(top.share * 100)}%)`;
+  if (!lead) return head;
+  return `${head} · ${TYPOLOGY_LABEL[lead]} by right on ${Math.round(landForType(z.shares, lead).yes * 100)}%`;
+}
+
 export default function PlaceFolds({ t, place, hud, rec, level, fitOrder }: { t: TractProps; place: PlaceMeasures; hud: HudTable; rec: Recommendation; level: PlanLevel; fitOrder: Typology[] }) {
   const band = LEVEL_BAND[level];
   // Market rate reads the bands above 80% AMI only (CHAS types: ">80%"); the HUD levels read every band at or below.
@@ -49,8 +61,6 @@ export default function PlaceFolds({ t, place, hud, rec, level, fitOrder }: { t:
   const askingShown = isNum(m.asking_2br) && m.asking_conf !== 'low';
   const tr = place.transit;
   const f = place.flood;
-  const z = place.zoning;
-  const byRight = z ? (Object.entries(z.by_type) as [Typology, string][]).filter(([, v]) => v === 'yes').map(([k]) => typologyById.get(k)?.label ?? TYPOLOGY_LABEL[k]) : [];
   const suggested = new Set(rec.types.map((x) => x.typology));
   const lvl = level === 'market' ? '>80% AMI' : LEVEL_LABEL[level];
   const lines = rec.lines.map((l, i) => toRuleLine(l, i, rec.stance, rec)).filter((l) => l.label !== 'You decide');
@@ -75,8 +85,8 @@ export default function PlaceFolds({ t, place, hud, rec, level, fitOrder }: { t:
       <Fold title="Land use" headline={landHeadline(t.GEOID)}>
         <LandUse geoid={t.GEOID} />
       </Fold>
-      <Fold title="Zoning" headline={z ? (byRight.length ? `${byRight.length} type${byRight.length === 1 ? '' : 's'} by right (unverified)` : 'none by right (unverified)') : 'not checked'}>
-        <ZoningPrograms place={place} />
+      <Fold title="Zoning" headline={zoningHeadline(place, rec.types[0]?.typology ?? null)}>
+        <ZoningPrograms place={place} lead={rec.types[0]?.typology ?? null} />
       </Fold>
       <Fold title="Rules" headline={`${lines.length} steps`}>
         <dl className="divide-y divide-stone-100 overflow-hidden rounded-xl bg-white ring-1 ring-stone-200/80">

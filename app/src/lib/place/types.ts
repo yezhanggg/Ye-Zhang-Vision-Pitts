@@ -39,6 +39,13 @@ export interface PlaceMarket {
   sale_n: number | null;
   sale_nbr_median: number | null;
   sale_nbr_n: number | null;
+  /** ACS 2020–24 B25031_004: median gross rent, 2 bedrooms (current renters, utilities included); null where suppressed. */
+  census_2br?: number | null;
+  census_2br_moe?: number | null;
+  /** End year of the earlier ACS 5-year vintage that filled a null 2024 value_acs; absent = 2020–24. */
+  value_acs_year?: number | null;
+  /** End year of the earlier ACS 5-year vintage that filled a null 2024 acs_rent; absent = 2020–24. */
+  acs_rent_year?: number | null;
 }
 
 export interface PlaceStock {

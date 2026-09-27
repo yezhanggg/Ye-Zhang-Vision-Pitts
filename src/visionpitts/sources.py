@@ -198,6 +198,18 @@ SOURCES: list[dict] = [
                 "largest-overlap ZCTA (the same assignment as the DDA flag).",
          caveats="ZCTAs approximate ZIP codes; SAFMRs are 40th-percentile gross rents of recent movers, not asking rents. "
                  "Information only, never a scoring factor."),
+    dict(id="acs_2br_rent", name="ACS 5-year 2020-2024 B25031_004: median gross rent, 2 bedrooms (Census API), plus earlier "
+                                 "vintages of B25064 / B25077 on disk (place measures)",
+         url="https://api.census.gov/data/2024/acs/acs5", vintage="2020-2024 (fills from 2019-2023 back to 2016-2020)",
+         geography="tract",
+         method="B25031_004E/M fetched once for Allegheny County tracts and cached raw under data/raw/acs/; suppressed cells "
+                "stay null (market.census_2br, census_2br_moe). The Equity rent gap uses it only where the Dewey asking rent "
+                "is too thin to use. Where the 2020-2024 median gross rent (B25064) or home value (B25077) is null, the most "
+                "recent earlier 5-year vintage on 2020 tract geography that has a value fills it, with that vintage's MOE and "
+                "its end year in acs_rent_year / value_acs_year; tracts with no value in any vintage stay null.",
+         caveats="Gross rent paid by current renters (contract rent plus utilities), including long-tenure and subsidized units: "
+                 "lower than asking rents, so never used in the Place/Compare market test. Filled values are older and not "
+                 "the same vintage as their neighbours."),
     dict(id="gtfs_frequent", name="Pittsburgh Regional Transit GTFS: frequent-stop access from 2020 blocks (place measures)",
          url="https://www.rideprt.org/business-center/developer-resources/", vintage="feed of June 2026 (service day 2026-07-01)",
          geography="stop, block, tract",

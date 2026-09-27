@@ -40,6 +40,19 @@ describe('explain helpers', () => {
     expect(s[2]).toBe('The largest gaps are in A, B and C.');
   });
 
+  it('says how many tracts use the census 2-bedroom rent', () => {
+    const vals = [
+      { id: 'a', value: 300 },
+      { id: 'b', value: 100 },
+      { id: 'c', value: -50 },
+      { id: 'd', value: null },
+    ];
+    const s = explainMeasure({ def: def('rent_gap'), ami: 50, values: vals, nameOf: (id) => id.toUpperCase(), usesCensusRent: (id) => id === 'b' });
+    expect(s[0]).toBe(
+      'Listings ask more than a 50% AMI household can pay in 2 of 3 tracts with a 2-bedroom rent (1 of them uses the census 2-bedroom gross rent because listings are too few). 1 tract has no 2-bedroom rent from listings or the census and is left out.',
+    );
+  });
+
   it('says so when the market fits everywhere', () => {
     const s = explainMeasure({ def: def('rent_gap'), ami: 80, values: [{ id: 'a', value: -10 }, { id: 'b', value: -5 }], nameOf: (id) => id });
     expect(s).toEqual(['Listings for a 2-bedroom already fit an 80% AMI household in all 2 tracts with a reliable asking rent.']);

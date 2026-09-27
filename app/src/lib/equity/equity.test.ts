@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { hud, placeById } from '../place/data';
 import type { HudTable, PlaceMeasures } from '../place/types';
 import { FAMILY_RULES, RESIDENTIAL_FAMILIES, SMALL_APT_CONDITIONAL_FAMILIES, statusFromShares } from './zoning';
-import { buildLegend, burdenedLe50, classOf, fitsRent2br, measureById, measureValue, median, quantileBreaks, rankByNeed, rentGap } from './measures';
+import { buildLegend, burdenedLe50, classOf, equityRentGap, fitsRent2br, gapRentSources, measureById, measureValue, median, quantileBreaks, rankByNeed, rentForGap, rentGap, usableAsking } from './measures';
 import { aduByRight, bonusAffordableHomes, densityBonus, gapCost, largestGaps, rent60TwoBedroom, transitExtension, transitPasses } from './policy';
 
 const HUD: HudTable = {
@@ -124,6 +124,33 @@ describe('measures', () => {
     expect(rentGap(place(), HUD, 80)).toBe(1500 - 1988); // 79,500 ÷ 40 = 1,987.5 → 1,988: negative, the market fits
     const low = place({ market: { ...place().market, asking_conf: 'low' } });
     expect(rentGap(low, HUD, 50)).toBeNull();
+  });
+
+  it('rentForGap: listings first, census 2-bedroom gross rent where listings are too few, else null', () => {
+    expect(rentForGap(place())).toEqual({ rent: 1500, source: 'listings' });
+    const low = place({ market: { ...place().market, asking_conf: 'low', census_2br: 1142 } });
+    expect(rentForGap(low)).toEqual({ rent: 1142, source: 'census' });
+    expect(usableAsking(low)).toBeNull(); // the Place/Compare market test never sees census rent
+    expect(rentGap(low, HUD, 50)).toBeNull(); // listings-only gap unchanged
+    expect(equityRentGap(low, HUD, 50)).toBe(1142 - 1242);
+    expect(measureValue('rent_gap', low, HUD, 50)).toBe(1142 - 1242);
+    const withBoth = place({ market: { ...place().market, census_2br: 900 } });
+    expect(rentForGap(withBoth)?.source).toBe('listings'); // a usable asking rent always wins
+    const none = place({ market: { ...place().market, asking_conf: 'low', census_2br: null } });
+    expect(rentForGap(none)).toBeNull();
+    expect(measureValue('rent_gap', none, HUD, 50)).toBeNull();
+    expect(gapRentSources([place(), low, none, null])).toEqual({ listings: 1, census: 1, none: 2 });
+    expect(measureById.get('rent_gap')!.source).toMatch(/listings \(Dewey.*or census 2-bedroom gross rent .*where listings are too few/);
+  });
+
+  it('bundled place.json: every ranked tract without a usable asking rent that has a census 2-bedroom rent falls back to it', () => {
+    const ranked = [...placeById.entries()];
+    const s = gapRentSources(ranked.map(([, p]) => p));
+    expect(s.census).toBeGreaterThan(0);
+    for (const [, p] of ranked) {
+      const r = rentForGap(p);
+      if (r?.source === 'census') expect(usableAsking(p)).toBeNull();
+    }
   });
 
   it('burdened renters at or below 50% AMI add the two lowest bands', () => {

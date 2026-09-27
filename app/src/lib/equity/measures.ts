@@ -45,9 +45,9 @@ export const MEASURES: MeasureDef[] = [
     id: 'rent_gap',
     short: 'Rent gap',
     title: 'Rent gap for a 2-bedroom',
-    definition: (ami) => `What listings ask for a 2-bedroom, minus the rent a 3-person household ${ami === 100 ? 'at the area median income (market rate)' : `at ${ami}% of area median income`} can pay (30% of income). Below $0 means the market already fits. Listings usually exclude utilities and the rent that fits includes them, so the real gap is larger.`,
+    definition: (ami) => `What listings ask for a 2-bedroom, minus the rent a 3-person household ${ami === 100 ? 'at the area median income (market rate)' : `at ${ami}% of area median income`} can pay (30% of income). Where listings are too few, the census median gross rent for a 2-bedroom (what current renters pay, utilities included) stands in, marked "census rent". Below $0 means the market already fits. Listings usually exclude utilities and the rent that fits includes them, so the real gap is larger.`,
     unit: '$ per month',
-    source: 'Asking rents: Dewey listings 2025–26 (high or medium confidence only) · Income limits: HUD FY2026, Pittsburgh HMFA',
+    source: 'Rent: listings (Dewey 2025–26, high or medium confidence), or census 2-bedroom gross rent (ACS 2020–24 B25031) where listings are too few · Income limits: HUD FY2026, Pittsburgh HMFA',
     higherIsNeed: true,
     step: 25,
     fmt: (v) => (isNum(v) ? `${dollars(v)}/mo` : NA),
@@ -55,8 +55,11 @@ export const MEASURES: MeasureDef[] = [
   {
     id: 'burdened',
     short: 'Burdened renters',
-    title: 'Renters at or below 50% AMI paying over 30%',
-    definition: () => 'Renter households earning up to half the area median income that spend more than 30% of income on housing (the ≤30% and 30–50% bands added together).',
+    title: 'Cost-burdened renters',
+    definition: (ami) =>
+      ami === 100
+        ? 'Renter households earning more than 80% of the area median income that spend more than 30% of income on housing (the 80–100% and above-100% bands added together).'
+        : `Renter households earning up to ${ami}% of the area median income that spend more than 30% of income on housing (every band at or below ${ami}% added together).`,
     unit: 'households',
     source: 'HUD CHAS 2018–2022, Table 8 (HAMFI bands)',
     higherIsNeed: true,
@@ -137,11 +140,50 @@ export function usableAsking(p: PlaceMeasures | null | undefined): number | null
   return isNum(m?.asking_2br) && confUsable(m?.asking_conf) ? m!.asking_2br! : null;
 }
 
-/** asking − fits, $/month; negative when the market already fits. */
+export type GapRentSource = 'listings' | 'census';
+
+/**
+ * The 2-bedroom rent the Equity rent gap compares with what fits: the usable asking rent, else the ACS 2020–24 median
+ * gross rent for a 2-bedroom (B25031, `market.census_2br`), marked 'census'. Equity only: the Place/Compare market test
+ * keeps `usableAsking`, because what current tenants pay is not a listing price.
+ */
+export function rentForGap(p: PlaceMeasures | null | undefined): { rent: number; source: GapRentSource } | null {
+  const a = usableAsking(p);
+  if (a != null) return { rent: a, source: 'listings' };
+  const c = p?.market?.census_2br;
+  return isNum(c) ? { rent: c, source: 'census' } : null;
+}
+
+/** The Equity map's rent gap: rentForGap − fits, $/month (census rent where listings are too few). */
+export function equityRentGap(p: PlaceMeasures | null | undefined, hud: HudTable | null, ami: AmiPct): number | null {
+  const r = rentForGap(p),
+    f = fitsRent2br(hud, ami);
+  return r != null && f != null ? r.rent - f : null;
+}
+
+/** Of these places, how many have a rent for the gap from listings and how many from the census fallback. */
+export function gapRentSources(ps: Iterable<PlaceMeasures | null | undefined>): { listings: number; census: number; none: number } {
+  const out = { listings: 0, census: 0, none: 0 };
+  for (const p of ps) {
+    const r = rentForGap(p);
+    if (r) out[r.source]++;
+    else out.none++;
+  }
+  return out;
+}
+
+/** asking − fits, $/month; negative when the market already fits. Listings only (Compare and the voucher estimate). */
 export function rentGap(p: PlaceMeasures | null | undefined, hud: HudTable | null, ami: AmiPct): number | null {
   const a = usableAsking(p),
     f = fitsRent2br(hud, ami);
   return a != null && f != null ? a - f : null;
+}
+
+/** Renters paying over 30% of income at the income level: every band at or below it, or (market rate) the bands above 80%. */
+export function burdenedAt(p: PlaceMeasures | null | undefined, ami: AmiPct): number | null {
+  const ids = ami === 100 ? (['b80_100', 'gt100'] as const) : ami === 30 ? (['le30'] as const) : ami === 50 ? (['le30', 'b30_50'] as const) : (['le30', 'b30_50', 'b50_80'] as const);
+  const xs = ids.map((id) => p?.bands?.[id]?.burden30);
+  return xs.every(isNum) ? (xs as number[]).reduce((s, v) => s + v, 0) : null;
 }
 
 export function burdenedLe50(p: PlaceMeasures | null | undefined): number | null {
@@ -155,9 +197,9 @@ export function measureValue(id: MeasureId, p: PlaceMeasures | null | undefined,
   const acc = accessOf(p);
   const v =
     id === 'rent_gap'
-      ? rentGap(p, hud, ami)
+      ? equityRentGap(p, hud, ami)
       : id === 'burdened'
-        ? burdenedLe50(p)
+        ? burdenedAt(p, ami)
         : id === 'jobs'
           ? acc?.jobs_1mi
           : id === 'school'

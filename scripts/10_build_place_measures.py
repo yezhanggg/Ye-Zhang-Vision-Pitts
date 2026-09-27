@@ -29,7 +29,7 @@ from visionpitts import zoning_map
 
 FOCUS_COLS = [
     "renter_hh", "le30_hh", "le30_moe", "le30_burden30", "le30_burden50", "b30_50_hh", "b30_50_burden30",
-    "types_le30_elderly_alone", "types_le30_small_family", "asking_2br", "asking_n", "asking_conf", "acs_rent", "zip", "safmr_2br",
+    "types_le30_elderly_alone", "types_le30_small_family", "asking_2br", "asking_n", "asking_conf", "acs_rent", "census_2br", "zip", "safmr_2br",
     "value_acs", "value_nbr_acs", "freq_share_qmi", "freq_dist_mi", "any_dist_mi", "departures_qmi", "departures_tract_qmi", "departures_pct",
     "jobs_1mi", "jobs_1mi_pct", "school_mi", "elem_mi", "grocery_mi", "services_halfmi",
     "hand_pct", "fema_sfha_pct", "fema_zone", "sale_median", "sale_n", "sale_nbr_median", "parcels_2_4", "vacant_parcels",
@@ -71,7 +71,9 @@ def main() -> None:
     types = step("CHAS Table 7 household types", pm.chas_household_types, failures, geoids)
     limits = step("HUD income limits (API)", pm.hud_limits, failures, 2026, args.refresh)
     safmr = step("HUD FMR / SAFMR (API)", pm.hud_safmr, failures, 2026, args.refresh)
-    mkt = step("market", pm.market, failures, tr, acs, nbrs, safmr)
+    older = step("ACS 2020-2023 vintages on disk (fill null 2024 rent / value)", pm.acs_older_vintages, failures)
+    rent2br = step("ACS B25031 2-bedroom gross rent (API, cached)", pm.census_2br, failures, args.refresh)
+    mkt = step("market", pm.market, failures, tr, acs, nbrs, safmr, older, rent2br)
     stk = step("stock (ACS shares)", pm.stock, failures, acs, geoids)
     tra = step("transit (GTFS + 2020 blocks)", pm.transit_measures, failures, tracts)
     acc = step("access (LODES jobs, NCES schools, OSM services + 2020 blocks)", pm.access_measures, failures, tracts)

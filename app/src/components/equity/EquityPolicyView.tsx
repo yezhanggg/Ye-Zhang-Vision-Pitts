@@ -15,10 +15,13 @@ import { POLICY_COLUMNS, buildEquityReport, equityFacts, equityPrompts, measureC
 import { downloadCsv, exportFilename, toCsv } from '../../lib/export/csv';
 import { mapSnapshot, printReport, reportFooter } from '../../lib/export/report';
 import ExportMenu, { useMapRef } from '../export/ExportMenu';
-import MapView from '../MapView';
+import MapView, { spotlightRings, type OverlayLayer } from '../MapView';
 import AnalysisChat from '../AnalysisChat';
-import EquityToolbar from './EquityToolbar';
-import MeasurePanel from './MeasurePanel';
+import EquityToolbar, { LEVERS_TRACT_ONLY, type AreaLevel } from './EquityToolbar';
+import MeasurePanel, { type AreaKind } from './MeasurePanel';
+import { ZIP_NOTE, hasZipData, zipRanked as zipIsRanked, rankedZips, zipById, zipCoverage, zipFacts, zipName, zipPlaces, zipValue, zipWords } from '../../lib/equity/zip';
+import { bundledGeo, CITY_GEOID } from '../../lib/explore/catalog';
+import { isNum } from '../../lib/place/format';
 import PolicyPopover from './PolicySimulator';
 import { explainPolicies, policiesOnLine } from '../../lib/equity/explain';
 import { useEquityReading } from '../../lib/equity/reading';
@@ -37,6 +40,47 @@ const infoOf = (id: string): TractInfo => {
   return { geoid: id, neighborhood: tractLabel(t), tract: t?.name ?? id };
 };
 const tractOf = (id: string) => tractById.get(id)?.name ?? id;
+
+// ZIP level: the ZCTA shapes Explore already bundles, labeled; edge ZIPs say "city part". Outside the city a light
+// veil (the city polygon cut out of a world ring) keeps the eye on the city part of each ZIP.
+const zipLabelOf = (id: string) => (zipById.get(id)?.edge ? `${id} (city part)` : id);
+const ZIP_FC: OverlayLayer['data'] = (() => {
+  const fc = bundledGeo('zcta');
+  return { type: 'FeatureCollection', features: fc.features.map((f) => ({ type: 'Feature' as const, geometry: f.geometry as OverlayLayer['data']['features'][number]['geometry'], properties: { GEOID: f.properties.GEOID, label: zipLabelOf(f.properties.GEOID) } })) };
+})();
+const CITY_VEIL: OverlayLayer['data'] | null = (() => {
+  const g = bundledGeo('city').features.find((f) => f.properties.GEOID === CITY_GEOID)?.geometry as { type: string; coordinates: unknown } | undefined;
+  if (!g) return null;
+  // The world minus the city, plus the enclaves inside it (the city polygon's inner rings, such as Mount Oliver).
+  const polys = g.type === 'Polygon' ? [g.coordinates as number[][][]] : g.type === 'MultiPolygon' ? (g.coordinates as number[][][][]) : [];
+  const enclaves = polys.flatMap((p) => p.slice(1).map((r) => [r]));
+  return { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { GEOID: 'veil' }, geometry: { type: 'MultiPolygon', coordinates: [spotlightRings(g), ...enclaves] } }] };
+})();
+const CITY_FC = bundledGeo('city') as unknown as OverlayLayer['data'];
+const ZIP_LINE: OverlayLayer['line'] = {
+  color: '#334155',
+  width: ['interpolate', ['linear'], ['zoom'], 10, 0.8, 15, 2] as unknown as number,
+  opacity: 0.9,
+  casing: { color: '#ffffff', width: ['interpolate', ['linear'], ['zoom'], 10, 2.4, 15, 4] as unknown as number, opacity: 0.7 },
+  label: { field: 'label', minzoom: 11, color: '#1e293b', size: 11 },
+};
+const ZIP_AREA: AreaKind = {
+  level: 'zip',
+  one: 'ZIP',
+  many: 'ZIPs',
+  label: (id) => zipName(id),
+  listSub: (id) => zipPlaces(id, (t) => tractLabel(tractById.get(t))),
+  sub: (id) => zipCoverage(id),
+  value: (m, id, ami) => zipValue(m, id, ami, hud),
+  note: (id) => {
+    const r = zipById.get(id);
+    if (!r) return null;
+    if (!zipIsRanked(r)) return 'Too few homes in the city part, not ranked.';
+    return r.edge ? `Edge ZIP: only ${Math.round(r.share * 100)}% of its homes are in the city, so these values cover its city part (the rent gap uses the whole ZIP's asking rent).` : null;
+  },
+  words: zipWords,
+  info: ZIP_NOTE,
+};
 
 function Legend({ title, items, flips }: { title: string; items: { color: string; label: string }[]; flips: number }) {
   return (
@@ -75,6 +119,10 @@ export default function EquityPolicyView({ active = true }: { active?: boolean }
   const [measure, setMeasure] = useState<MeasureId>('rent_gap');
   const [on, setOn] = useState<Record<LeverId, boolean>>({ adu: false, bonus: false, voucher: false, transit: false });
   const [homesText, setHomesText] = useState('40');
+  // Tracts (default) or ZIP codes for the map and the measure section; the levers always run on tracts.
+  const [areaLevel, setAreaLevel] = useState<AreaLevel>('tract');
+  const zipMode = areaLevel === 'zip' && hasZipData;
+  const [selZip, setSelZip] = useState<string | null>(null);
   // VisionPitts-Chat floats over the right of the page; the map and the analysis never change size, so opening it
   // costs no layout work (the panel stays mounted and only fades and slides).
   const [chatOpen, setChatOpen] = useState(() => {
@@ -118,6 +166,44 @@ export default function EquityPolicyView({ active = true }: { active?: boolean }
   const fits = fits2br(hud, level);
   const med = medians.get(measure) ?? null;
   const { results, levers, flips } = usePolicy(rows, level, homes, on);
+
+  // ZIP level: the same charts and lists over the city's ZIP codes (lib/equity/zip).
+  const zipAll = useMemo(() => new Map(MEASURES.map((m) => [m.id, rankedZips.map((z) => zipValue(m.id, z, level, hud)).filter(isNum)])), [level]);
+  const zipMedians = useMemo(() => new Map(MEASURES.map((m) => [m.id, median(zipAll.get(m.id) ?? [])])), [zipAll]);
+  const zipValues = useMemo(() => rankedZips.map((z) => ({ id: z, value: zipValue(measure, z, level, hud) })), [measure, level]);
+  const zipRankedRows = useMemo(() => rankByNeed(zipValues, def.higherIsNeed), [zipValues, def]);
+  const zipLegend = useMemo(() => buildLegend(def, zipValues.map((v) => v.value).filter(isNum)), [def, zipValues]);
+  const zipPaint: MapPaint = useMemo(() => ({ kind: 'cat', palette: zipLegend.colors, values: new Map(zipValues.map((v) => [v.id, zipLegend.classOf(v.value)])) }), [zipLegend, zipValues]);
+  const zipValueById = useMemo(() => new Map(zipValues.map((v) => [v.id, v.value])), [zipValues]);
+  const onZip = useCallback((id: string | null) => setSelZip((cur) => (id != null && cur === id ? null : id)), []);
+  const overlays = useMemo<OverlayLayer[] | undefined>(() => {
+    if (!zipMode) return undefined;
+    const out: OverlayLayer[] = [
+      {
+        id: 'eq-zip',
+        data: ZIP_FC,
+        idField: 'GEOID',
+        line: ZIP_LINE,
+        fill: { paint: zipPaint },
+        interactive: true,
+        zoomTo: false,
+        selectedId: selZip,
+        onSelect: (id) => onZip(id),
+        tooltip: (id) => (
+          <div className="max-w-64">
+            <div className="font-semibold">{zipName(id)}</div>
+            <div className="text-caption text-white/75">{zipCoverage(id)}</div>
+            <div className="mt-1">
+              {def.short}: <b>{zipValueById.has(id) ? def.fmt(zipValueById.get(id) ?? null) : 'not ranked'}</b>
+            </div>
+          </div>
+        ),
+      },
+    ];
+    if (CITY_VEIL) out.push({ id: 'eq-city-veil', data: CITY_VEIL, idField: 'GEOID', fill: { color: '#f8f7f4', opacity: 0.78 }, line: { color: '#0f172a', width: 0, opacity: 0 } });
+    out.push({ id: 'eq-city-line', data: CITY_FC, idField: 'GEOID', line: { color: '#1e293b', width: 1.8, opacity: 0.9, casing: { color: '#ffffff', width: 4, opacity: 0.8 } } });
+    return out;
+  }, [zipMode, zipPaint, selZip, onZip, def, zipValueById]);
   const toggle = useCallback((id: LeverId) => setOn((o) => ({ ...o, [id]: !o[id] })), []);
 
   const selectedFacts = useMemo(() => {
@@ -125,10 +211,12 @@ export default function EquityPolicyView({ active = true }: { active?: boolean }
     const p = placeById.get(selectedId)!;
     return { id: selectedId, values: MEASURES.map((m) => ({ def: m, value: measureValue(m.id, p, hud, level), median: medians.get(m.id) ?? null })) };
   }, [selectedId, level, medians]);
-  const facts = useMemo(
-    () => equityFacts({ ami: level, def, median: med, available, n: rows.length, ranked, levers, nameOf, tractOf, selected: selectedFacts }),
-    [level, def, med, available, rows.length, ranked, levers, selectedFacts],
-  );
+  const facts = useMemo(() => {
+    const base = equityFacts({ ami: level, def, median: med, available, n: rows.length, ranked, levers, nameOf, tractOf, selected: selectedFacts });
+    // At ZIP level the ZIP facts come first (they are what the map and the section show); the tract facts follow
+    // because the four levers run on tracts.
+    return zipMode ? `${zipFacts({ def, ami: level, hud, selected: selZip })}\nTRACT-LEVEL DATA BEHIND THE LEVERS:\n${base}` : base;
+  }, [level, def, med, available, rows.length, ranked, levers, selectedFacts, zipMode, selZip]);
   // What the switched-on policies change (exact sentences), and a VisionPitts-Chat reading of the whole tab.
   const policyTexts = useMemo(
     () =>
@@ -145,7 +233,10 @@ export default function EquityPolicyView({ active = true }: { active?: boolean }
   );
   const readingFacts = useMemo(() => (policyTexts.length ? `${facts}\nWHAT THE POLICIES THAT ARE ON CHANGE:\n${policyTexts.map((p) => `${p.name}: ${p.text}`).join('\n')}` : facts), [facts, policyTexts]);
   const reading = useEquityReading(readingFacts, active);
-  const prompts = useMemo(() => equityPrompts(def, level, levers, selectedId ? nameOf(selectedId) : null), [def, level, levers, selectedId]);
+  const prompts = useMemo(() => {
+    const ps = equityPrompts(def, level, levers, zipMode ? (selZip ? zipName(selZip) : null) : selectedId ? nameOf(selectedId) : null);
+    return zipMode ? ps.map((q) => q.replace('Which neighborhoods', 'Which ZIP codes')) : ps;
+  }, [def, level, levers, selectedId, zipMode, selZip]);
 
   const exportItems = [
     {
@@ -176,6 +267,32 @@ export default function EquityPolicyView({ active = true }: { active?: boolean }
       hint: `All ${rows.length} tracts, six measures${flips.size ? ', levers on' : ''}`,
       onSelect: () => downloadCsv(exportFilename('equity-measures', `${level}-ami`, 'csv'), toCsv(measureRows(rows, infoOf, hud, level, levers), measureColumns(level, levers))),
     },
+    ...(zipMode
+      ? [
+          {
+            label: 'ZIP measures (CSV)',
+            hint: `All ${rankedZips.length} ZIP codes, six measures (tract aggregates)`,
+            onSelect: () =>
+              downloadCsv(
+                exportFilename('equity-zip-measures', `${level}-ami`, 'csv'),
+                toCsv(
+                  rankedZips.map((z) => {
+                    const r = zipById.get(z)!;
+                    return { zip: z, city_part: r.edge ? 'yes' : 'no', city_homes: r.hu, share_in_city: r.share, tracts: r.tracts.length, ...Object.fromEntries(MEASURES.map((m) => [m.id, zipValue(m.id, z, level, hud)])) };
+                  }),
+                  [
+                    { key: 'zip', label: 'ZIP code' },
+                    { key: 'city_part', label: 'Edge ZIP (city part only)' },
+                    { key: 'city_homes', label: 'City homes (2020)' },
+                    { key: 'share_in_city', label: "Share of the ZIP's homes in the city" },
+                    { key: 'tracts', label: 'City tracts used' },
+                    ...MEASURES.map((m) => ({ key: m.id, label: `${m.title} (${m.unit})` })),
+                  ],
+                ),
+              ),
+          },
+        ]
+      : []),
     {
       label: 'Policy results (CSV)',
       hint: 'One row per lever: rule, before, after',
@@ -229,6 +346,9 @@ export default function EquityPolicyView({ active = true }: { active?: boolean }
           level={level}
           onLevel={(l) => setPlan({ level: l === 100 ? 'market' : l })}
           marketAs80={false}
+          incomeApplies={measure === 'rent_gap' || measure === 'burdened'}
+          area={zipMode ? 'zip' : 'tract'}
+          onArea={hasZipData ? setAreaLevel : undefined}
           fitsFormula={fits?.formula ?? null}
           on={on}
           onToggle={toggle}
@@ -265,8 +385,10 @@ export default function EquityPolicyView({ active = true }: { active?: boolean }
           <div className="relative min-h-[420px] min-w-0 flex-[44_1_0%] overflow-hidden rounded-xl ring-1 ring-stone-200/80">
             <MapView
               paint={paint}
-              selectedId={selectedId}
-              flips={flips}
+              selectedId={zipMode ? null : selectedId}
+              flips={zipMode ? null : flips}
+              baseTracts={!zipMode}
+              overlays={overlays}
               lite={lite}
               terrain={false}
               buildings
@@ -285,29 +407,35 @@ export default function EquityPolicyView({ active = true }: { active?: boolean }
                 </div>
               )}
             />
-            <Legend title={`${def.title} (${def.unit})`} items={legend.items} flips={flips.size} />
+            {zipMode ? (
+              <Legend title={`${def.title} (${def.unit}), by ZIP`} items={zipLegend.items} flips={0} />
+            ) : (
+              <Legend title={`${def.title} (${def.unit})`} items={legend.items} flips={flips.size} />
+            )}
           </div>
 
           <div className="ml-2.5 flex min-h-0 min-w-0 flex-[56_1_0%] flex-col max-lg:ml-0 max-lg:mt-2.5 [&>section]:flex-1">
+          {/* One panel for both levels, so VisionPitts-Chat (inside it) keeps its thread when the level changes. */}
           <MeasurePanel
             wide
+            area={zipMode ? ZIP_AREA : undefined}
             def={def}
             ami={level}
-            median={med}
-            available={available}
-            n={rows.length}
-            ranked={ranked}
-            values={values}
-            legend={legend}
-            medians={medians}
-            allValues={allValues}
-            selectedId={selectedId}
-            policiesLine={policiesOnLine(levers)}
+            median={zipMode ? (zipMedians.get(measure) ?? null) : med}
+            available={zipMode ? zipValues.filter((v) => v.value != null).length : available}
+            n={zipMode ? rankedZips.length : rows.length}
+            ranked={zipMode ? zipRankedRows : ranked}
+            values={zipMode ? zipValues : values}
+            legend={zipMode ? zipLegend : legend}
+            medians={zipMode ? zipMedians : medians}
+            allValues={zipMode ? zipAll : allValues}
+            selectedId={zipMode ? selZip : selectedId}
+            policiesLine={zipMode ? (levers.some((l) => l.on) ? LEVERS_TRACT_ONLY : null) : policiesOnLine(levers)}
             chat={chatPanel}
             chatOpen={chatOpen}
-            policyTexts={policyTexts}
+            policyTexts={zipMode ? [] : policyTexts}
             reading={reading}
-            onPick={select}
+            onPick={zipMode ? setSelZip : select}
           />
           </div>
 

@@ -14,7 +14,8 @@ Measures (plan section 2):
            data/raw/benchmark/hud_api/ (git-ignored).
   market   asking 2BR rent (Dewey listings, via tracts.csv), ACS rent and home value with margins of error, the
            neighbors' median home value (queen contiguity), the SAFMR for the tract's largest-overlap ZCTA; parcel
-           sales since 2023 (Tier 2).
+           sales since 2023 (Tier 2). ACS B25031_004 2-bedroom median gross rent (census_2br). A null 2024 ACS rent or
+           value is filled from the most recent earlier vintage on disk (2023 back to 2020), its year recorded.
   stock    ACS structure shares; 2-4 family and vacant parcel counts (Tier 2).
   transit  PRT GTFS: a frequent stop has >= 64 departures on the representative Wednesday (about one every 15 minutes
            over a 16-hour service day). Distances are straight lines in EPSG:2272 from 2020 block internal points,
@@ -117,6 +118,12 @@ VALID_SALE = "VALID SALE"
 LAND_USE_CLASSES = ["residential", "commercial", "industrial", "vacant", "institutional", "other"]
 PUBLIC_HOUSING_USES = ("OWNED BY METRO HOUSING", "HUD PROJ")
 INSTITUTIONAL_USES = {"CHURCHES, PUBLIC WORSHIP", "CEMETERY/MONUMENTS", "DAYCARE/PRIVATE SCHOOL"}
+
+ACS_RAW_DIR = RAW / "acs"
+ACS_CURRENT = 2024                     # vintage behind acs_tract.csv
+ACS_FILL_YEARS = (2023, 2022, 2021, 2020)  # earlier 5-year vintages on 2020 tract geography, most recent first
+CENSUS_2BR_VARS = ("B25031_004E", "B25031_004M")  # median gross rent, 2 bedrooms, renter-occupied units paying cash rent
+CENSUS_2BR_CACHE = ACS_RAW_DIR / f"acs5_{ACS_CURRENT}_tract_b25031_2br.csv"
 
 TRACTS_CSV = PROCESSED / "tracts.csv"
 ACS_TRACT_CSV = PROCESSED / "acs_tract.csv"
@@ -355,8 +362,87 @@ def neighbor_median(values: pd.Series, nbrs: dict[str, list[str]]) -> pd.Series:
     return pd.Series(out, dtype=float).reindex(values.index)
 
 
-def market(tr: pd.DataFrame, acs: pd.DataFrame, nbrs: dict[str, list[str]], safmr: dict | None) -> pd.DataFrame:
-    """Asking rent, census rent and value with MOE, neighbors' value, ZIP and its 2BR Small Area FMR."""
+def _clean_estimates(df: pd.DataFrame) -> pd.DataFrame:
+    """Census API strings -> numbers; negative sentinels (-666666666 not available, -222222222 MOE not applicable) -> NaN."""
+    out = df.apply(pd.to_numeric, errors="coerce")
+    return out.where(out >= 0)
+
+
+def acs_vintage(year: int, stems: Sequence[str], directory: Path | None = None) -> pd.DataFrame | None:
+    """E/M columns for `stems` from the cached county tract file of one earlier vintage (data/raw/acs/acs5_<year>_tract.csv),
+    cleaned; None when the file or a column is missing. Only 2020+ vintages share the 2020 tract GEOIDs."""
+    path = (directory or ACS_RAW_DIR) / f"acs5_{year}_tract.csv"
+    if not path.exists():
+        return None
+    cols = [f"{s}{x}" for s in stems for x in ("E", "M")]
+    head = pd.read_csv(path, nrows=0).columns
+    if any(c not in head for c in cols):
+        return None
+    raw = pd.read_csv(path, dtype=str, usecols=["GEOID", *cols]).set_index("GEOID")
+    return _clean_estimates(raw)
+
+
+def acs_older_vintages(stems: Sequence[str] = ("B25077_001", "B25064_001"), years: Sequence[int] = ACS_FILL_YEARS,
+                       directory: Path | None = None) -> dict[int, pd.DataFrame]:
+    """{year: cleaned E/M frame} for the earlier vintages on disk (missing files are skipped)."""
+    out = {}
+    for y in years:
+        df = acs_vintage(y, stems, directory)
+        if df is not None:
+            out[y] = df
+    return out
+
+
+def fill_from_older(est: pd.Series, moe: pd.Series, older: dict[int, pd.DataFrame], stem: str
+                    ) -> tuple[pd.Series, pd.Series, pd.Series]:
+    """Where the current estimate is null, take the most recent earlier vintage that has one (with its own MOE) and record
+    that vintage's end year; the year stays NaN for current-vintage values and for tracts no vintage covers. Never imputes."""
+    est, moe = est.astype(float).copy(), moe.astype(float).copy()
+    year = pd.Series(np.nan, index=est.index, dtype=float)
+    for y in sorted(older, reverse=True):
+        frame = older[y]
+        if f"{stem}E" not in frame.columns:
+            continue
+        need = est.isna()
+        if not need.any():
+            break
+        cand = frame[f"{stem}E"].reindex(est.index)
+        take = need & cand.notna()
+        est[take] = cand[take]
+        moe[take] = frame[f"{stem}M"].reindex(est.index)[take]
+        year[take] = y
+    return est, moe, year
+
+
+def census_2br(refresh: bool = False, cache: Path | None = None) -> pd.DataFrame:
+    """ACS 2020-2024 B25031_004 (median gross rent, 2 bedrooms) with MOE for Allegheny County tracts, fetched once from
+    the Census API and cached raw under data/raw/acs/ (git-ignored). Columns census_2br, census_2br_moe; suppressed -> NaN.
+    CENSUS_API_KEY comes from .env via visionpitts.config and is never written or printed."""
+    from visionpitts import acs_levels as al  # request_rows redacts the key from every message
+
+    path = cache or CENSUS_2BR_CACHE
+    if refresh or not path.exists():
+        from visionpitts.config import CENSUS_API_KEY, COUNTY_FIPS, STATE_FIPS
+
+        params = {"get": ",".join(CENSUS_2BR_VARS), "for": "tract:*", "in": f"state:{STATE_FIPS} county:{COUNTY_FIPS}"}
+        if CENSUS_API_KEY:
+            params["key"] = CENSUS_API_KEY
+        rows = al.request_rows(requests.Session(), params, url=f"https://api.census.gov/data/{ACS_CURRENT}/acs/acs5")
+        raw = al.rows_to_frame(rows, "tract")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        raw.to_csv(path, index_label="GEOID")
+    raw = pd.read_csv(path, dtype=str).set_index("GEOID")
+    clean_ = _clean_estimates(raw[list(CENSUS_2BR_VARS)])
+    return clean_.rename(columns={"B25031_004E": "census_2br", "B25031_004M": "census_2br_moe"})
+
+
+def market(tr: pd.DataFrame, acs: pd.DataFrame, nbrs: dict[str, list[str]], safmr: dict | None,
+           older: dict[int, pd.DataFrame] | None = None, rent2br: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Asking rent, census rent and value with MOE, neighbors' value, ZIP and its 2BR Small Area FMR.
+
+    `older` ({year: cleaned raw E/M frame}) fills a null 2024 ACS rent or home value from the most recent earlier vintage,
+    recorded in acs_rent_year / value_acs_year. The neighbors' median stays on 2024 values only (one vintage per
+    comparison). `rent2br` adds the ACS 2-bedroom median gross rent (census_2br, census_2br_moe)."""
     out = pd.DataFrame(index=tr.index)
     out["asking_2br"] = tr["rent_2br_2025_26"]
     out["asking_n"] = tr["n_units_2025_26"]
@@ -369,6 +455,14 @@ def market(tr: pd.DataFrame, acs: pd.DataFrame, nbrs: dict[str, list[str]], safm
     out["value_acs"] = acs["med_home_value"].reindex(tr.index)
     out["value_acs_moe"] = acs["med_home_value_moe"].reindex(tr.index)
     out["value_nbr_acs"] = neighbor_median(out["value_acs"], nbrs)
+    if older:
+        out["acs_rent"], out["acs_rent_moe"], out["acs_rent_year"] = fill_from_older(
+            out["acs_rent"], out["acs_rent_moe"], older, "B25064_001")
+        out["value_acs"], out["value_acs_moe"], out["value_acs_year"] = fill_from_older(
+            out["value_acs"], out["value_acs_moe"], older, "B25077_001")
+    if rent2br is not None:
+        out["census_2br"] = rent2br["census_2br"].reindex(tr.index)
+        out["census_2br_moe"] = rent2br["census_2br_moe"].reindex(tr.index)
     return out
 
 
@@ -977,6 +1071,9 @@ def to_place_json(df: pd.DataFrame, rules: dict | None = None) -> dict:
                 "safmr_2br": _int(get("safmr_2br")), "value_acs": _int(get("value_acs")), "value_acs_moe": _int(get("value_acs_moe")),
                 "value_nbr_acs": _int(get("value_nbr_acs")), "sale_median": _int(get("sale_median")), "sale_n": _int(get("sale_n")),
                 "sale_nbr_median": _int(get("sale_nbr_median")), "sale_nbr_n": _int(get("sale_nbr_n")),
+                "census_2br": _int(get("census_2br")), "census_2br_moe": _int(get("census_2br_moe")),
+                # vintage end year only where an earlier ACS vintage filled a null 2024 value (absent = 2024)
+                **{f"{k}_year": _int(get(f"{k}_year")) for k in ("value_acs", "acs_rent") if _int(get(f"{k}_year")) is not None},
             },
             "stock": {
                 "sfd_share": _num(get("sfd_share"), 4), "units_2_4_share": _num(get("units_2_4_share"), 4),

@@ -38,6 +38,7 @@ export const ABOUT = {
   contact: {
     email: 'yezhang1@upenn.edu',
     linkedin: { label: 'linkedin.com/in/yezhang03', url: 'https://www.linkedin.com/in/yezhang03' },
+    github: { label: 'github.com/yezhanggg', url: 'https://github.com/yezhanggg' },
   },
 };
 

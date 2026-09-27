@@ -17,6 +17,48 @@ import type { ReadingState } from '../../lib/equity/reading';
 import { Sparkles } from 'lucide-react';
 import { nameOf } from './names';
 
+/**
+ * Which areas the section reads: census tracts (the default, unchanged) or ZIP codes. Everything that names, labels
+ * or looks up an area goes through this, so the same charts and lists serve both levels.
+ */
+export interface AreaKind {
+  level: 'tract' | 'zip';
+  /** "tract" / "ZIP" (headings: "This tract vs city"). */
+  one: string;
+  /** "tracts" / "ZIPs" (donut center, counts). */
+  many: string;
+  /** Main label of an area in the list and the table. */
+  label: (id: string) => string;
+  /** Grey detail after the label in the list ("Tract 1234" without "Tract", or the ZIP's neighborhoods). */
+  listSub: (id: string) => string;
+  /** Grey detail after the label in the table header. */
+  sub: (id: string) => string;
+  /** A measure's value for an area. */
+  value: (m: MeasureId, id: string, ami: AmiPct) => number | null;
+  /** An amber note under the selected area's name ("Fewer than 25 households, not ranked"), or null. */
+  note: (id: string) => string | null;
+  /** Rewrites the tract sentences for this level (identity for tracts). */
+  words: (s: string) => string;
+  /** A short line on how the level is built, shown under the sentences (ZIP level only). */
+  info?: string;
+}
+
+/** Census tracts: the section exactly as it always read. */
+export const TRACT_AREA: AreaKind = {
+  level: 'tract',
+  one: 'tract',
+  many: 'tracts',
+  label: (id) => tractLabel(tractById.get(id)),
+  listSub: (id) => tractById.get(id)?.name.replace('Tract ', '') ?? '',
+  sub: (id) => tractById.get(id)?.name ?? '',
+  value: (m, id, ami) => measureValue(m, placeById.get(id) ?? null, hud, ami),
+  note: (id) => {
+    const t = tractById.get(id);
+    return t && !t.residential ? 'Fewer than 25 households, not ranked.' : null;
+  },
+  words: (x) => x,
+};
+
 
 /** A value without its unit word (the unit is in the header). */
 const bare = (s: string) => s.replace(/ (households|jobs|places)$/, '').replace('not available', 'n/a');
@@ -36,7 +78,7 @@ function Heading({ children, right }: { children: React.ReactNode; right?: React
 }
 
 /** Tracts per map class as a donut (same colors as the map legend), with counts beside it. */
-function ClassDonut({ legend, values, size = 68 }: { legend: Legend; values: TractValue[]; size?: number }) {
+function ClassDonut({ legend, values, size = 68, many = 'tracts' }: { legend: Legend; values: TractValue[]; size?: number; many?: string }) {
   const lite = useApp((s) => s.lite);
   const { classes, missing } = classCounts(legend, values);
   const parts = [...classes, ...(missing ? [{ color: '#e7e5e4', label: 'no value', count: missing }] : [])];
@@ -63,7 +105,7 @@ function ClassDonut({ legend, values, size = 68 }: { legend: Legend; values: Tra
           {total}
         </text>
         <text x="34" y="44" textAnchor="middle" fontSize="8" fill="#64748b">
-          tracts
+          {many}
         </text>
       </svg>
       <ul className="min-w-0 flex-1 space-y-px">
@@ -96,7 +138,7 @@ function useSize<T extends HTMLElement>() {
   return [ref, size] as const;
 }
 
-function Spread({ def, legend, values, median, selected, width, height }: { def: MeasureDef; legend: Legend; values: TractValue[]; median: number | null; selected: number | null; width: number; height: number }) {
+function Spread({ def, legend, values, median, selected, width, height, many = 'tracts' }: { def: MeasureDef; legend: Legend; values: TractValue[]; median: number | null; selected: number | null; width: number; height: number; many?: string }) {
   const lite = useApp((s) => s.lite);
   const h = useMemo(() => histogram(values.map((v) => v.value), 16), [values]);
   const W = Math.max(120, width),
@@ -115,14 +157,14 @@ function Spread({ def, legend, values, median, selected, width, height }: { def:
     selected != null ? { v: selected, label: 'selected', color: SERIES.place } : null,
   ] as (Mark | null)[]).filter((m): m is Mark => !!m);
   return (
-    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="block" role="img" aria-label={`${def.title} across ${h.n} tracts; city median ${def.fmt(median)}`}>
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="block" role="img" aria-label={`${def.title} across ${h.n} ${many}; city median ${def.fmt(median)}`}>
       {h.counts.map((n, i) => {
         const mid = (h.edges[i] + h.edges[i + 1]) / 2;
         const cls = legend.classOf(mid);
         const bh = (n / maxC) * (H - P.t - P.b);
         return (
           <motion.rect key={i} x={P.l + i * bw + 0.75} width={Math.max(1, bw - 1.5)} rx="1.5" fill={cls == null ? '#cbd5e1' : legend.colors[cls]} stroke="rgba(0,0,0,0.08)" initial={lite ? false : { height: 0, y: H - P.b }} animate={{ height: bh, y: H - P.b - bh }} transition={{ ...DRAW, delay: lite ? 0 : i * 0.025 }}>
-            <title>{`${def.fmt(h.edges[i])} to ${def.fmt(h.edges[i + 1])}: ${n} tracts`}</title>
+            <title>{`${def.fmt(h.edges[i])} to ${def.fmt(h.edges[i + 1])}: ${n} ${many}`}</title>
           </motion.rect>
         );
       })}
@@ -152,9 +194,9 @@ function Spread({ def, legend, values, median, selected, width, height }: { def:
 /** The selected tract on all six measures: where it ranks among the city's tracts (right = more need), the city median at the middle tick. */
 /** The six measures as a readable table: measure, need-rank bar, this tract's value, the city median. With no tract
  *  selected it shows the city medians and asks for a click. */
-function SelectedVsCity({ id, ami, medians, measure, allValues, onClose }: { id: string | null; ami: AmiPct; medians: Map<MeasureId, number | null>; measure: MeasureId; allValues: Map<MeasureId, number[]>; onClose: () => void }) {
-  const t = id ? tractById.get(id) : undefined;
-  const p = id ? (placeById.get(id) ?? null) : null;
+function SelectedVsCity({ id, ami, medians, measure, allValues, onClose, area }: { id: string | null; ami: AmiPct; medians: Map<MeasureId, number | null>; measure: MeasureId; allValues: Map<MeasureId, number[]>; onClose: () => void; area: AreaKind }) {
+  const tractLevel = area.level === 'tract';
+  const note = id ? area.note(id) : null;
   const grid = id ? 'grid grid-cols-[minmax(0,118px)_minmax(0,1fr)_76px_64px] items-center gap-x-2.5' : 'grid grid-cols-[minmax(0,1fr)_88px] items-center gap-x-2.5';
   const val = (m: (typeof MEASURES)[number], v: number | null) => bare(m.fmt(v)).replace('/mo', '');
   return (
@@ -162,44 +204,48 @@ function SelectedVsCity({ id, ami, medians, measure, allValues, onClose }: { id:
       <div className="mb-1.5 flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <h3 className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            {id ? 'This tract vs city' : 'City medians'}
+            {id ? `This ${area.one} vs city` : tractLevel ? 'City medians' : 'City medians by ZIP'}
             <InfoTip label="How to read this table" width={250}>
-              {id
-                ? 'Bar length: the share of city tracts this tract has more need than. Grey line: the middle tract. The highlighted row is the measure on the map.'
-                : 'The median tract on each of the six measures. Click a tract on the map or in the list to compare it with these.'}
+              {tractLevel
+                ? id
+                  ? 'Bar length: the share of city tracts this tract has more need than. Grey line: the middle tract. The highlighted row is the measure on the map.'
+                  : 'The median tract on each of the six measures. Click a tract on the map or in the list to compare it with these.'
+                : id
+                  ? 'Bar length: the share of city ZIP codes this ZIP has more need than. Grey line: the middle ZIP. City column: the median ZIP. The highlighted row is the measure on the map.'
+                  : 'The median ZIP code on each of the six measures. Click a ZIP on the map or in the list to compare it with these.'}
             </InfoTip>
           </h3>
           {id ? (
             <div className="truncate text-body font-semibold text-violet-900">
-              {tractLabel(t)} <span className="text-small font-normal text-slate-500">{t?.name}</span>
+              {area.label(id)} <span className="text-small font-normal text-slate-500">{area.sub(id)}</span>
             </div>
           ) : (
-            <div className="text-small text-slate-500">Click a tract to compare it with the city.</div>
+            <div className="text-small text-slate-500">Click a {tractLevel ? 'tract' : 'ZIP'} to compare it with the city.</div>
           )}
         </div>
         {id && (
-          <button type="button" onClick={onClose} className="grid h-6 w-6 shrink-0 place-items-center rounded text-slate-500 hover:bg-stone-100 hover:text-slate-900" aria-label="Clear the selected tract" title="Clear">
+          <button type="button" onClick={onClose} className="grid h-6 w-6 shrink-0 place-items-center rounded text-slate-500 hover:bg-stone-100 hover:text-slate-900" aria-label={`Clear the selected ${area.one}`} title="Clear">
             <X className="h-4 w-4" />
           </button>
         )}
       </div>
-      {t && !t.residential && <div className="mb-1 text-caption text-amber-800">Fewer than 25 households, not ranked.</div>}
+      {note && <div className="mb-1 text-caption text-amber-800">{note}</div>}
       <div className={cx(grid, 'border-b border-stone-200/80 pb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400')}>
         <span>Measure</span>
         {id && <span>Need rank</span>}
-        {id && <span className="text-right">This tract</span>}
+        {id && <span className="text-right">This {area.one}</span>}
         <span className="text-right">City</span>
       </div>
       <div className="divide-y divide-stone-100">
         {MEASURES.map((m) => {
-          const v = id ? measureValue(m.id, p, hud, ami) : null;
+          const v = id ? area.value(m.id, id, ami) : null;
           const pct = id ? needPercentile(v, allValues.get(m.id) ?? [], m.higherIsNeed) : null;
           const cur = m.id === measure;
           return (
             <div key={m.id} className={cx(grid, 'rounded py-1.5 text-small', cur && 'bg-violet-50/80')} title={id ? `${m.title}: ${m.fmt(v)} here; city median ${m.fmt(medians.get(m.id) ?? null)}` : m.title}>
               <span className={cx('truncate pl-1', cur ? 'font-semibold text-violet-900' : 'text-slate-700')}>{m.short}</span>
               {id && (
-                <div className="relative h-3 bg-stone-100" role="img" aria-label={pct == null ? 'no value' : `more need than ${Math.round(pct * 100)}% of tracts`}>
+                <div className="relative h-3 bg-stone-100" role="img" aria-label={pct == null ? 'no value' : `more need than ${Math.round(pct * 100)}% of ${area.many}`}>
                   {pct != null && <motion.span className="absolute inset-y-0 left-0" style={{ background: SERIES.place, opacity: cur ? 0.9 : 0.55 }} initial={{ width: '0%' }} animate={{ width: `${Math.max(1.5, pct * 100)}%` }} transition={DRAW} />}
                   <span className="absolute -inset-y-[3px] left-1/2 w-px bg-slate-500" aria-hidden />
                 </div>
@@ -233,6 +279,7 @@ export default function MeasurePanel({
   wide = false,
   chat,
   chatOpen = false,
+  area = TRACT_AREA,
 }: {
   def: MeasureDef;
   ami: AmiPct;
@@ -256,30 +303,37 @@ export default function MeasurePanel({
   /** VisionPitts-Chat, shown in the right column when open (it stays mounted while closed). */
   chat?: React.ReactNode;
   chatOpen?: boolean;
+  /** Tracts (default) or ZIP codes. */
+  area?: AreaKind;
 }) {
   const lite = useApp((s) => s.lite);
   const listRef = useRef<HTMLOListElement>(null);
   // Keep the selected tract's row in view.
   useEffect(() => {
     const el = selectedId ? listRef.current?.querySelector<HTMLElement>(`[data-id="${selectedId}"]`) : null;
-    el?.scrollIntoView({ block: 'nearest' });
+    const list = listRef.current;
+    // Scroll the list only (scrollIntoView would also scroll the page and the columns around it).
+    if (el && list) {
+      const top = el.offsetTop - list.offsetTop;
+      if (top < list.scrollTop || top + el.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = Math.max(0, top - list.clientHeight / 2);
+    }
   }, [selectedId, def.id]);
-  const sentences = useMemo(() => explainMeasure({ def, ami, values, nameOf }), [def, ami, values]);
+  const sentences = useMemo(() => explainMeasure({ def, ami, values, nameOf: area.level === 'tract' ? nameOf : area.label }).map(area.words), [def, ami, values, area]);
   const [spreadRef, spread] = useSize<HTMLDivElement>();
   const selValue = selectedId ? (values.find((v) => v.id === selectedId)?.value ?? null) : null;
   // Charts replay whenever the measure or the income level changes.
-  const replay = `${def.id}-${ami}`;
+  const replay = `${def.id}-${ami}-${area.level}`;
   const move = lite ? { duration: 0 } : SPRING_PANEL;
 
   const header = (
-    <motion.header layout="position" transition={move} className="shrink-0">
+    <header className="shrink-0">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className={cx('flex min-w-0 items-center gap-1 font-semibold text-slate-900', wide ? 'text-body' : 'text-small')}>
           {def.title}
           <InfoTip label={`About ${def.title.toLowerCase()}`} width={300} side="bottom">
             <span className="block">{def.definition(ami)}</span>
             <span className="mt-1 block text-white/75">
-              {def.unit} · {available} of {n} tracts have a value · Source: {def.source}
+              {def.unit} · {available} of {n} {area.level === 'tract' ? 'tracts' : 'ZIP codes'} have a value · Source: {area.level === 'zip' && def.id === 'rent_gap' ? def.source.replace('Dewey listings', "Dewey listings for the whole ZIP") : def.source}
             </span>
           </InfoTip>
         </h2>
@@ -287,7 +341,7 @@ export default function MeasurePanel({
           median <b className="font-semibold text-slate-900 tnum">{def.fmt(median)}</b>
         </span>
       </div>
-    </motion.header>
+    </header>
   );
   const policies = policyTexts.length ? (
     <div className="shrink-0 space-y-1.5 rounded-lg bg-violet-50/70 px-3 py-2.5 ring-1 ring-violet-200/70" data-testid="equity-policy-effects">
@@ -322,33 +376,37 @@ export default function MeasurePanel({
       </div>
     ) : null;
   const explain = (
-    <motion.p key={`x-${replay}`} layout="position" initial={lite ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={move} className={cx('shrink-0 text-slate-800', wide ? 'text-body leading-relaxed' : 'text-small leading-[1.4]')} data-testid="equity-explain">
+    <motion.p key={`x-${replay}`} initial={lite ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={move} className={cx('shrink-0 text-slate-800', wide ? 'text-body leading-relaxed' : 'text-small leading-[1.4]')} data-testid="equity-explain">
       {sentences.join(' ')}
     </motion.p>
   );
+  const areaInfo = area.info ? (
+    <p className="shrink-0 rounded-md bg-sky-50 px-2 py-1 text-caption leading-snug text-sky-900 ring-1 ring-sky-200/70" data-testid="equity-zip-note">
+      {area.info}
+    </p>
+  ) : null;
   const donut = (
-    <motion.div layout="position" transition={move} className="shrink-0">
-      <Heading right="How many tracts fall in each map class, in the same colors as the map legend.">Tracts by class</Heading>
-      <ClassDonut key={`d-${replay}`} legend={legend} values={values} size={wide ? 104 : 68} />
-    </motion.div>
+    <div className="shrink-0">
+      <Heading right={`How many ${area.level === 'tract' ? 'tracts' : 'ZIP codes'} fall in each map class, in the same colors as the map legend.`}>{area.level === 'tract' ? 'Tracts by class' : 'ZIP codes by class'}</Heading>
+      <ClassDonut key={`d-${replay}`} legend={legend} values={values} size={wide ? 104 : 68} many={area.many} />
+    </div>
   );
   const spreadBlock = (
-    <motion.div layout="position" transition={move} className={cx('flex flex-col', wide ? 'min-h-[180px] flex-1' : 'min-h-[70px] flex-1')}>
-      <Heading right={`How the tracts spread across values; ${def.higherIsNeed ? 'further right' : 'further left'} means more need. The dashed line is the city median; the violet line is the selected tract.`}>Spread across tracts</Heading>
+    <div className={cx('flex flex-col', wide ? 'min-h-[180px] flex-1' : 'min-h-[70px] flex-1')}>
+      <Heading right={`How the ${area.level === 'tract' ? 'tracts' : 'ZIP codes'} spread across values; ${def.higherIsNeed ? 'further right' : 'further left'} means more need. The dashed line is the city median; the violet line is the selected ${area.level === 'tract' ? 'tract' : 'ZIP'}.`}>{area.level === 'tract' ? 'Spread across tracts' : 'Spread across ZIP codes'}</Heading>
       <div ref={spreadRef} className="min-h-[52px] flex-1 overflow-hidden">
-        {spread.w > 0 && <Spread key={`s-${replay}`} def={def} legend={legend} values={values} median={median} selected={selValue} width={spread.w} height={spread.h} />}
+        {spread.w > 0 && <Spread key={`s-${replay}`} def={def} legend={legend} values={values} median={median} selected={selValue} width={spread.w} height={spread.h} many={area.level === 'tract' ? 'tracts' : 'ZIP codes'} />}
       </div>
-    </motion.div>
+    </div>
   );
-  const selected = <SelectedVsCity id={selectedId} ami={ami} medians={medians} measure={def.id} allValues={allValues} onClose={() => onPick(null)} />;
+  const selected = <SelectedVsCity id={selectedId} ami={ami} medians={medians} measure={def.id} allValues={allValues} onClose={() => onPick(null)} area={area} />;
   const list = (
     <>
       <div className="px-3.5 pb-0.5 pt-1.5">
-        <Heading right={`Every ranked tract, ${def.higherIsNeed ? 'highest' : 'lowest'} value first. Click a row to select the tract on the map.`}>Most need first</Heading>
+        <Heading right={area.level === 'tract' ? `Every ranked tract, ${def.higherIsNeed ? 'highest' : 'lowest'} value first. Click a row to select the tract on the map.` : `Every ranked ZIP code, ${def.higherIsNeed ? 'highest' : 'lowest'} value first. Click a row to select the ZIP on the map.`}>Most need first</Heading>
       </div>
       <ol key={`l-${replay}`} ref={listRef} className="scroll-quiet min-h-0 flex-1 overflow-y-auto px-2 pb-1.5">
         {ranked.map((r, i) => {
-          const t = tractById.get(r.id);
           return (
             <motion.li key={r.id} initial={lite || i > 24 ? false : { opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ ...DRAW, delay: lite ? 0 : Math.min(i, 24) * 0.018 }}>
               <button
@@ -360,7 +418,7 @@ export default function MeasurePanel({
               >
                 <span className="w-5 shrink-0 text-right text-[11px] text-slate-400 tnum">{i + 1}</span>
                 <span className="min-w-0 flex-1 truncate text-caption text-slate-800">
-                  {tractLabel(t)} <span className="text-slate-400">{t?.name.replace('Tract ', '')}</span>
+                  {area.label(r.id)} <span className="text-slate-400">{area.listSub(r.id)}</span>
                 </span>
                 <span className={cx('shrink-0 text-caption font-semibold tnum', r.value == null ? 'font-normal text-slate-400' : 'text-slate-900')}>{r.value == null ? 'n/a' : bare(def.fmt(r.value))}</span>
               </button>
@@ -377,9 +435,9 @@ export default function MeasurePanel({
     // list move under the charts and the chat takes the right column.
     const box = 'rounded-xl bg-white ring-1 ring-stone-200/80';
     const selectedBlock = (
-      <motion.div key="sel" layout="position" transition={move} className={cx('shrink-0 px-1 pb-0.5 pt-1', chatOpen && 'rounded-xl bg-white px-3.5 pb-2.5 pt-3 ring-1 ring-stone-200/80')}>
+      <div key="sel" className={cx('shrink-0 px-1 pb-0.5 pt-1', chatOpen && 'rounded-xl bg-white px-3.5 pb-2.5 pt-3 ring-1 ring-stone-200/80')}>
         {selected}
-      </motion.div>
+      </div>
     );
     const listBlock = (
       <div key="list" className={cx(box, 'flex min-h-0 flex-col overflow-hidden pt-1', chatOpen ? 'h-[340px] shrink-0' : 'flex-1')}>
@@ -392,6 +450,7 @@ export default function MeasurePanel({
           <div className={cx(box, 'flex shrink-0 flex-col gap-2.5 px-4 pb-3.5 pt-3')}>
             {header}
             {explain}
+            {areaInfo}
             {policies}
             {readingBlock}
           </div>
@@ -420,6 +479,7 @@ export default function MeasurePanel({
         {header}
         {policies}
         {explain}
+        {areaInfo}
         {donut}
         {spreadBlock}
         {selected}

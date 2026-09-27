@@ -1,7 +1,8 @@
 // Plain sentences and chart inputs for the measure section of Equity & policy. Deterministic templates, one per
 // measure, filled from the same tract values the map draws; no scores, no model text.
 import { isNum } from '../place/format';
-import { median, rankByNeed, type AmiPct, type Legend, type MeasureDef, type MeasureId } from './measures';
+import { placeById } from '../place/data';
+import { median, rankByNeed, rentForGap, type AmiPct, type Legend, type MeasureDef, type MeasureId } from './measures';
 
 export interface TractValue {
   id: string;
@@ -13,7 +14,11 @@ export interface ExplainInput {
   ami: AmiPct;
   values: TractValue[];
   nameOf: (id: string) => string;
+  /** Rent gap only: true when the tract's rent is the census 2-bedroom fallback (default: looked up in place.json). */
+  usesCensusRent?: (id: string) => boolean;
 }
+
+const censusRentInPlace = (id: string): boolean => rentForGap(placeById.get(id))?.source === 'census';
 
 const int = (v: number) => Math.round(v).toLocaleString('en-US');
 const perMonth = (v: number) => `$${int(Math.abs(v))} a month`;
@@ -40,7 +45,7 @@ export function topNames(values: TractValue[], higherIsNeed: boolean, nameOf: (i
 const missingNote = (missing: number, what: string) => (missing > 0 ? ` ${int(missing)} ${missing === 1 ? 'tract has' : 'tracts have'} no ${what} and ${missing === 1 ? 'is' : 'are'} left out.` : '');
 
 /** Two or three sentences reading the city picture for one measure. */
-export function explainMeasure({ def, ami, values, nameOf }: ExplainInput): string[] {
+export function explainMeasure({ def, ami, values, nameOf, usesCensusRent = censusRentInPlace }: ExplainInput): string[] {
   const xs = values.map((v) => v.value).filter(isNum);
   const avail = xs.length;
   const missing = values.length - avail;
@@ -53,9 +58,15 @@ export function explainMeasure({ def, ami, values, nameOf }: ExplainInput): stri
     case 'rent_gap': {
       const pos = count((v) => v > 0);
       const posMed = median(xs.filter((v) => v > 0));
-      if (!pos) return [`Listings for a 2-bedroom already fit ${ami === 100 ? 'a median-income' : `${ami === 80 ? 'an' : 'a'} ${ami}% AMI`} household in all ${int(avail)} tracts with a reliable asking rent.${missingNote(missing, 'reliable asking rent')}`];
+      const census = values.filter((v) => isNum(v.value) && usesCensusRent(v.id)).length;
+      // With census fallbacks the denominator is "tracts with a 2-bedroom rent", and the sentence says how many are census.
+      const withRent = census
+        ? `tracts with a 2-bedroom rent (${int(census)} of them ${census === 1 ? 'uses' : 'use'} the census 2-bedroom gross rent because listings are too few)`
+        : 'tracts with a reliable asking rent';
+      const noRent = census ? '2-bedroom rent from listings or the census' : 'reliable asking rent';
+      if (!pos) return [`Listings for a 2-bedroom already fit ${ami === 100 ? 'a median-income' : `${ami === 80 ? 'an' : 'a'} ${ami}% AMI`} household in all ${int(avail)} ${withRent}.${missingNote(missing, noRent)}`];
       return [
-        `Listings ask more than ${ami === 100 ? 'a median-income' : `${ami === 80 ? 'an' : 'a'} ${ami}% AMI`} household can pay in ${int(pos)} of ${int(avail)} tracts with a reliable asking rent.${missingNote(missing, 'reliable asking rent')}`,
+        `Listings ask more than ${ami === 100 ? 'a median-income' : `${ami === 80 ? 'an' : 'a'} ${ami}% AMI`} household can pay in ${int(pos)} of ${int(avail)} ${withRent}.${missingNote(missing, noRent)}`,
         med > 0
           ? `The median gap is ${perMonth(med)}${posMed != null && pos < avail ? `; where there is a gap, it is typically ${perMonth(posMed)}` : ''}.`
           : `In the median tract listings already fit${posMed != null ? `; where there is a gap, it is typically ${perMonth(posMed)}` : ''}.`,
@@ -68,7 +79,7 @@ export function explainMeasure({ def, ami, values, nameOf }: ExplainInput): stri
       const k = Math.min(10, sorted.length);
       const topShare = total > 0 ? Math.round((sorted.slice(0, k).reduce((s, v) => s + v, 0) / total) * 100) : 0;
       return [
-        `About ${int(total)} renter households earning up to half the area median pay more than 30% of income for housing, across ${int(avail)} tracts.${missingNote(missing, 'CHAS count')}`,
+        `About ${int(total)} renter households ${ami === 100 ? 'earning more than 80% of the area median' : ami === 50 ? 'earning up to half the area median' : `earning up to ${ami}% of the area median`} pay more than 30% of income for housing, across ${int(avail)} tracts.${missingNote(missing, 'CHAS count')}`,
         `A typical tract has ${int(med)}; the ${k} tracts with the most hold ${topShare}% of them.`,
         `The most are in ${top}.`,
       ];
