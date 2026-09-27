@@ -24,7 +24,8 @@ export const NEAR_VARS = ['pop', 'med_hh_income', 'med_gross_rent', 'med_home_va
 /** Figures listed for the selected place, the city and the county. */
 export const PLACE_VARS = [...NEAR_VARS, 'households', 'median_age', 'median_year_built', 'sfd_share', 'units_2_4_share', 'units_5_19_share', 'units_20plus_share', 'bachelors_share', 'unemployment_rate', 'transit_share', 'no_vehicle_share', 'white_nh_share', 'black_nh_share', 'asian_nh_share', 'hispanic_share'];
 export const RADIUS_MILES = 3;
-const NEAR_CAP = 12;
+/** Eight nearby places are enough to compare with, and every one of them is paid for in tokens. */
+const NEAR_CAP = 8;
 const NEAR_FLOOR = 5;
 /** Nearby places with fewer residents than this (parks, campuses, river land) are left out of a comparison. */
 export const MIN_POP = 50;
@@ -98,7 +99,7 @@ export function composeFacts(d: FactsData): string {
   const { one, many } = LEVEL_LABEL[d.level];
   const out: string[] = [];
   out.push('ABOUT THE MAP');
-  out.push(`The map shows ${many} ${d.cityOnly ? 'in the City of Pittsburgh' : 'across Allegheny County, Pennsylvania'}. Census figures are American Community Survey 2020–2024 5-year estimates (each has a margin of error, not listed here).`);
+  out.push(`The map shows ${many} ${d.cityOnly ? 'in the City of Pittsburgh' : 'across Allegheny County, Pennsylvania'}. Census figures are American Community Survey 2020–2024 5-year estimates.`);
 
   if (d.selected) {
     out.push('', 'SELECTED PLACE', `${d.selected.name}, a ${one.toLowerCase()}`);
@@ -124,8 +125,8 @@ export function composeFacts(d: FactsData): string {
   }
 
   out.push('', 'CITY AND COUNTY');
-  out.push(`City of Pittsburgh: ${figures(PLACE_VARS, d.city).join('; ')}`);
-  out.push(`Allegheny County: ${figures(PLACE_VARS, d.county).join('; ')}`);
+  out.push(`City of Pittsburgh: ${figures(d.selected ? NEAR_VARS : PLACE_VARS, d.city).join('; ')}`);
+  out.push(`Allegheny County: ${figures(d.selected ? NEAR_VARS : PLACE_VARS, d.county).join('; ')}`);
 
   if (d.variable) {
     out.push('', 'VARIABLE PAINTED ON THE MAP', `${d.variable.label}: ${d.variable.description}`);
@@ -239,6 +240,8 @@ export interface ChatMessage {
   id: number;
   role: 'user' | 'assistant';
   text: string;
+  /** When the question was sent (ms since epoch); the thinking animation runs from here. */
+  at: number;
   pending?: boolean;
   /** The service answered but some figure could not be traced to the facts. */
   unchecked?: boolean;
@@ -250,42 +253,63 @@ export interface ChatMessage {
 interface ChatState {
   messages: ChatMessage[];
   busy: boolean;
-  ask: (question: string, facts: () => Promise<string>) => Promise<void>;
+  /** `about` names what the question is about (boundary, place, painted variable); the same question about the same thing is answered from memory. */
+  ask: (question: string, facts: () => Promise<string>, about?: string) => Promise<void>;
   clear: () => void;
 }
+/** Answers given in this visit, by what was asked about what. A repeat costs nothing. */
+const remembered = new Map<string, Pick<ChatMessage, 'text' | 'provider' | 'unchecked'>>();
+const memoKey = (about: string, q: string) => `${about}\n${q.toLowerCase().replace(/\s+/g, ' ').replace(/[?.!]+$/, '')}`;
 export const CHAT_COPY = {
   offline: 'The assistant needs the online version of this tool. This offline file still has the map, the data and every summary.',
   down: 'The assistant is not available right now. The summary panel has the same figures.',
   unchecked: 'Some figures in this answer could not be matched to the data. Check them in the summary.',
-  by: (who: string) => `Written by ${who} from this tool's data. Every number is checked against it.`,
+  poweredBy: (who: string) => `Powered by ${who}`,
+  defaultProvider: 'DeepSeek',
 };
+/** An answer is shown after at least this long, so the thinking animation always has time to read as thinking. */
+export const MIN_THINK_MS = 5000;
+/** A refusal (offline file, service down) still waits this long, so the box does not flicker. */
+export const MIN_FAIL_MS = 900;
+const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, Math.max(0, ms)));
 let seq = 0;
 
 export const useChat = create<ChatState>((set, get) => ({
   messages: [],
   busy: false,
   clear: () => set({ messages: [] }),
-  ask: async (question, facts) => {
+  ask: async (question, facts, about) => {
     const q = question.trim();
     if (!q || get().busy) return;
     const before = get().messages;
-    // The last two finished exchanges give a follow-up question its context.
+    // The last finished exchange gives a follow-up question its context; more would only cost tokens.
     const history: { role: 'user' | 'assistant'; text: string }[] = [];
     for (let i = 0; i + 1 < before.length; i++) {
       const a = before[i], b = before[i + 1];
       if (a.role === 'user' && b.role === 'assistant' && !b.failed && !b.pending) history.push({ role: 'user', text: a.text }, { role: 'assistant', text: b.text });
     }
+    const key = about ? memoKey(about, q) : null;
     const answerId = (seq += 2);
-    set({ busy: true, messages: [...before, { id: answerId - 1, role: 'user', text: q }, { id: answerId, role: 'assistant', text: '', pending: true }] });
-    const finish = (m: Partial<ChatMessage>) => set({ busy: false, messages: get().messages.map((x) => (x.id === answerId ? { ...x, pending: false, ...m } : x)) });
+    const at = Date.now();
+    set({ busy: true, messages: [...before, { id: answerId - 1, role: 'user', text: q, at }, { id: answerId, role: 'assistant', text: '', at, pending: true }] });
+    // Every outcome waits for its minimum, counted from the moment the question was sent.
+    const finish = async (m: Partial<ChatMessage>) => {
+      await wait((m.failed ? MIN_FAIL_MS : MIN_THINK_MS) - (Date.now() - at));
+      set({ busy: false, messages: get().messages.map((x) => (x.id === answerId ? { ...x, pending: false, ...m } : x)) });
+    };
+    const known = key ? remembered.get(key) : undefined;
+    if (known) return finish(known);
     if (typeof fetch !== 'function' || (typeof location !== 'undefined' && location.protocol === 'file:')) return finish({ text: CHAT_COPY.offline, failed: true });
     try {
-      const res = await fetch('/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question: q, facts: await facts(), history: history.slice(-4) }) });
+      const res = await fetch('/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question: q, facts: await facts(), history: history.slice(-2) }) });
       const j = (await res.json().catch(() => null)) as { ok?: boolean; text?: string; provider?: string; checked?: boolean } | null;
-      if (j?.ok && j.text) finish({ text: j.text, provider: j.provider, unchecked: j.checked === false });
-      else finish({ text: CHAT_COPY.down, failed: true });
+      if (j?.ok && j.text) {
+        const answer = { text: j.text, provider: j.provider, unchecked: j.checked === false };
+        if (key && !answer.unchecked) remembered.set(key, answer);
+        await finish(answer);
+      } else await finish({ text: CHAT_COPY.down, failed: true });
     } catch {
-      finish({ text: CHAT_COPY.down, failed: true });
+      await finish({ text: CHAT_COPY.down, failed: true });
     }
   },
 }));

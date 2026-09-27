@@ -4,7 +4,6 @@
 import { useId, useState, type ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { useApp } from '../lib/store';
-import { cx } from '../lib/format';
 import { niceTicks, type Histogram as HistogramData } from '../lib/explore/summary';
 import type { Conf } from '../lib/types';
 import { ConfChip } from './primitives';
@@ -46,7 +45,7 @@ export function StatTile({ label, value, sub, delta, conf }: { label: string; va
       <div className="flex items-baseline gap-1.5">
         <span className="text-lead font-semibold text-slate-900 tnum">{value}</span>
         {delta && (
-          <span className={cx('text-caption', delta.dir === 'up' ? 'text-rose-700' : delta.dir === 'down' ? 'text-emerald-700' : 'text-slate-500')} title={delta.text}>
+          <span className="text-caption text-slate-400" title={delta.text}>
             {delta.dir === 'up' ? '▲' : delta.dir === 'down' ? '▼' : '≈'}
           </span>
         )}

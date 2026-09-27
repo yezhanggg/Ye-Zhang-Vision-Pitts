@@ -4,7 +4,7 @@ import AppShell from './components/AppShell';
 import LandingPage from './components/LandingPage';
 import ExploreView from './components/explore/ExploreView';
 import AnalysisView from './components/AnalysisView';
-import SourcesModal from './components/SourcesModal';
+import DetailsModal from './components/DetailsModal';
 
 export default function App() {
   const view = useApp((s) => s.view);
@@ -30,7 +30,7 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
-      <SourcesModal />
+      <DetailsModal />
     </MotionConfig>
   );
 }

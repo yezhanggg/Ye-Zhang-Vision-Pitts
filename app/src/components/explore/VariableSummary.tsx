@@ -2,31 +2,20 @@ import { useMemo } from 'react';
 import { matchPreset, useApp } from '../../lib/store';
 import { scoring } from '../../lib/data';
 import { classCounts, fmtAnalysis, isAnalysis, type AnalysisVar } from '../../lib/explore/analysisVars';
-import { LEVEL_LABEL, RELIABILITY, bundledGeo, groups, hasHistoryFor, plainDescription, referenceSeries, unitTitle } from '../../lib/explore/catalog';
+import { LEVEL_LABEL, bundledGeo, groups, hasHistoryFor, plainDescription, referenceSeries, unitTitle } from '../../lib/explore/catalog';
 import { histogram, topBottom } from '../../lib/explore/summary';
 import { HistogramChart, LineChart, SERIES, fmtK } from '../charts';
-import { estimates, fmtMoe, fmtTick, fmtValue, reliability, reliabilityMix } from '../../lib/explore/bins';
+import { estimates, fmtTick, fmtValue } from '../../lib/explore/bins';
 import { EXPLORE_UI } from '../../lib/explore/copy';
 import { useReference } from '../../lib/explore/remote';
 import type { BrowseLevel, Estimate, Loaded, UnitFC, ValueMap, VariableDef } from '../../lib/explore/types';
-import { Button, ConfChip, InfoTip, SectionTitle } from '../primitives';
-
-const MIX = [
-  { key: 'high', label: EXPLORE_UI.summary.high, color: '#10b981' },
-  { key: 'medium', label: EXPLORE_UI.summary.medium, color: '#f59e0b' },
-  { key: 'low', label: EXPLORE_UI.summary.low, color: '#f43f5e' },
-  { key: 'none', label: EXPLORE_UI.summary.none, color: '#e7e5e4' },
-] as const;
+import { Button, SectionTitle } from '../primitives';
 
 function RefStat({ k, e, variable }: { k: string; e: Estimate | null; variable: VariableDef }) {
   return (
     <div className="bg-white px-3 py-2">
       <div className="text-caption text-slate-600">{k}</div>
       <div className="text-lead font-semibold text-slate-900 tnum">{fmtValue(e?.est, variable.unit)}</div>
-      <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-caption text-slate-600 tnum">
-        {typeof e?.moe === 'number' && <span>± {fmtMoe(e.moe, variable.unit)}</span>}
-        <ConfChip conf={reliability(e?.cv, RELIABILITY)} />
-      </div>
     </div>
   );
 }
@@ -101,7 +90,7 @@ function AnalysisSummary({ variable, values }: { variable: AnalysisVar; values: 
   );
 }
 
-/** Right panel while a variable is painted and nothing is selected: what it is, city and county values, reliability. */
+/** Right panel while a variable is painted and nothing is selected: what it is, the city and county values, how the places spread. */
 export default function VariableSummary({ variable, level, values, fc }: { variable: VariableDef; level: BrowseLevel; values: Loaded<ValueMap>; fc?: UnitFC }) {
   if (isAnalysis(variable)) return <AnalysisSummary variable={variable} values={values} />;
   return <AcsSummary variable={variable} level={level} values={values} fc={fc} />;
@@ -110,7 +99,6 @@ export default function VariableSummary({ variable, level, values, fc }: { varia
 function AcsSummary({ variable, level, values, fc }: { variable: VariableDef; level: BrowseLevel; values: Loaded<ValueMap>; fc?: UnitFC }) {
   const setBrowse = useApp((s) => s.setBrowse);
   const ref = useReference(variable.id);
-  const mix = useMemo(() => reliabilityMix(values.data, RELIABILITY), [values.data]);
   const hist = useMemo(() => histogram(estimates(values.data), 12), [values.data]);
   const tb = useMemo(() => topBottom(values.data, 5), [values.data]);
   const index = useMemo(() => new Map((fc ?? bundledGeo(level)).features.map((f) => [f.properties.GEOID, f.properties])), [level, fc]);
@@ -166,28 +154,9 @@ function AcsSummary({ variable, level, values, fc }: { variable: VariableDef; le
       {hasHistoryFor(variable.id) && series.city && series.county && (
         <section>
           <SectionTitle sub="ACS 5-year estimates by end year, city and county">2014–2024</SectionTitle>
-          <LineChart years={series.city.years} series={[{ id: 'city', label: EXPLORE_UI.charts.city, color: SERIES.city, values: series.city.est, moe: series.city.moe }, { id: 'county', label: EXPLORE_UI.charts.county, color: SERIES.county, values: series.county.est }]} fmt={(v) => (variable.unit === 'usd' ? `$${fmtK(v)}` : fmtTick(v, variable.unit))} caption={EXPLORE_UI.charts.acsWindows} />
+          <LineChart years={series.city.years} series={[{ id: 'city', label: EXPLORE_UI.charts.city, color: SERIES.city, values: series.city.est }, { id: 'county', label: EXPLORE_UI.charts.county, color: SERIES.county, values: series.county.est }]} fmt={(v) => (variable.unit === 'usd' ? `$${fmtK(v)}` : fmtTick(v, variable.unit))} caption={EXPLORE_UI.charts.acsWindows} />
         </section>
       )}
-      <section>
-        <SectionTitle sub={EXPLORE_UI.summary.unitsWithData(mix.withData, mix.total, many)}>
-          <span className="flex items-center gap-1">
-            {EXPLORE_UI.summary.reliability}
-            <InfoTip label="How reliability is judged">{EXPLORE_UI.summary.reliabilityHow}</InfoTip>
-          </span>
-        </SectionTitle>
-        <div className="flex h-3 overflow-hidden rounded-full ring-1 ring-black/5" role="img" aria-label={MIX.map((m) => `${m.label} ${mix[m.key]}`).join(', ')}>
-          {MIX.map((m) => (mix[m.key] > 0 ? <div key={m.key} style={{ background: m.color, width: `${(mix[m.key] / Math.max(1, mix.total)) * 100}%` }} /> : null))}
-        </div>
-        <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-caption text-slate-700">
-          {MIX.map((m) => (
-            <span key={m.key} className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-sm" style={{ background: m.color }} />
-              {m.label} <span className="font-semibold text-slate-900 tnum">{mix[m.key]}</span>
-            </span>
-          ))}
-        </div>
-      </section>
       <p className="text-caption text-slate-600">{EXPLORE_UI.footer}</p>
     </div>
   );

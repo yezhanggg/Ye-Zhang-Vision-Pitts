@@ -93,6 +93,23 @@ export function SectionTitle({ children, right, sub }: { children: ReactNode; ri
   );
 }
 
+// ------------------------------------------------------------------ motion shared by everything that folds
+/** Panels growing out of their tab: quick, with a little give at the end. */
+export const SPRING_PANEL = { type: 'spring', stiffness: 360, damping: 30, mass: 0.85 } as const;
+/** Small things (tabs, buttons, chevrons): snappier, a touch of bounce. */
+export const SPRING_TAB = { type: 'spring', stiffness: 520, damping: 26, mass: 0.7 } as const;
+/** Heights opening and closing: settles without overshooting, so nothing shows an empty gap. */
+export const SPRING_FOLD = { type: 'spring', stiffness: 380, damping: 38, mass: 0.9 } as const;
+
+/** A round button that folds something away; it leans into the press. */
+export function FoldButton({ onClick, label, children }: { onClick: () => void; label: string; children: ReactNode }) {
+  return (
+    <motion.button type="button" onClick={onClick} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.88 }} transition={SPRING_TAB} className="rounded-lg p-1.5 text-slate-500 hover:bg-stone-100 hover:text-slate-900" aria-label={label} title={label}>
+      {children}
+    </motion.button>
+  );
+}
+
 /** Animated disclosure for secondary detail. Uncontrolled by default; pass `open` + `onToggle` to drive it from state. */
 export function Explainer({ title, children, defaultOpen = false, className, tone = 'plain', right, open: controlled, onToggle }: { title: ReactNode; children: ReactNode; defaultOpen?: boolean; className?: string; tone?: 'plain' | 'card'; right?: ReactNode; open?: boolean; onToggle?: (open: boolean) => void }) {
   const [inner, setInner] = useState(defaultOpen);
@@ -107,7 +124,7 @@ export function Explainer({ title, children, defaultOpen = false, className, ton
     <div className={cx(tone === 'card' && 'rounded-xl bg-white ring-1 ring-stone-200/80', className)}>
       <div className={cx('flex items-center justify-between gap-2', tone === 'card' && 'px-3 py-2.5')}>
         <button type="button" aria-expanded={open} aria-controls={id} onClick={toggle} className={cx('group flex min-w-0 flex-1 items-center gap-1.5 text-left font-semibold', tone === 'card' ? 'text-body text-slate-900' : 'text-small text-violet-700 hover:text-violet-900')}>
-          <motion.svg viewBox="0 0 16 16" className="h-3.5 w-3.5 shrink-0" initial={false} animate={{ rotate: open ? 90 : 0 }} transition={{ duration: 0.18 }}>
+          <motion.svg viewBox="0 0 16 16" className="h-3.5 w-3.5 shrink-0 transition-transform group-active:scale-75" initial={false} animate={{ rotate: open ? 90 : 0 }} transition={SPRING_TAB}>
             <path d="M6 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </motion.svg>
           <span className="min-w-0">{title}</span>
@@ -116,8 +133,10 @@ export function Explainer({ title, children, defaultOpen = false, className, ton
       </div>
       <AnimatePresence initial={false}>
         {open && (
-          <motion.div id={id} initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }} className="overflow-hidden">
-            <div className={cx(tone === 'card' ? 'px-3 pb-3' : 'pt-1.5')}>{children}</div>
+          <motion.div id={id} initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0, transition: { ...SPRING_FOLD, opacity: { duration: 0.12 } } }} transition={SPRING_FOLD} className="overflow-hidden">
+            <motion.div initial={{ y: -8 }} animate={{ y: 0 }} exit={{ y: -8 }} transition={SPRING_FOLD} className={cx(tone === 'card' ? 'px-3 pb-3' : 'pt-1.5')}>
+              {children}
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -178,14 +197,20 @@ export function readableColor(hex: string): string {
   return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
 }
 
-export function Segmented<T extends string>({ value, options, onChange, size = 'sm', full }: { value: T | null; options: { value: T; label: ReactNode }[]; onChange: (v: T) => void; size?: 'sm' | 'xs'; full?: boolean }) {
+/** A choice between a few options; the white pill slides to the one that is on. */
+export function Segmented<T extends string>({ value, options, onChange, size = 'sm', full, label }: { value: T | null; options: { value: T; label: ReactNode; disabled?: boolean }[]; onChange: (v: T) => void; size?: 'sm' | 'xs'; full?: boolean; label?: string }) {
+  const pill = useId();
   return (
-    <div className={cx('rounded-lg bg-stone-100 p-0.5 ring-1 ring-stone-200/70', full ? 'grid' : 'inline-flex')} style={full ? { gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` } : undefined}>
-      {options.map((o) => (
-        <button key={o.value} onClick={() => onChange(o.value)} className={cx('rounded-md font-medium transition-all', size === 'sm' ? 'px-3 py-1.5 text-small' : 'px-2 py-1 text-caption', value === o.value ? 'bg-white text-slate-900 shadow-sm ring-1 ring-black/5' : 'text-slate-600 hover:text-slate-900')}>
-          {o.label}
-        </button>
-      ))}
+    <div role="radiogroup" aria-label={label} className={cx('rounded-lg bg-stone-100 p-0.5 ring-1 ring-stone-200/70', full ? 'grid' : 'inline-flex')} style={full ? { gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` } : undefined}>
+      {options.map((o) => {
+        const on = value === o.value;
+        return (
+          <button key={o.value} type="button" role="radio" aria-checked={on} disabled={o.disabled} onClick={() => onChange(o.value)} className={cx('relative rounded-md font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40', size === 'sm' ? 'px-3 py-1.5 text-small' : 'px-2 py-1 text-caption', on ? 'text-slate-900' : 'text-slate-600 hover:text-slate-900')}>
+            {on && <motion.span layoutId={pill} transition={SPRING_TAB} className="absolute inset-0 rounded-md bg-white shadow-sm ring-1 ring-black/5" />}
+            <span className="relative">{o.label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

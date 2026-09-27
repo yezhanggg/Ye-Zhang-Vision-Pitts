@@ -5,7 +5,8 @@
 // button that turns from microphone to send to stop. Left out, because this tool has nothing behind them: the model
 // and effort pickers, image attachments and the simulated voice demo. It uses the app's own colors and `cx`, so it
 // needs no shadcn folder, path alias, animation package or extra theme variables.
-import { forwardRef, useCallback, useEffect, useRef, useState, type FocusEvent, type ReactNode } from 'react';
+// `bare` drops the card (surface, ring, shadow, width) so a parent can hold the input and its answers in one box.
+import { forwardRef, useCallback, useEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { cx } from '../../lib/format';
 
 const SPRING = 'cubic-bezier(0.175, 0.885, 0.32, 1.275)';
@@ -63,13 +64,16 @@ const Spinner = () => (
 );
 
 export interface PromptInputProps {
-  onSubmit?: (value: string) => void;
+  /** Enter or the button. Return false to keep the text in the box (nothing was done with it). */
+  onSubmit?: (value: string) => boolean | void;
+  /** Sees every key first; return true when it handled the key (arrow keys in a list under the box). */
+  onKey?: (e: KeyboardEvent<HTMLTextAreaElement>) => boolean;
   placeholder?: string;
   className?: string;
   defaultValue?: string;
   value?: string;
   onChange?: (value: string) => void;
-  /** Waiting for an answer: the button spins and nothing can be sent. */
+  /** Waiting for an answer: the button spins while the box is empty. Text can still be typed and sent. */
   busy?: boolean;
   /** A quiet line under the text, e.g. what the question is about. */
   footer?: ReactNode;
@@ -78,10 +82,14 @@ export interface PromptInputProps {
   /** Widths of the closed pill and the open box, in pixels. */
   closedWidth?: number;
   openWidth?: number;
+  /** No surface, ring, shadow or width of its own: the parent is the box. */
+  bare?: boolean;
+  /** Told when the text area opens or closes, so a parent box can follow. */
+  onOpenChange?: (open: boolean) => void;
 }
 
 export const PromptInput = forwardRef<HTMLDivElement, PromptInputProps>(function PromptInput(
-  { onSubmit, placeholder = 'Ask anything', className, defaultValue = '', value: controlled, onChange, busy = false, footer, voice = true, closedWidth = 320, openWidth = 440 },
+  { onSubmit, onKey, placeholder = 'Ask anything', className, defaultValue = '', value: controlled, onChange, busy = false, footer, voice = true, closedWidth = 320, openWidth = 440, bare = false, onOpenChange },
   ref,
 ) {
   const [expanded, setExpanded] = useState(false);
@@ -110,6 +118,10 @@ export const PromptInput = forwardRef<HTMLDivElement, PromptInputProps>(function
   useEffect(() => {
     valueRef.current = value;
   }, [value]);
+  useEffect(() => {
+    onOpenChange?.(expanded);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded]);
 
   const updateFades = () => {
     const el = textRef.current;
@@ -262,20 +274,20 @@ export const PromptInput = forwardRef<HTMLDivElement, PromptInputProps>(function
   };
   const submit = () => {
     const text = value.trim();
-    if (!text || busy) return;
-    onSubmit?.(text);
+    if (!text) return;
+    if (onSubmit?.(text) === false) return;
     change('');
     close();
   };
 
   const showStop = recording;
-  const showSpin = busy && !recording;
+  const showSpin = busy && !recording && !hasValue;
   const showMic = !recording && !busy && !hasValue && canVoice;
-  const showArrow = !recording && !busy && !showMic;
+  const showArrow = !recording && !showSpin && !showMic;
   const action = () => {
     if (recording) stopRecording();
-    else if (busy) return;
     else if (hasValue) submit();
+    else if (busy) return;
     else if (canVoice) void startRecording();
     else {
       setSmooth(false);
@@ -294,7 +306,7 @@ export const PromptInput = forwardRef<HTMLDivElement, PromptInputProps>(function
       }}
       onBlur={onBlur}
       className={cx('relative w-full', className)}
-      style={{ maxWidth: expanded ? openWidth : closedWidth, transition: smooth ? 'max-width 0.15s ease-out' : `max-width 0.4s ${SPRING}` }}
+      style={bare ? undefined : { maxWidth: expanded ? openWidth : closedWidth, transition: smooth ? 'max-width 0.15s ease-out' : `max-width 0.4s ${SPRING}` }}
     >
       <div
         onMouseDown={(e) => {
@@ -303,8 +315,8 @@ export const PromptInput = forwardRef<HTMLDivElement, PromptInputProps>(function
             textRef.current?.focus();
           }
         }}
-        style={{ borderRadius: 24, height: expanded ? boxHeight : CLOSED, transition: smooth ? 'height 0.15s ease-out' : `height 0.4s ${SPRING}` }}
-        className={cx('relative w-full overflow-hidden bg-white/95 shadow-lg ring-1 ring-black/5 backdrop-blur focus-within:ring-2 focus-within:ring-violet-300', expanded ? 'cursor-text' : 'cursor-default')}
+        style={{ borderRadius: bare ? 0 : 24, height: expanded ? boxHeight : CLOSED, transition: smooth ? 'height 0.15s ease-out' : `height 0.4s ${SPRING}` }}
+        className={cx('relative w-full overflow-hidden', !bare && 'bg-white/95 shadow-lg ring-1 ring-black/5 backdrop-blur focus-within:ring-2 focus-within:ring-violet-300', expanded ? 'cursor-text' : 'cursor-default')}
       >
         <textarea
           ref={textRef}
@@ -312,6 +324,7 @@ export const PromptInput = forwardRef<HTMLDivElement, PromptInputProps>(function
           onChange={(e) => change(e.target.value)}
           onScroll={updateFades}
           onKeyDown={(e) => {
+            if (onKey?.(e)) return;
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
               submit();
@@ -362,7 +375,7 @@ export const PromptInput = forwardRef<HTMLDivElement, PromptInputProps>(function
           }}
           onClick={action}
           disabled={showSpin}
-          aria-label={showStop ? 'Stop recording' : showSpin ? 'Waiting for the answer' : showMic ? 'Ask by voice' : 'Send'}
+          aria-label={showStop ? 'Stop recording' : showSpin ? 'Waiting for the answer' : showMic ? 'Speak instead of typing' : 'Go'}
           className={cx('absolute bottom-2 right-2 z-[3] flex h-8 w-8 items-center justify-center rounded-full text-white outline-none transition-all duration-300 focus-visible:ring-2 focus-visible:ring-violet-300', showArrow && !hasValue ? 'bg-slate-300' : 'bg-violet-600 hover:bg-violet-700')}
         >
           <span className="relative flex h-full w-full items-center justify-center">

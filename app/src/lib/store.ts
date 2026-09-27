@@ -51,7 +51,7 @@ export interface Browse {
 }
 
 // ------------------------------------------------------------------ layout: floating panels and their sections
-/** Collapsible sections of the left panel. Explore uses search/layers (Boundary)/data/settings; the Analysis views use the rest. */
+/** Collapsible sections of the left panel. Explore uses layers (Boundary)/data/settings; the Analysis views use the rest. (Search lives in the box at the top right.) */
 export type SectionId = 'search' | 'layers' | 'data' | 'settings' | 'place' | 'priorities' | 'colorBy' | 'save' | 'compare';
 export type SectionState = 'open' | 'collapsed' | 'hidden';
 export const SECTION_IDS: SectionId[] = ['search', 'layers', 'data', 'settings', 'place', 'priorities', 'colorBy', 'save', 'compare'];
@@ -68,7 +68,7 @@ export const SECTION_LABELS: Record<SectionId, string> = {
 };
 /** Sections each mode shows, in panel order (the Panels menu lists these). */
 export const SECTIONS_FOR_MODE: Record<Mode, SectionId[]> = {
-  explore: ['search', 'layers', 'data', 'settings'],
+  explore: ['layers', 'data', 'settings'],
   match: ['place', 'priorities', 'colorBy', 'save'],
   tracts: ['place', 'priorities', 'colorBy'],
   scenarios: ['place', 'compare', 'priorities'],
@@ -145,6 +145,8 @@ try {
 export const defaultLayers = (lite = liteDefault): Layers => ({ buildings: true, terrain: !lite, hillshade: false, tracts: true, bg: false, zcta: false, muni: false, county: false, city: true });
 export const defaultBrowse = (): Browse => ({ level: 'tract', variable: null, selected: null });
 
+export type DetailsTab = 'overview' | 'sources' | 'limits' | 'next';
+
 export interface AppState {
   /** Landing page first; deep links (any hash with a mode) open the app directly. */
   view: 'landing' | 'app';
@@ -164,7 +166,9 @@ export interface AppState {
   metric: MapMetric;
   pin: Pin | null;
   lite: boolean;
+  /** The Details window (the project, its data and method, its limits, what comes next). */
   sourcesOpen: boolean;
+  detailsTab: DetailsTab;
   layers: Layers;
   browse: Browse;
   /** Unit under the cursor in Explore (for the legend tick). */
@@ -215,6 +219,7 @@ export const useApp = create<AppState>((set, get) => ({
   pin: null,
   lite: liteDefault,
   sourcesOpen: false,
+  detailsTab: 'overview',
   layers: defaultLayers(),
   browse: defaultBrowse(),
   hoverId: null,

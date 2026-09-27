@@ -5,18 +5,18 @@ import { useMemo } from 'react';
 import { FMR_2BR, askingRents, scoring, tractById } from '../../lib/data';
 import { stabilityFor, tLabel, useAllResults } from '../../lib/derived';
 import { matchPreset, useApp, type Level } from '../../lib/store';
-import { CITY_GEOID, COUNTY_GEOID, LEVEL_LABEL, RELIABILITY, hasHistoryFor, plainDescription, referenceSeries, reference, rentAreaFor, rentAreas, variableById, xwDominant, history } from '../../lib/explore/catalog';
+import { CITY_GEOID, COUNTY_GEOID, LEVEL_LABEL, hasHistoryFor, plainDescription, referenceSeries, reference, rentAreaFor, rentAreas, variableById, xwDominant, history } from '../../lib/explore/catalog';
 import { useSeries } from '../../lib/explore/remote';
-import { estimates, fmtMoe, fmtTick, fmtValue, reliability } from '../../lib/explore/bins';
+import { estimates, fmtTick, fmtValue } from '../../lib/explore/bins';
 import { EXPLORE_UI } from '../../lib/explore/copy';
-import { analysisConf, fmtAnalysis, isAnalysis } from '../../lib/explore/analysisVars';
+import { fmtAnalysis, isAnalysis } from '../../lib/explore/analysisVars';
 import { binOf, change, composition, histogram, rankOf, type Series } from '../../lib/explore/summary';
 import type { Estimate, Loaded, Unit, ValueMap, VariableDef } from '../../lib/explore/types';
 import { FACTOR_COPY, RENT_CAVEAT, directionWord, factorName, matchText, pctShort, stabilityWords } from '../../lib/copy';
 import { fmtSignedPct } from '../../lib/format';
-import type { Conf, TractProps } from '../../lib/types';
+import type { TractProps } from '../../lib/types';
 import { BarCompare, Donut, HistogramChart, LineChart, PARTS, RankBar, SERIES, StackedBar, StatTile, fmtK } from '../charts';
-import { Button, ConfChip, Explainer } from '../primitives';
+import { Button, Explainer } from '../primitives';
 
 const C = EXPLORE_UI.charts;
 const fmtFor = (unit: Unit) => (v: number) => fmtValue(v, unit);
@@ -88,7 +88,7 @@ function HistoryLine({ level, geoid, varId, label }: { level: Level; geoid: stri
   const ref = referenceSeries(varId);
   if (!v || !mine) return null;
   const series = [
-    { id: 'place', label: C.thisPlace, color: SERIES.place, values: mine.est, moe: mine.moe },
+    { id: 'place', label: C.thisPlace, color: SERIES.place, values: mine.est },
     ...(ref.city ? [{ id: 'city', label: C.city, color: SERIES.city, values: ref.city.est }] : []),
     ...(ref.county ? [{ id: 'county', label: C.county, color: SERIES.county, values: ref.county.est }] : []),
   ];
@@ -130,11 +130,6 @@ export function RentLine({ level, geoid }: { level: Level; geoid: string }) {
         </span>
       </div>
       <LineChart years={years} series={series} fmt={(v) => `$${fmtK(v)}`} caption={`${C.rentSeries} ${RENT_CAVEAT}`} />
-      {area.conf && (
-        <div className="mt-1">
-          <ConfChip conf={area.conf} />
-        </div>
-      )}
     </div>
   );
 }
@@ -169,15 +164,11 @@ function AnalysisBlock({ t }: { t: TractProps }) {
       <div className="space-y-2">
         {scoring.factors.map((f) => {
           const v = typeof t[f.id] === 'number' ? (t[f.id] as number) : null;
-          const conf = (t[`${f.id}_conf`] as Conf | null) ?? null;
           return (
             <div key={f.id}>
               <div className="flex items-center justify-between gap-2 text-small">
                 <span className="text-slate-800">{factorName(f.id, f.label)}</span>
-                <span className="flex items-center gap-1.5 tnum">
-                  <span className="font-semibold text-slate-900">{v == null ? 'no data' : pctShort(v)}</span>
-                  {conf && <ConfChip conf={conf} />}
-                </span>
+                <span className="font-semibold text-slate-900 tnum">{v == null ? 'no data' : pctShort(v)}</span>
               </div>
               <div className="mt-1">
                 <RankBar pct={v} label={`${factorName(f.id, f.label)}: ${v == null ? 'no data' : pctShort(v)}`} />
@@ -216,10 +207,9 @@ export default function PlaceSummary({ level, geoid, unit }: { level: Level; geo
       <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-stone-200/70 ring-1 ring-stone-200/70">
         {TILES.map((id) => {
           const v = variableById.get(id);
-          const e = unit?.[id];
           if (!v) return null;
-          const value = est(e);
-          return <StatTile key={id} label={v.label} value={fmtValue(value, v.unit)} sub={typeof e?.moe === 'number' ? `± ${fmtMoe(e.moe, v.unit)}` : undefined} delta={v.unit === 'count' ? null : delta(value, est(reference(id).city), v.unit)} conf={reliability(e?.cv, RELIABILITY)} />;
+          const value = est(unit?.[id]);
+          return <StatTile key={id} label={v.label} value={fmtValue(value, v.unit)} delta={v.unit === 'count' ? null : delta(value, est(reference(id).city), v.unit)} />;
         })}
       </div>
       <Section title={C.tenure} sub={`${C.source} · renter vs owner households`}>
@@ -236,7 +226,7 @@ export default function PlaceSummary({ level, geoid, unit }: { level: Level; geo
             return (
               <div key={id}>
                 <div className="mb-1 text-small font-medium text-slate-800">{label}</div>
-                <BarCompare rows={[{ label: C.thisPlace, value: est(unit?.[id]), moe: unit?.[id]?.moe ?? null, color: SERIES.place }, { label: 'City', value: est(ref.city), color: SERIES.city }, { label: 'County', value: est(ref.county), color: SERIES.county }]} fmt={fmtFor('share')} max={1} />
+                <BarCompare rows={[{ label: C.thisPlace, value: est(unit?.[id]), color: SERIES.place }, { label: 'City', value: est(ref.city), color: SERIES.city }, { label: 'County', value: est(ref.county), color: SERIES.county }]} fmt={fmtFor('share')} max={1} />
               </div>
             );
           })}
@@ -291,8 +281,6 @@ export function VariableDetail({ level, geoid, variable, values, unit }: { level
         <div className="text-caption text-slate-600">{variable.label}</div>
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <span className="font-display text-display font-bold text-slate-900 tnum">{analysis ? fmtAnalysis(analysis, value) : fmtValue(value, variable.unit)}</span>
-          {!analysis && typeof own?.moe === 'number' && <span className="text-small text-slate-600 tnum">± {fmtMoe(own.moe, variable.unit)}</span>}
-          {analysis ? analysisConf(analysis, geoid) && <ConfChip conf={analysisConf(analysis, geoid)} /> : <ConfChip conf={reliability(own?.cv, RELIABILITY)} />}
         </div>
         {rank && (
           <div className="mt-2">
@@ -314,7 +302,7 @@ export function VariableDetail({ level, geoid, variable, values, unit }: { level
       )}
       {!analysis && (
         <Section title="Against the city and county">
-          <BarCompare rows={[{ label: C.thisPlace, value, moe: own?.moe ?? null, color: SERIES.place }, { label: 'City', value: est(ref.city), moe: ref.city?.moe ?? null, color: SERIES.city }, { label: 'County', value: est(ref.county), moe: ref.county?.moe ?? null, color: SERIES.county }]} fmt={fmt} />
+          <BarCompare rows={[{ label: C.thisPlace, value, color: SERIES.place }, { label: 'City', value: est(ref.city), color: SERIES.city }, { label: 'County', value: est(ref.county), color: SERIES.county }]} fmt={fmt} />
         </Section>
       )}
       {!analysis && series && (

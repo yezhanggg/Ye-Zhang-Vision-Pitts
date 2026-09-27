@@ -85,7 +85,7 @@ export default function DataPanel() {
           </div>
           <p className="mt-3 text-caption text-slate-600">
             {EXPLORE_UI.footer} ·{' '}
-            <button onClick={() => set({ sourcesOpen: true })} className="font-semibold text-violet-700 hover:underline">
+            <button onClick={() => set({ sourcesOpen: true, detailsTab: 'sources' })} className="font-semibold text-violet-700 hover:underline">
               {EXPLORE_UI.sourcesLink}
             </button>
           </p>

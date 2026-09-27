@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LIMITS, buildMessages, checkNumbers, clean, pickProvider, tidy } from './chat';
+import { FACTS_ACK, LIMITS, buildMessages, checkNumbers, clean, pickProvider, tidy } from './chat';
 
 const FACTS = `SELECTED PLACE
 Hazelwood (Census Tract 5623), census tract
@@ -26,7 +26,7 @@ describe('checkNumbers', () => {
 
 describe('clean', () => {
   it('bounds the question and keeps a well-formed history', () => {
-    const p = clean({ question: ` ${'x'.repeat(900)} `, facts: FACTS, history: [{ role: 'user', text: 'a' }, { role: 'assistant', text: 'b' }] });
+    const p = clean({ question: ` ${'x'.repeat(900)} `, facts: FACTS, history: [{ role: 'user', text: 'old' }, { role: 'assistant', text: 'older' }, { role: 'user', text: 'a' }, { role: 'assistant', text: 'b' }] });
     expect(p?.question.length).toBe(LIMITS.question);
     expect(p?.history).toEqual([{ role: 'user', text: 'a' }, { role: 'assistant', text: 'b' }]);
   });
@@ -40,12 +40,15 @@ describe('clean', () => {
 });
 
 describe('buildMessages, tidy, pickProvider', () => {
-  it('puts the facts and the question in the last user message', () => {
-    const m = buildMessages({ question: 'What is the rent?', facts: FACTS, history: [{ role: 'user', text: 'a' }, { role: 'assistant', text: 'b' }] });
-    expect(m).toHaveLength(3);
-    expect(m[2].role).toBe('user');
-    expect(m[2].text.startsWith('FACTS\nSELECTED PLACE')).toBe(true);
-    expect(m[2].text.endsWith('QUESTION\nWhat is the rent?')).toBe(true);
+  it('puts the facts first, so a second question about the same place repeats the same opening', () => {
+    const a = buildMessages({ question: 'What is the rent?', facts: FACTS, history: [{ role: 'user', text: 'a' }, { role: 'assistant', text: 'b' }] });
+    const b = buildMessages({ question: 'And the income?', facts: FACTS });
+    expect(a.map((m) => m.role)).toEqual(['user', 'assistant', 'user', 'assistant', 'user']);
+    expect(a[0].text.startsWith('FACTS\nSELECTED PLACE')).toBe(true);
+    expect(a[1].text).toBe(FACTS_ACK);
+    expect(a[4].text).toBe('QUESTION\nWhat is the rent?');
+    expect(b.slice(0, 2)).toEqual(a.slice(0, 2));
+    expect(b).toHaveLength(3);
   });
   it('strips markdown the interface would show as symbols', () => {
     expect(tidy('## Rent\n**Hazelwood** is lower.\n- Greenfield is higher.')).toBe('Rent\nHazelwood is lower.\n• Greenfield is higher.');

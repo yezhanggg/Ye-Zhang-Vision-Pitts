@@ -8,6 +8,9 @@
 //     gets one retry that names them; if the second answer still has some, it is returned with checked:false and the
 //     app says so beside the answer.
 //  3. The API key lives in the environment; the browser never sees it. Inputs are size-limited and nothing is stored.
+//  4. Tokens are money. The facts go first, right after the system text, so that a second question about the same
+//     place repeats the same opening and the provider can bill it as cached input. Only the last exchange is sent as
+//     history, answers are capped, and a question already answered while this function is warm is served from memory.
 //
 // The provider code repeats api/explain.ts on purpose: every file in api/ deploys as its own function, so this one
 // does not depend on a neighbor being bundled with it.
@@ -30,8 +33,9 @@ interface Provider {
   model: string;
 }
 
-export const LIMITS = { question: 400, facts: 16000, history: 4, turn: 1500 };
-const MAX_TOKENS = 450;
+export const LIMITS = { question: 400, facts: 16000, history: 2, turn: 1500 };
+const MAX_TOKENS = 380;
+export const FACTS_ACK = 'Understood. I will answer from these facts only.';
 const TEMPERATURE = 0.2;
 
 export function pickProvider(env: Record<string, string | undefined>): Provider | null {
@@ -48,7 +52,7 @@ export const SYSTEM = `You are the assistant inside VisionPitts, a housing data 
 You answer questions from residents, planners and community staff in plain language.
 
 Rules:
-1. Use only the FACTS in the latest message. They come from the tool's own data. If they do not cover the question, say so in one sentence and name what the facts do cover.
+1. Use only the FACTS given at the start of the conversation. They come from the tool's own data. If they do not cover the question, say so in one sentence and name what the facts do cover.
 2. Never invent, estimate or calculate a number. Quote figures exactly as they are written in the facts. Compare with words (higher, lower, about the same, the highest nearby) instead of working out differences or percentages.
 3. Describe the data, not the people: no stereotypes, no judgments about residents, no advice on where to live, invest or build.
 4. "Asking rent" figures come from licensed listings and lean toward market-rate units. Say so only when you quote an asking rent. "Median gross rent" is a census figure and needs no such note.
@@ -75,8 +79,9 @@ export function clean(body: unknown): ChatPayload | null {
   return { question, facts, history: ok ? history : [] };
 }
 
+/** Facts first (the part that repeats from one question to the next), then the last exchange, then the question. */
 export function buildMessages(p: ChatPayload): Turn[] {
-  return [...(p.history ?? []), { role: 'user', text: `FACTS\n${p.facts}\n\nQUESTION\n${p.question}` }];
+  return [{ role: 'user', text: `FACTS\n${p.facts}` }, { role: 'assistant', text: FACTS_ACK }, ...(p.history ?? []), { role: 'user', text: `QUESTION\n${p.question}` }];
 }
 
 const NUMBER = /\d[\d,]*(?:\.\d+)?/g;
@@ -107,7 +112,16 @@ export function checkNumbers(text: string, sources: string[]): { ok: boolean; un
 /** Plain text: the interface does not render markdown. */
 export const tidy = (s: string) => s.replace(/\*\*/g, '').replace(/^#+\s*/gm, '').replace(/^\s*[-*]\s+/gm, '• ').trim();
 
-async function complete(p: Provider, messages: Turn[]): Promise<{ ok: true; text: string } | { ok: false; status: number }> {
+export interface Usage {
+  input: number;
+  /** Input tokens the provider billed at its cached rate. */
+  cached: number;
+  output: number;
+}
+type Done = { ok: true; text: string; usage: Usage } | { ok: false; status: number };
+const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+
+async function complete(p: Provider, messages: Turn[]): Promise<Done> {
   if (p.id === 'deepseek') {
     const r = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
@@ -115,8 +129,9 @@ async function complete(p: Provider, messages: Turn[]): Promise<{ ok: true; text
       body: JSON.stringify({ model: p.model, max_tokens: MAX_TOKENS, temperature: TEMPERATURE, thinking: { type: 'disabled' }, messages: [{ role: 'system', content: SYSTEM }, ...messages.map((m) => ({ role: m.role, content: m.text }))] }),
     });
     if (!r.ok) return { ok: false, status: r.status };
-    const data = (await r.json()) as { choices?: { message?: { content?: string } }[] };
-    return { ok: true, text: (data.choices?.[0]?.message?.content ?? '').trim() };
+    const data = (await r.json()) as { choices?: { message?: { content?: string } }[]; usage?: Record<string, unknown> };
+    const u = data.usage ?? {};
+    return { ok: true, text: (data.choices?.[0]?.message?.content ?? '').trim(), usage: { input: num(u.prompt_tokens), cached: num(u.prompt_cache_hit_tokens), output: num(u.completion_tokens) } };
   }
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -124,9 +139,14 @@ async function complete(p: Provider, messages: Turn[]): Promise<{ ok: true; text
     body: JSON.stringify({ model: p.model, max_tokens: MAX_TOKENS, temperature: TEMPERATURE, system: SYSTEM, messages: messages.map((m) => ({ role: m.role, content: m.text })) }),
   });
   if (!r.ok) return { ok: false, status: r.status };
-  const data = (await r.json()) as { content?: { type: string; text?: string }[] };
-  return { ok: true, text: (data.content ?? []).map((c) => c.text ?? '').join('').trim() };
+  const data = (await r.json()) as { content?: { type: string; text?: string }[]; usage?: Record<string, unknown> };
+  const u = data.usage ?? {};
+  return { ok: true, text: (data.content ?? []).map((c) => c.text ?? '').join('').trim(), usage: { input: num(u.input_tokens), cached: num(u.cache_read_input_tokens), output: num(u.output_tokens) } };
 }
+
+/** Answers given while this function instance is warm, by provider, facts, history and question. */
+const warm = new Map<string, Record<string, unknown>>();
+const WARM_MAX = 200;
 
 export default async function handler(req: { method?: string; body?: unknown }, res: { status: (n: number) => { json: (b: unknown) => void } }) {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, reason: 'POST only' });
@@ -141,14 +161,21 @@ export default async function handler(req: { method?: string; body?: unknown }, 
   if (!payload) return res.status(400).json({ ok: false, reason: 'bad_request' });
 
   const messages = buildMessages(payload);
+  const cacheKey = JSON.stringify([provider.id, provider.model, messages]);
+  const hit = warm.get(cacheKey);
+  if (hit) return res.status(200).json({ ...hit, cached: true, usage: { input: 0, cached: 0, output: 0 } });
   const sources = [payload.facts, payload.question, ...(payload.history ?? []).map((t) => t.text)];
   const first = await complete(provider, messages);
   if (!first.ok) return res.status(200).json({ ok: false, reason: `${provider.id}_${first.status}` });
+  const usage: Usage = { ...first.usage };
   let text = tidy(first.text);
   let check = checkNumbers(text, sources);
   if (!check.ok) {
     const again = await complete(provider, [...messages, { role: 'assistant', text: first.text }, { role: 'user', text: `These numbers are not in the facts: ${check.unmatched.join(', ')}. Rewrite the answer using only figures written in the facts, exactly as written. Do not calculate anything.` }]);
     if (again.ok) {
+      usage.input += again.usage.input;
+      usage.cached += again.usage.cached;
+      usage.output += again.usage.output;
       const t2 = tidy(again.text);
       const c2 = checkNumbers(t2, sources);
       if (c2.unmatched.length < check.unmatched.length) {
@@ -158,5 +185,10 @@ export default async function handler(req: { method?: string; body?: unknown }, 
     }
   }
   if (!text) return res.status(200).json({ ok: false, reason: 'empty_answer' });
-  return res.status(200).json({ ok: true, text, provider: provider.label, model: provider.model, checked: check.ok, unmatched: check.unmatched });
+  const out = { ok: true, text, provider: provider.label, model: provider.model, checked: check.ok, unmatched: check.unmatched };
+  if (check.ok) {
+    if (warm.size >= WARM_MAX) warm.delete(warm.keys().next().value as string);
+    warm.set(cacheKey, out);
+  }
+  return res.status(200).json({ ...out, usage });
 }

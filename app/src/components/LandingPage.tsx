@@ -6,7 +6,7 @@ import { buildPaint } from '../lib/paint';
 import { HERO_VIEW } from '../lib/mapStyle';
 import { presetWeights, useApp } from '../lib/store';
 import MapView from './MapView';
-import { AboutModal, LimitsModal } from './LandingModals';
+import { AboutModal } from './LandingModals';
 
 function HeroMap() {
   const lite = useApp((s) => s.lite);
@@ -34,7 +34,7 @@ function Tile({ title, sub, onClick, primary }: { title: string; sub: string; on
 }
 
 export default function LandingPage() {
-  const [panel, setPanel] = useState<'limits' | 'about' | null>(null);
+  const [about, setAbout] = useState(false);
   const set = useApp((s) => s.set);
   const enter = () => {
     const s = useApp.getState();
@@ -59,20 +59,18 @@ export default function LandingPage() {
         </p>
       </div>
 
-      {/* the four doors */}
+      {/* the three doors */}
       <div className="scroll-quiet flex min-h-0 flex-col overflow-y-auto border-l border-stone-200/70 px-6 py-6 md:px-12 md:py-10">
         <div className="my-auto space-y-3 py-10">
           <Tile primary title="Open VisionPitts" sub="Browse the census, then match housing types to places." onClick={enter} />
-          <Tile title="Sources" sub="Every dataset, its vintage, geography and caveats." onClick={() => set({ sourcesOpen: true })} />
-          <Tile title="Limitations & future implementation" sub="What the data cannot tell you yet, and what comes next." onClick={() => setPanel('limits')} />
-          <Tile title="About" sub="Who built this, and why." onClick={() => setPanel('about')} />
+          <Tile title="Details" sub="What the project has, its data and method, its limits and what comes next." onClick={() => set({ sourcesOpen: true, detailsTab: 'overview' })} />
+          <Tile title="About" sub="Who built this, and how to get in touch." onClick={() => setAbout(true)} />
         </div>
 
         <div className="text-caption text-slate-500">© 2026 Ye Zhang · VisionPitts · AI Horizons 2026 · AI for Housing Hackathon</div>
       </div>
 
-      <LimitsModal open={panel === 'limits'} onClose={() => setPanel(null)} />
-      <AboutModal open={panel === 'about'} onClose={() => setPanel(null)} onLimits={() => setPanel('limits')} />
+      <AboutModal open={about} onClose={() => setAbout(false)} />
     </div>
   );
 }

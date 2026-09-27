@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import maplibregl, { type ExpressionSpecification, type GeoJSONSource, type Map as MLMap, type MapGeoJSONFeature, type MapLayerMouseEvent } from 'maplibre-gl';
 import { buildingsFC, scoring, tractBounds, tractsFC } from '../lib/data';
 import { boundsOf, type Bounds } from '../lib/geo';
+import { farZoom, isFar } from '../lib/farView';
 import { ELEV_STOPS_FT, M_TO_FT, PGH_VIEW, VIOLET, catExpression, contourSourceUrl, easeInOutCubic, easeOutCubic, loadBasemapStyle, loadDemConfig, seqExpression, type DemConfig } from '../lib/mapStyle';
 import type { MapPaint } from '../lib/paint';
 import type { Pin } from '../lib/types';
@@ -859,32 +860,63 @@ export default function MapView(props: Props) {
     if (map.getLayer('hillshade')) map.setLayoutProperty('hillshade', 'visibility', props.hillshade ? 'visible' : 'none');
   }, [props.hillshade, ready]);
 
-  // Hold the Command key with the pointer over the map for a flat, top-down view; releasing it restores the tilt.
+  // Two things lay the map flat, and both give the tilt back: holding the Command key with the pointer over the
+  // map, and zooming out until the view takes in five miles around the city limits (lib/farView). The second is
+  // checked when a move ends, so it never cuts into a zoom in progress.
   useEffect(() => {
     const map = mapRef.current;
     const node = el.current;
     if (!map || !node || !ready || props.interactive === false) return;
     let over = false;
-    let saved: number | null = null;
-    const ms = props.lite ? 0 : 350;
-    const flatten = () => {
-      if (saved != null || !st.introDone) return;
-      saved = map.getPitch();
-      map.easeTo({ pitch: 0, duration: ms, essential: true });
-      setFlat(true);
-    };
-    const restore = () => {
-      if (saved == null) return;
-      const pitch = saved;
-      saved = null;
+    let held = false;
+    let far = false;
+    /** The tilt to come back to while the map is laid flat; null while it is not. */
+    let tilt: number | null = null;
+    /** A pitch the map is on its way to. Tilting by hand cancels it. */
+    let want: number | null = null;
+    const ms = props.lite ? 0 : 450;
+    const ease = (pitch: number) => {
+      want = pitch;
       map.easeTo({ pitch, duration: ms, essential: true });
-      setFlat(false);
+    };
+    const sync = () => {
+      if (!st.introDone) return;
+      const pitch = map.getPitch();
+      if (held || far) {
+        if (tilt == null) tilt = pitch;
+        if (pitch > 0.5) ease(0);
+        else want = null;
+      } else if (tilt != null) {
+        const back = tilt;
+        tilt = null;
+        // Something else (a flight to a place) may already have tilted the map: then there is nothing to give back.
+        if (pitch < 0.5 && back > 0.5) ease(back);
+        else want = null;
+      } else if (want != null && Math.abs(pitch - want) > 0.5) ease(want);
+      else want = null;
+      setFlat(held);
+    };
+    const settle = () => {
+      const box = map.getContainer().getBoundingClientRect();
+      const threshold = farZoom(box.width, box.height);
+      if (threshold != null) far = isFar(map.getZoom(), threshold, far);
+      sync();
+    };
+    const byHand = (e: { originalEvent?: unknown }) => {
+      if (e.originalEvent) want = null;
     };
     const down = (e: KeyboardEvent) => {
-      if (e.key === 'Meta' && over && !e.repeat) flatten();
+      if (e.key !== 'Meta' || !over || e.repeat || held) return;
+      held = true;
+      sync();
+    };
+    const release = () => {
+      if (!held) return;
+      held = false;
+      sync();
     };
     const up = (e: KeyboardEvent) => {
-      if (e.key === 'Meta') restore();
+      if (e.key === 'Meta') release();
     };
     const enter = () => (over = true);
     const leave = () => (over = false);
@@ -893,15 +925,19 @@ export default function MapView(props: Props) {
     node.addEventListener('mouseleave', leave);
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
-    window.addEventListener('blur', restore);
+    window.addEventListener('blur', release);
+    map.on('moveend', settle);
+    map.on('pitchstart', byHand);
+    settle();
     return () => {
-      restore();
+      map.off('moveend', settle);
+      map.off('pitchstart', byHand);
       node.removeEventListener('mouseenter', enter);
       node.removeEventListener('mousemove', enter);
       node.removeEventListener('mouseleave', leave);
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
-      window.removeEventListener('blur', restore);
+      window.removeEventListener('blur', release);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.interactive, props.lite, ready]);

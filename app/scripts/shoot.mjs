@@ -33,12 +33,19 @@ await open('#m=tracts&t=42003562300&b=42003140300&c=top', 'text=Why they differ'
 await shot('05-compare-tracts', 4500);
 await open('#m=scenarios&t=42003562300', 'text=How the two scenarios weigh things');
 await shot('06-compare-scenarios', 4500);
-// Sources & method: Home -> the Sources door of the start page.
+// Details (the project, its data and method, its limits, what comes next): Home -> the Details door -> Data & method.
 await page.click('[title="Back to the start page"]');
 await page.waitForSelector('text=Open VisionPitts', { timeout: 25000 });
-await page.locator('button', { hasText: 'Every dataset, its vintage' }).click();
+await page.locator('button', { hasText: 'What the project has' }).click();
+await page.getByRole('button', { name: 'Data & method' }).click();
 await page.waitForSelector('text=Observed data: where the numbers come from', { timeout: 25000 });
 await shot('07-sources', 1500);
+// About: the author.
+await page.keyboard.press('Escape');
+await page.mouse.click(20, 20);
+await page.locator('button', { hasText: 'Who built this' }).click();
+await page.waitForSelector('text=Background', { timeout: 25000 });
+await shot('12-about', 1200);
 // Analysis > Match: the asking-rent information layer (licensed listings, never scored).
 await open(`#m=match&${W}&c=info.rent_growth_existing`, 'text=Start here');
 await shot('08-asking-rents', 4500);

@@ -1,6 +1,7 @@
 import { useApp } from '../../lib/store';
 import { BOUNDARY_ROWS, EXPLORE_UI, SETTING_ROWS } from '../../lib/explore/copy';
 import { cx } from '../../lib/format';
+import { Segmented } from '../primitives';
 
 /** Accessible toggle: a button with aria-pressed, a small track and knob, label and caption. */
 export function Switch({ on, onChange, label, caption, id, disabled }: { on: boolean; onChange: (on: boolean) => void; label: string; caption?: string; id?: string; disabled?: boolean }) {
@@ -17,19 +18,30 @@ export function Switch({ on, onChange, label, caption, id, disabled }: { on: boo
   );
 }
 
-/** The boundaries, one open at a time, and the switch that keeps the map to the City of Pittsburgh. */
+/** The area (Pittsburgh or the whole county) and the boundaries, one open at a time. */
 export function BoundaryPanel() {
   const layers = useApp((s) => s.layers);
   const setLayer = useApp((s) => s.setLayer);
+  const A = EXPLORE_UI.area;
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
+      <div>
+        <Segmented
+          full
+          label={A.label}
+          value={layers.city && !layers.muni ? 'city' : 'county'}
+          onChange={(v) => setLayer('city', v === 'city')}
+          options={[
+            { value: 'city', label: A.city, disabled: layers.muni },
+            { value: 'county', label: A.county },
+          ]}
+        />
+        {layers.muni && <p className="px-1 pt-1 text-caption text-slate-600">{A.muni}</p>}
+      </div>
       <div role="group" aria-label={EXPLORE_UI.layers} className="space-y-1.5">
         {BOUNDARY_ROWS.map((row) => (
           <Switch key={row.id} id={`layer-${row.id}`} on={!!layers[row.id]} label={row.label} caption={row.caption} onChange={(on) => setLayer(row.id, on)} />
         ))}
-      </div>
-      <div className="border-t border-stone-200 pt-1.5">
-        <Switch id="layer-city" on={layers.city} disabled={layers.muni} label={EXPLORE_UI.cityOnly.label} caption={layers.muni ? EXPLORE_UI.cityOnly.muni : EXPLORE_UI.cityOnly.caption} onChange={(on) => setLayer('city', on)} />
       </div>
     </div>
   );

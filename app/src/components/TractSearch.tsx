@@ -25,7 +25,7 @@ interface Props {
 
 const GROUP_TITLE: Record<string, string> = { neighborhood: 'Neighborhoods', tract: 'Census tracts', address: 'Addresses & places' };
 
-function KindIcon({ kind }: { kind: GeoResult['kind'] }) {
+export function KindIcon({ kind }: { kind: GeoResult['kind'] }) {
   const cls = 'h-4 w-4 shrink-0 text-slate-500';
   if (kind === 'address')
     return (
@@ -48,7 +48,7 @@ function KindIcon({ kind }: { kind: GeoResult['kind'] }) {
 }
 
 /** Enter with a custom resolver: the same geocoder chain as searchOnEnter, but each hit is placed by `resolve`. */
-async function enterWith(q: string, resolve: (r: GeoResult) => Resolved, signal?: AbortSignal): Promise<Resolved> {
+export async function enterWith(q: string, resolve: (r: GeoResult) => Resolved, signal?: AbortSignal): Promise<Resolved> {
   const text = q.trim();
   if (!text) return { ok: false, reason: 'notfound' };
   const attempts: (() => Promise<GeoResult | null | undefined>)[] = [];

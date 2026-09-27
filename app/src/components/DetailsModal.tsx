@@ -1,7 +1,8 @@
 import { AnimatePresence, motion } from 'motion/react';
+import { LIMITS, NEXT, PROJECT } from '../lib/about';
 import { FMR_2BR, activeFactorIds, askingRents, hasAskingRents, meta, scoring, sources } from '../lib/data';
 import { FACTOR_COPY, GLOSSARY, PRESSURE_HOW, RENT_HOW, RENT_WHY_INFO, SCORE_HOW, factorName } from '../lib/copy';
-import { useApp } from '../lib/store';
+import { useApp, type DetailsTab } from '../lib/store';
 import { cx, fmtInt, fmtMoney, fmtSignedPct } from '../lib/format';
 import { RELIABILITY, catalogue, groups, hasBrowser, levelMeta, variables, variablesByGroup } from '../lib/explore/catalog';
 
@@ -34,8 +35,73 @@ function formula(num: string[], den: string | null): string {
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 
-export default function SourcesModal() {
+const TABS: { id: DetailsTab; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'sources', label: 'Data & method' },
+  { id: 'limits', label: 'Limitations' },
+  { id: 'next', label: 'What comes next' },
+];
+
+function Bullets({ groups }: { groups: { title: string; items: string[] }[] }) {
+  return (
+    <>
+      {groups.map((g) => (
+        <section key={g.title}>
+          <h3 className="mb-2 text-body font-semibold text-slate-900">{g.title}</h3>
+          <ul className="space-y-1.5 text-small text-slate-700">
+            {g.items.map((it, i) => (
+              <li key={i} className="flex gap-2">
+                <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-violet-500" />
+                <span>{it}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </>
+  );
+}
+
+function Overview() {
+  return (
+    <>
+      <div>
+        <p className="font-display text-display font-bold leading-tight tracking-tight text-slate-900">{PROJECT.tagline}</p>
+        <div className="mt-2 space-y-2 text-body leading-relaxed text-slate-800">
+          {PROJECT.lines.map((l, i) => (
+            <p key={i}>{l}</p>
+          ))}
+        </div>
+      </div>
+      <section>
+        <h3 className="mb-2 text-body font-semibold text-slate-900">What it has</h3>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {PROJECT.has.map((h) => (
+            <div key={h.title} className="rounded-xl bg-stone-50 p-3 ring-1 ring-stone-200/80">
+              <div className="text-small font-semibold text-slate-900">{h.title}</div>
+              <div className="mt-0.5 text-small text-slate-700">{h.text}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+      <ul className="space-y-1 text-small">
+        {PROJECT.links.map((l) => (
+          <li key={l.url}>
+            <a href={l.url} target="_blank" rel="noreferrer" className="font-semibold text-violet-700 hover:underline">
+              {l.label} →
+            </a>
+          </li>
+        ))}
+      </ul>
+      <p className="border-t border-stone-100 pt-3 text-caption text-slate-500">{PROJECT.credits}</p>
+    </>
+  );
+}
+
+/** Details: everything about the project in one window. Overview, data and method, limitations, what comes next. */
+export default function DetailsModal() {
   const open = useApp((s) => s.sourcesOpen);
+  const tab = useApp((s) => s.detailsTab);
   const set = useApp((s) => s.set);
   const factors = scoring.factors.filter((f) => activeFactorIds.includes(f.id));
   return (
@@ -44,17 +110,40 @@ export default function SourcesModal() {
         <motion.div className="fixed inset-0 z-[3000] grid place-items-center bg-slate-900/30 p-6 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => set({ sourcesOpen: false })}>
           <motion.div initial={{ y: 16, scale: 0.98, opacity: 0 }} animate={{ y: 0, scale: 1, opacity: 1 }} exit={{ y: 8, opacity: 0 }} transition={{ type: 'spring', stiffness: 320, damping: 30 }} onClick={(e) => e.stopPropagation()} className="scroll-quiet max-h-[86vh] w-full max-w-3xl overflow-auto rounded-2xl bg-white shadow-2xl ring-1 ring-black/5">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-stone-100 bg-white/95 px-6 py-4 backdrop-blur">
-              <div>
-                <h2 className="font-display text-lg font-bold text-slate-900">Sources & method</h2>
-                <p className="text-small text-slate-600">What is observed data, and what is a value judgment.</p>
+              <div className="min-w-0">
+                <h2 className="font-display text-lg font-bold text-slate-900">Details</h2>
+                <nav aria-label="Details" className="mt-2 flex flex-wrap gap-1">
+                  {TABS.map((t) => (
+                    <button key={t.id} onClick={() => set({ detailsTab: t.id })} aria-current={tab === t.id ? 'page' : undefined} className={cx('relative rounded-lg px-3 py-1.5 text-small font-semibold transition-colors', tab === t.id ? 'text-slate-900' : 'text-slate-600 hover:text-slate-900')}>
+                      {tab === t.id && <motion.span layoutId="details-tab" className="absolute inset-0 rounded-lg bg-stone-100 ring-1 ring-black/5" transition={{ type: 'spring', stiffness: 420, damping: 32 }} />}
+                      <span className="relative">{t.label}</span>
+                    </button>
+                  ))}
+                </nav>
               </div>
-              <button onClick={() => set({ sourcesOpen: false })} className="rounded-lg p-2 text-slate-500 hover:bg-stone-100 hover:text-slate-900" aria-label="Close">
+              <button onClick={() => set({ sourcesOpen: false })} className="self-start rounded-lg p-2 text-slate-500 hover:bg-stone-100 hover:text-slate-900" aria-label="Close">
                 <svg viewBox="0 0 20 20" className="h-4 w-4">
                   <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
               </button>
             </div>
-            <div className="space-y-6 px-6 py-5">
+            {tab === 'overview' && (
+              <div className="space-y-6 px-6 py-5">
+                <Overview />
+              </div>
+            )}
+            {tab === 'limits' && (
+              <div className="space-y-6 px-6 py-5">
+                <Bullets groups={LIMITS} />
+              </div>
+            )}
+            {tab === 'next' && (
+              <div className="space-y-6 px-6 py-5">
+                <Bullets groups={NEXT} />
+              </div>
+            )}
+            <div className={cx('space-y-6 px-6 py-5', tab !== 'sources' && 'hidden')}>
+              <p className="text-small text-slate-600">What is observed data, and what is a value judgment.</p>
               <section>
                 <h3 className="mb-2 text-body font-semibold text-emerald-800">Observed data: where the numbers come from</h3>
                 <div className="overflow-hidden rounded-xl ring-1 ring-stone-200">

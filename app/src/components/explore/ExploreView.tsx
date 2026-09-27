@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { MousePointerClick, X } from 'lucide-react';
+import { MapPinned, MousePointerClick, X } from 'lucide-react';
 import type { ExpressionSpecification } from 'maplibre-gl';
 import { useApp, type Level } from '../../lib/store';
 import type { MapPaint } from '../../lib/paint';
-import { LEVEL_LAYER, unitSubtitle, unitTitle, variableById } from '../../lib/explore/catalog';
+import { LEVEL_LAYER, variableById } from '../../lib/explore/catalog';
 import { browsePaint, estimates, extent, quantileBreaks } from '../../lib/explore/bins';
 import { BOUNDARY_STYLE, EXPLORE_UI } from '../../lib/explore/copy';
 import { useGeo, useVariable } from '../../lib/explore/remote';
@@ -16,14 +16,12 @@ import { useAllResults } from '../../lib/derived';
 import { cx } from '../../lib/format';
 import MapView, { type IntroPhase, type OverlayLayer } from '../MapView';
 import IntroOverlay from '../IntroOverlay';
-import PanelFrame from '../PanelFrame';
+import PanelFrame, { RightColumn } from '../PanelFrame';
 import Rail, { RailSection } from '../Rail';
-import TractSearch from '../TractSearch';
 import ChatBox from './ChatBox';
 import DataLegend from './DataLegend';
 import DataPanel from './DataPanel';
 import DataTooltip from './DataTooltip';
-import ScopeOverview from './ScopeOverview';
 import { BoundaryPanel, SettingsPanel } from './LayersPanel';
 import PlaceCard from './PlaceCard';
 import VariableSummary from './VariableSummary';
@@ -59,6 +57,21 @@ function lineFor(id: BoundaryId, active: boolean): OverlayLayer['line'] {
 }
 
 const indexOf = (features: { properties: UnitProps }[]) => new Map(features.map((f) => [f.properties.GEOID, f.properties]));
+
+/** The summary before anything is chosen: nothing but where to click. */
+function EmptySummary() {
+  return (
+    <div className="grid h-full min-h-[260px] place-items-center p-8 text-center">
+      <div>
+        <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-violet-50 text-violet-600 ring-1 ring-violet-100">
+          <MapPinned className="h-5 w-5" />
+        </div>
+        <h2 className="mt-3 font-display text-lead font-bold text-slate-900">{EXPLORE_UI.empty.title}</h2>
+        <p className="mx-auto mt-1 max-w-[30ch] text-small text-slate-600">{EXPLORE_UI.empty.body}</p>
+      </div>
+    </div>
+  );
+}
 
 export default function ExploreView() {
   const layers = useApp((s) => s.layers);
@@ -102,7 +115,6 @@ export default function ExploreView() {
   const ext = useMemo(() => (values && !fixedPaint ? extent(estimates(values)) : null), [values, fixedPaint]);
   const fillPaint = useMemo(() => fixedPaint ?? (values ? browsePaint(values, breaks) : null), [fixedPaint, values, breaks]);
   const browseIndex = useMemo(() => indexOf(browseGeo.data.features), [browseGeo.data]);
-  const selectedProps = selected ? browseIndex.get(selected.geoid) ?? null : null;
   const resolve = useMemo(() => resolveForLevel(level, browseGeo.data), [level, browseGeo.data]);
   // The map keeps its focus clear of whichever panels are open.
   const padding = useMemo(() => ({ top: 90, bottom: 90, left: left ? 420 : 70, right: panelOpen ? 500 : 70 }), [left, panelOpen]);
@@ -169,18 +181,6 @@ export default function ExploreView() {
       />
       {phase === 'done' && (
         <Rail float title={EXPLORE_UI.intro.kicker}>
-          <RailSection id="search" title="Search">
-            <TractSearch
-              value={selected?.geoid ?? null}
-              onChange={(geoid) => setBrowse({ selected: { level, geoid } })}
-              label={EXPLORE_UI.search}
-              placeholder={EXPLORE_UI.searchPlaceholder}
-              showQuickPicks={false}
-              resolve={resolve}
-              currentLabel={selectedProps ? [unitTitle(selectedProps), unitSubtitle(selectedProps)].filter(Boolean).join(' · ') : null}
-              outsideText={EXPLORE_UI.outsideScope(browseGeo.scope)}
-            />
-          </RailSection>
           <RailSection id="layers" title={EXPLORE_UI.layers} sub={EXPLORE_UI.layersSub}>
             <BoundaryPanel />
           </RailSection>
@@ -190,18 +190,18 @@ export default function ExploreView() {
           </RailSection>
         </Rail>
       )}
-      {/* Right column: the question box on top, the summary (or its small tab) underneath. */}
+      {/* Right column: the search-and-question box on top, the summary (or its small tab) underneath. */}
       {phase === 'done' && (
-        <div className="pointer-events-none absolute bottom-3 right-3 top-3 z-20 flex w-[440px] flex-col items-end gap-2">
-          <ChatBox scope={chat} />
+        <RightColumn>
+          <ChatBox scope={chat} resolve={resolve} onGo={(geoid) => setBrowse({ selected: { level, geoid } })} />
           <PanelFrame inline open={panelOpen} onToggle={(o) => set({ browsePanel: o })} title={EXPLORE_UI.summaryTab}>
             <AnimatePresence mode="wait" initial={false}>
-              <motion.div key={panelKey} initial={lite ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={lite ? undefined : { opacity: 0, y: -6 }} transition={{ duration: 0.16 }}>
-                {selected ? <PlaceCard selected={selected} fc={browseGeo.data} variable={variable} values={loaded} /> : variable && loaded ? <VariableSummary variable={variable} level={level} values={loaded} fc={browseGeo.data} /> : <ScopeOverview />}
+              <motion.div key={panelKey} className={selected || variable ? undefined : 'h-full'} initial={lite ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={lite ? undefined : { opacity: 0, y: -6 }} transition={{ duration: 0.16 }}>
+                {selected ? <PlaceCard selected={selected} fc={browseGeo.data} variable={variable} values={loaded} /> : variable && loaded ? <VariableSummary variable={variable} level={level} values={loaded} fc={browseGeo.data} /> : <EmptySummary />}
               </motion.div>
             </AnimatePresence>
           </PanelFrame>
-        </div>
+        </RightColumn>
       )}
       <AnimatePresence>
         {showHint && (

@@ -183,3 +183,29 @@ input[type='range'].weight:focus-visible::-webkit-slider-thumb {
     scroll-behavior: auto !important;
   }
 }
+
+/* Words of the thinking mark: a slow light passes over them. Still text when motion is reduced. */
+.shimmer-text {
+  color: #64748b;
+  background: linear-gradient(90deg, #64748b 0%, #64748b 35%, #7c3aed 50%, #64748b 65%, #64748b 100%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer-pass 2.2s linear infinite;
+}
+@keyframes shimmer-pass {
+  from {
+    background-position: 110% 0;
+  }
+  to {
+    background-position: -110% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-text {
+    animation: none;
+    -webkit-text-fill-color: currentColor;
+    background: none;
+  }
+}

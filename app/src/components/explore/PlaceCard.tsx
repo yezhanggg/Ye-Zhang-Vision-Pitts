@@ -1,17 +1,13 @@
 import { useMemo } from 'react';
 import { useApp, type Level } from '../../lib/store';
-import { LEVEL_LABEL, RELIABILITY, groups, unitSubtitle, unitTitle, variablesByGroup } from '../../lib/explore/catalog';
-import { fmtEstimate, reliability } from '../../lib/explore/bins';
+import { LEVEL_LABEL, groups, unitSubtitle, unitTitle, variablesByGroup } from '../../lib/explore/catalog';
+import { fmtValue } from '../../lib/explore/bins';
 import { isAnalysisGroup } from '../../lib/explore/analysisVars';
 import { EXPLORE_UI } from '../../lib/explore/copy';
 import { useUnit } from '../../lib/explore/remote';
 import type { Loaded, UnitFC, ValueMap, VariableDef } from '../../lib/explore/types';
 import PlaceSummary, { VariableDetail } from './PlaceSummary';
-import { cx } from '../../lib/format';
-import type { Conf } from '../../lib/types';
-import { Dot, Explainer } from '../primitives';
-
-const CONF_COLOR: Record<Conf, string> = { high: '#10b981', medium: '#f59e0b', low: '#f43f5e' };
+import { Explainer } from '../primitives';
 
 /**
  * Right panel for a selected place. With a variable painted it shows that variable for this place and nothing
@@ -69,22 +65,15 @@ export default function PlaceCard({ selected, fc, variable = null, values = null
                 {groups.filter((g) => !isAnalysisGroup(g.id)).map((g) => (
                   <Explainer key={g.id} title={g.label}>
                     <ul className="divide-y divide-stone-100">
-                      {variablesByGroup(g.id).map((v) => {
-                        const e = unit.values?.[v.id];
-                        const r = reliability(e?.cv, RELIABILITY);
-                        return (
-                          <li key={v.id} className="flex items-center gap-2 py-1.5 text-small">
-                            <Dot color={r ? CONF_COLOR[r] : '#d6d3d1'} size={8} />
-                            <span className="min-w-0 flex-1" title={r ? `Reliability: ${r}` : 'No reliability (no value)'}>
-                              <span className="block truncate text-slate-800">{v.label}</span>
-                              <span className="block text-caption text-slate-600 tnum">{fmtEstimate(e, v.unit)}</span>
-                            </span>
-                            <button onClick={() => setBrowse({ variable: v.id })} className={cx('shrink-0 rounded-full bg-white px-2 py-0.5 text-caption font-semibold text-violet-700 ring-1 ring-violet-200 transition hover:bg-violet-50')}>
-                              {EXPLORE_UI.place.showOnMap}
-                            </button>
-                          </li>
-                        );
-                      })}
+                      {variablesByGroup(g.id).map((v) => (
+                        <li key={v.id} className="flex items-center gap-2 py-1.5 text-small">
+                          <span className="min-w-0 flex-1 truncate text-slate-800">{v.label}</span>
+                          <span className="shrink-0 font-semibold text-slate-900 tnum">{fmtValue(unit.values?.[v.id]?.est, v.unit)}</span>
+                          <button onClick={() => setBrowse({ variable: v.id })} className="shrink-0 rounded-full bg-white px-2 py-0.5 text-caption font-semibold text-violet-700 ring-1 ring-violet-200 transition hover:bg-violet-50">
+                            {EXPLORE_UI.place.showOnMap}
+                          </button>
+                        </li>
+                      ))}
                     </ul>
                   </Explainer>
                 ))}
@@ -94,7 +83,7 @@ export default function PlaceCard({ selected, fc, variable = null, values = null
         )}
         <p className="text-caption text-slate-600">
           {variable && variable.source === 'analysis' ? EXPLORE_UI.analysisOnly : EXPLORE_UI.footer} ·{' '}
-          <button onClick={() => set({ sourcesOpen: true })} className="font-semibold text-violet-700 hover:underline">
+          <button onClick={() => set({ sourcesOpen: true, detailsTab: 'sources' })} className="font-semibold text-violet-700 hover:underline">
             {EXPLORE_UI.sourcesLink}
           </button>
         </p>

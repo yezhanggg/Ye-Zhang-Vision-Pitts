@@ -10,7 +10,8 @@ import { useExplanation } from '../lib/explainRemote';
 import type { TractProps } from '../lib/types';
 import MapView from './MapView';
 import Rail, { RailSection } from './Rail';
-import PanelFrame from './PanelFrame';
+import AnalysisChat from './AnalysisChat';
+import PanelFrame, { RightColumn } from './PanelFrame';
 import TractSearch from './TractSearch';
 import WeightPanel from './WeightPanel';
 import MetricPicker from './MetricPicker';
@@ -368,7 +369,10 @@ export default function MatchView() {
           </button>
         </RailSection>
       </Rail>
-      <PanelFrame>{t && r ? <TractDetail t={t} r={r} weights={weights} onClose={() => select(null)} /> : <CitySummary results={results} />}</PanelFrame>
+      <RightColumn>
+        <AnalysisChat />
+        <PanelFrame inline>{t && r ? <TractDetail t={t} r={r} weights={weights} onClose={() => select(null)} /> : <CitySummary results={results} />}</PanelFrame>
+      </RightColumn>
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={`absolute bottom-3 z-20 transition-[left] duration-200 ${ui.left ? 'left-[364px] xl:left-[384px]' : 'left-3'}`}>
         <Legend metric={metric} buildings={buildingColor} />
       </motion.div>
