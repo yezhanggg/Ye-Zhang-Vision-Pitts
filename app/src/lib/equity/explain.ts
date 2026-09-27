@@ -147,3 +147,55 @@ export function policiesOnLine(levers: { name: string; on: boolean }[]): string 
   const on = levers.filter((l) => l.on).map((l) => l.name);
   return on.length ? `Policies on: ${on.join(', ')} — details in ③` : null;
 }
+
+// ---------------------------------------------------------------- what the switched-on policies change
+export interface PolicyExplainInput {
+  def: MeasureDef;
+  /** Tract values of the measure on the map (for "the tracts with the most need"). */
+  values: TractValue[];
+  levers: { id: string; name: string; on: boolean; before: string; after: string; changed: string[] }[];
+  /** Subsidy details: the funded tracts, homes per tract, yearly total and the rent that fits. */
+  subsidy?: { tracts: string[]; homes: number; total: number; fits: number | null; ami: AmiPct };
+  /** "$49,700 × 1.2 = $59,640; … = $1,491" (the density bonus's 60% AMI 2-bedroom rent). */
+  rent60?: string | null;
+  transitLabel?: string;
+  nameOf: (id: string) => string;
+  /** How many of the highest-need tracts to compare against (default 20). */
+  topN?: number;
+}
+
+/**
+ * One short paragraph per policy that is on: what it changes, how many tracts, and how many of the tracts with the
+ * most need on the measure shown it reaches (and which). Deterministic, from the same results the pop-up prints.
+ */
+export function explainPolicies({ def, values, levers, subsidy, rent60, transitLabel, nameOf, topN = 20 }: PolicyExplainInput): { id: string; name: string; text: string }[] {
+  const needy = rankByNeed(values.filter((v) => isNum(v.value)), def.higherIsNeed).slice(0, topN).map((v) => v.id);
+  const needSet = new Set(needy);
+  const measure = def.title.charAt(0).toLowerCase() + def.title.slice(1);
+  const reach = (ids: string[]) => {
+    const hit = ids.filter((id) => needSet.has(id));
+    const names = joinNames([...new Set(hit.map(nameOf))].slice(0, 3));
+    if (!needy.length) return '';
+    return hit.length
+      ? ` ${int(hit.length)} of the ${int(needy.length)} tracts with the most need on ${measure} are among them, including ${names}.`
+      : ` None of the ${int(needy.length)} tracts with the most need on ${measure} are among them.`;
+  };
+  const out: { id: string; name: string; text: string }[] = [];
+  for (const l of levers) {
+    if (!l.on) continue;
+    const n = l.changed.length;
+    if (l.id === 'adu')
+      out.push({ id: l.id, name: l.name, text: `A homeowner could add a backyard or basement apartment without a hearing in ${int(n)} more ${n === 1 ? 'tract' : 'tracts'} (${l.before} → ${l.after} tracts where an ADU is by right).${reach(l.changed)}` });
+    else if (l.id === 'bonus')
+      out.push({ id: l.id, name: l.name, text: `Small apartment buildings become by right in ${int(n)} more ${n === 1 ? 'tract' : 'tracts'} (${l.before} → ${l.after}), each keeping 1 in 10 homes affordable at 60% AMI${rent60 ? ` (${rent60.split('; ').pop()} for a 2-bedroom)` : ''}.${reach(l.changed)}` });
+    else if (l.id === 'voucher' && subsidy)
+      out.push({
+        id: l.id,
+        name: l.name,
+        text: `Paying the gap for ${int(subsidy.homes)} homes in each of ${int(subsidy.tracts.length)} tracts, where the gap meets the most burdened renters, costs $${int(subsidy.total)} a year${subsidy.fits != null ? `; those ${int(subsidy.homes * subsidy.tracts.length)} homes would rent at $${int(subsidy.fits)} a month instead of the asking rent` : ''}.${reach(subsidy.tracts)}`,
+      });
+    else if (l.id === 'transit')
+      out.push({ id: l.id, name: l.name, text: `Counting a frequent stop within 1 mile as served${transitLabel ? ` instead of ${transitLabel}` : ''} lets ${int(n)} more ${n === 1 ? 'tract' : 'tracts'} pass (${l.before} → ${l.after}); no stops or routes are added.${reach(l.changed)}` });
+  }
+  return out;
+}

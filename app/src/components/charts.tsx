@@ -185,7 +185,7 @@ export interface LineSeries {
   moe?: (number | null)[] | null;
   dashed?: boolean;
 }
-const W = 400, H = 150, PAD = { l: 44, r: 10, t: 10, b: 22 };
+const W = 400, H = 150, PAD = { l: 44, r: 18, t: 10, b: 22 }; // r leaves room for the last year label, centered on its tick
 /** Multi-series line over years: one axis, thin lines, hover crosshair with every series' value, gaps for nulls. */
 export function LineChart({ years, series, fmt, caption }: { years: number[]; series: LineSeries[]; fmt: (v: number) => string; caption?: ReactNode }) {
   const [hover, setHover] = useState<number | null>(null);
@@ -232,7 +232,7 @@ export function LineChart({ years, series, fmt, caption }: { years: number[]; se
     const i = Math.round(((px - PAD.l) / (W - PAD.l - PAD.r)) * (years.length - 1));
     setHover(Math.max(0, Math.min(years.length - 1, i)));
   };
-  const labelYears = years.filter((_, i) => i === 0 || i === years.length - 1 || i % 3 === 0);
+  const labelYears = years.filter((_, i) => i === 0 || i === years.length - 1 || (i % 3 === 0 && years.length - 1 - i >= 2));
   return (
     <div>
       <div className="relative">

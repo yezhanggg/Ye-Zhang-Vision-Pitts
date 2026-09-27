@@ -13,9 +13,10 @@ import { MEASURES, measureValue, type AmiPct, type Legend, type MeasureDef, type
 import { classCounts, explainMeasure, needPercentile, type TractValue } from '../../lib/equity/explain';
 import { DRAW, SERIES, SPIN } from '../charts';
 import { InfoTip, SPRING_PANEL } from '../primitives';
+import type { ReadingState } from '../../lib/equity/reading';
+import { Sparkles } from 'lucide-react';
 import { nameOf } from './names';
 
-const TINY: Partial<Record<MeasureId, string>> = { burdened: 'Burdened', transit: 'Transit', services: 'Services' };
 
 /** A value without its unit word (the unit is in the header). */
 const bare = (s: string) => s.replace(/ (households|jobs|places)$/, '').replace('not available', 'n/a');
@@ -149,53 +150,62 @@ function Spread({ def, legend, values, median, selected, width, height }: { def:
 }
 
 /** The selected tract on all six measures: where it ranks among the city's tracts (right = more need), the city median at the middle tick. */
+/** The six measures as a readable table: measure, need-rank bar, this tract's value, the city median. With no tract
+ *  selected it shows the city medians and asks for a click. */
 function SelectedVsCity({ id, ami, medians, measure, allValues, onClose }: { id: string | null; ami: AmiPct; medians: Map<MeasureId, number | null>; measure: MeasureId; allValues: Map<MeasureId, number[]>; onClose: () => void }) {
   const t = id ? tractById.get(id) : undefined;
   const p = id ? (placeById.get(id) ?? null) : null;
-  if (!id)
-    return (
-      <div className="shrink-0">
-        <div className="mb-1 flex items-baseline justify-between gap-2">
-          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">City medians, all six measures</h3>
-          <span className="text-[11px] text-slate-400">click a tract to compare</span>
-        </div>
-        <div className="grid grid-cols-2 gap-x-3 gap-y-[3px]">
-          {MEASURES.map((m) => (
-            <div key={m.id} className={cx('flex items-baseline justify-between gap-2 rounded px-1 py-px text-caption leading-tight', m.id === measure && 'bg-violet-50 ring-1 ring-violet-200')}>
-              <span className={m.id === measure ? 'font-semibold text-violet-900' : 'text-slate-600'}>{TINY[m.id] ?? m.short}</span>
-              <span className="font-semibold text-slate-900 tnum">{bare(m.fmt(medians.get(m.id) ?? null)).replace('/mo', '')}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+  const grid = id ? 'grid grid-cols-[minmax(0,118px)_minmax(0,1fr)_76px_64px] items-center gap-x-2.5' : 'grid grid-cols-[minmax(0,1fr)_88px] items-center gap-x-2.5';
+  const val = (m: (typeof MEASURES)[number], v: number | null) => bare(m.fmt(v)).replace('/mo', '');
   return (
-    <div data-testid="equity-selected" className="shrink-0">
-      <div className="mb-1 flex items-baseline gap-2">
-        <h3 className="min-w-0 flex-1 truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-          This tract vs city · <span className="normal-case tracking-normal text-violet-800">{tractLabel(t)}</span> <span className="font-normal normal-case tracking-normal text-slate-400">{t?.name.replace('Tract ', '')}</span>
-        </h3>
-        <InfoTip label="How to read these bars" width={240}>
-          Bar length: the share of city tracts this tract has more need than. Grey line: the city median. The highlighted row is the measure on the map.
-        </InfoTip>
-        <button type="button" onClick={onClose} className="grid h-5 w-5 shrink-0 place-items-center rounded text-slate-500 hover:bg-stone-100 hover:text-slate-900" aria-label="Clear the selected tract" title="Clear">
-          <X className="h-3.5 w-3.5" />
-        </button>
+    <div data-testid={id ? 'equity-selected' : undefined} className="shrink-0">
+      <div className="mb-1.5 flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <h3 className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            {id ? 'This tract vs city' : 'City medians'}
+            <InfoTip label="How to read this table" width={250}>
+              {id
+                ? 'Bar length: the share of city tracts this tract has more need than. Grey line: the middle tract. The highlighted row is the measure on the map.'
+                : 'The median tract on each of the six measures. Click a tract on the map or in the list to compare it with these.'}
+            </InfoTip>
+          </h3>
+          {id ? (
+            <div className="truncate text-body font-semibold text-violet-900">
+              {tractLabel(t)} <span className="text-small font-normal text-slate-500">{t?.name}</span>
+            </div>
+          ) : (
+            <div className="text-small text-slate-500">Click a tract to compare it with the city.</div>
+          )}
+        </div>
+        {id && (
+          <button type="button" onClick={onClose} className="grid h-6 w-6 shrink-0 place-items-center rounded text-slate-500 hover:bg-stone-100 hover:text-slate-900" aria-label="Clear the selected tract" title="Clear">
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
-      {t && !t.residential && <div className="text-caption text-amber-800">Fewer than 25 households, not ranked.</div>}
-      <div className="grid grid-cols-2 gap-x-3 gap-y-[3px]">
+      {t && !t.residential && <div className="mb-1 text-caption text-amber-800">Fewer than 25 households, not ranked.</div>}
+      <div className={cx(grid, 'border-b border-stone-200/80 pb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400')}>
+        <span>Measure</span>
+        {id && <span>Need rank</span>}
+        {id && <span className="text-right">This tract</span>}
+        <span className="text-right">City</span>
+      </div>
+      <div className="divide-y divide-stone-100">
         {MEASURES.map((m) => {
-          const v = measureValue(m.id, p, hud, ami);
-          const pct = needPercentile(v, allValues.get(m.id) ?? [], m.higherIsNeed);
+          const v = id ? measureValue(m.id, p, hud, ami) : null;
+          const pct = id ? needPercentile(v, allValues.get(m.id) ?? [], m.higherIsNeed) : null;
           const cur = m.id === measure;
           return (
-            <div key={m.id} className={cx('grid grid-cols-[minmax(0,64px)_1fr_auto] items-center gap-1.5 rounded px-1 py-px text-caption leading-tight', cur && 'bg-violet-50 ring-1 ring-violet-200')} title={`${m.title}: ${m.fmt(v)} here; city median ${m.fmt(medians.get(m.id) ?? null)}`}>
-              <span className={cx('truncate', cur ? 'font-semibold text-violet-900' : 'text-slate-600')}>{TINY[m.id] ?? m.short}</span>
-              <div className="relative h-2.5 bg-stone-100" role="img" aria-label={pct == null ? 'no value' : `more need than ${Math.round(pct * 100)}% of tracts`}>
-                {pct != null && <motion.span className="absolute inset-y-0 left-0" style={{ background: SERIES.place, opacity: cur ? 0.9 : 0.6 }} initial={{ width: '0%' }} animate={{ width: `${Math.max(1.5, pct * 100)}%` }} transition={DRAW} />}
-                <span className="absolute -inset-y-[2px] left-1/2 w-px bg-slate-500" aria-hidden />
-              </div>
-              <span className={cx('text-right tnum', cur ? 'font-semibold text-slate-900' : 'text-slate-700')}>{bare(m.fmt(v)).replace('/mo', '')}</span>
+            <div key={m.id} className={cx(grid, 'rounded py-1.5 text-small', cur && 'bg-violet-50/80')} title={id ? `${m.title}: ${m.fmt(v)} here; city median ${m.fmt(medians.get(m.id) ?? null)}` : m.title}>
+              <span className={cx('truncate pl-1', cur ? 'font-semibold text-violet-900' : 'text-slate-700')}>{m.short}</span>
+              {id && (
+                <div className="relative h-3 bg-stone-100" role="img" aria-label={pct == null ? 'no value' : `more need than ${Math.round(pct * 100)}% of tracts`}>
+                  {pct != null && <motion.span className="absolute inset-y-0 left-0" style={{ background: SERIES.place, opacity: cur ? 0.9 : 0.55 }} initial={{ width: '0%' }} animate={{ width: `${Math.max(1.5, pct * 100)}%` }} transition={DRAW} />}
+                  <span className="absolute -inset-y-[3px] left-1/2 w-px bg-slate-500" aria-hidden />
+                </div>
+              )}
+              {id && <span className={cx('text-right tnum', cur ? 'font-semibold text-slate-900' : 'font-medium text-slate-800')}>{val(m, v)}</span>}
+              <span className="pr-1 text-right text-slate-500 tnum">{val(m, medians.get(m.id) ?? null)}</span>
             </div>
           );
         })}
@@ -217,6 +227,8 @@ export default function MeasurePanel({
   allValues,
   selectedId,
   policiesLine,
+  policyTexts = [],
+  reading,
   onPick,
   wide = false,
 }: {
@@ -232,6 +244,10 @@ export default function MeasurePanel({
   allValues: Map<MeasureId, number[]>;
   selectedId: string | null;
   policiesLine: string | null;
+  /** One paragraph per policy that is on (lib/equity/explain.explainPolicies). */
+  policyTexts?: { id: string; name: string; text: string }[];
+  /** VisionPitts-Chat's reading of the tab, shown only when it passed the number check. */
+  reading?: ReadingState;
   onPick: (id: string | null) => void;
   /** The chat is hidden: two columns, larger charts, the ranking at full height. */
   wide?: boolean;
@@ -268,7 +284,38 @@ export default function MeasurePanel({
       </div>
     </motion.header>
   );
-  const policies = policiesLine && <p className="shrink-0 rounded-md bg-violet-50 px-2 py-0.5 text-caption text-violet-900 ring-1 ring-violet-200/70">{policiesLine}</p>;
+  const policies = policyTexts.length ? (
+    <div className="shrink-0 space-y-1.5 rounded-lg bg-violet-50/70 px-3 py-2.5 ring-1 ring-violet-200/70" data-testid="equity-policy-effects">
+      <h3 className="text-[11px] font-semibold uppercase tracking-wide text-violet-800">What the policies change</h3>
+      {policyTexts.map((p) => (
+        <p key={p.id} className="text-small leading-snug text-slate-800">
+          <span className="font-semibold text-violet-900">{p.name}.</span> {p.text}
+        </p>
+      ))}
+    </div>
+  ) : policiesLine ? (
+    <p className="shrink-0 rounded-md bg-violet-50 px-2 py-0.5 text-caption text-violet-900 ring-1 ring-violet-200/70">{policiesLine}</p>
+  ) : null;
+  const readingBlock =
+    reading && reading.status !== 'idle' && reading.status !== 'off' ? (
+      <div className="shrink-0 border-t border-stone-100 pt-2.5" data-testid="equity-reading">
+        <h3 className="mb-1 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          <Sparkles className="h-3 w-3 text-violet-500" /> In plain words
+          <InfoTip label="About this reading" width={250}>
+            Written by VisionPitts-Chat (DeepSeek) from this tab's numbers. It is shown only when every number in it matches the tool's data.
+          </InfoTip>
+        </h3>
+        {reading.status === 'loading' ? (
+          <div className="space-y-1.5" aria-label="Writing">
+            <div className="h-3 w-full animate-pulse rounded bg-stone-100" />
+            <div className="h-3 w-11/12 animate-pulse rounded bg-stone-100" />
+            <div className="h-3 w-4/5 animate-pulse rounded bg-stone-100" />
+          </div>
+        ) : (
+          <p className="text-small leading-relaxed text-slate-700">{reading.status === 'ok' ? reading.text : ''}</p>
+        )}
+      </div>
+    ) : null;
   const explain = (
     <motion.p key={`x-${replay}`} layout="position" initial={lite ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={move} className={cx('shrink-0 text-slate-800', wide ? 'text-body leading-relaxed' : 'text-small leading-[1.4]')} data-testid="equity-explain">
       {sentences.join(' ')}
@@ -328,8 +375,9 @@ export default function MeasurePanel({
         <div className="scroll-quiet flex min-h-0 flex-col gap-2.5 overflow-y-auto">
           <div className={cx(box, 'flex shrink-0 flex-col gap-2.5 px-4 pb-3.5 pt-3')}>
             {header}
-            {policies}
             {explain}
+            {policies}
+            {readingBlock}
           </div>
           <div className={cx(box, 'flex min-h-[260px] flex-1 flex-col gap-3 px-4 pb-3 pt-3')}>
             {donut}

@@ -668,7 +668,7 @@ export default function CompareTractsView({
               </p>
             )}
 
-            <div className="relative h-[62vh] min-h-[400px]">
+            <div className="relative h-[52vh] min-h-[420px]">
               <SyncedMapPair
                 syncZoom={mapSync}
                 className="relative grid h-full grid-cols-2 gap-3"

@@ -148,6 +148,8 @@ interface Props {
   onHover?: (id: string | null, overlayId?: string) => void;
   /** Play the globe → Pittsburgh flight once the style loads (landing page → Explore). */
   intro?: boolean;
+  /** How dark the rest of the map goes when a place is selected (default 0.3). */
+  spotlightDim?: number;
   /** Increment to cut the flight short. */
   skipSignal?: number;
   onIntroPhase?: (p: IntroPhase) => void;
@@ -1499,7 +1501,7 @@ export default function MapView(props: Props) {
       return;
     }
     src.setData({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: spotlightRings(selGeom.geometry) } } as never);
-    map.setPaintProperty("sel-dim", "fill-opacity", SPOTLIGHT_DIM);
+    map.setPaintProperty("sel-dim", "fill-opacity", props.spotlightDim ?? SPOTLIGHT_DIM);
     map.setPaintProperty("sel-halo", "line-opacity", 0.95);
     map.setPaintProperty("sel-edge", "line-opacity", 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1521,7 +1523,9 @@ export default function MapView(props: Props) {
     if (!id || !changed || !st.introDone) return;
     const b = tractBounds.get(id);
     if (b) flyToBounds(map, b);
-    if (map.getLayer("focus-3d")) {
+    // The grow re-sets a data-driven paint property every frame, which makes MapLibre re-tile the building source each
+    // time; paired maps (Compare) skip it, since two of them at once made switching places lag.
+    if (map.getLayer("focus-3d") && !live.current.sync) {
       cancelAnimationFrame(st.bldRaf);
       const setH = (m: number) =>
         map.setPaintProperty("focus-3d", "fill-extrusion-height", [

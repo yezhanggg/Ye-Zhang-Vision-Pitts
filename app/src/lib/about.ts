@@ -43,6 +43,14 @@ export const ABOUT = {
 
 export const LIMITS: { title: string; items: string[] }[] = [
   {
+    title: 'Built in one weekend',
+    items: [
+      'VisionPitts was built in about 36 hours. That was not enough time to find more data, clean it up and join it together as carefully as it deserves.',
+      'With so little time, it was hard to organize everything and to study how the different measures relate to each other, which is where the most useful insights would come from.',
+      'With more time, this tool could be a lot more powerful and much easier to use. What is here is a working start, not the finished version.',
+    ],
+  },
+  {
     title: 'Where the numbers are rough',
     items: [
       'Eviction counts come by ZIP code and are split among neighborhoods by how many homes each has, so they are estimates. We lower our confidence where a neighborhood sits across several ZIP codes and none holds at least 80% of it.',

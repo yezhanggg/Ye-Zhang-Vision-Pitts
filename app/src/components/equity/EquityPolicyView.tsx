@@ -10,7 +10,7 @@ import { hud, placeById } from '../../lib/place/data';
 import { usePlan } from '../../lib/place/planStore';
 import { amiOf } from '../../lib/place/plan';
 import { MEASURES, buildLegend, fits2br, measureById, measureValue, median, rankByNeed, type AmiPct, type MeasureId } from '../../lib/equity/measures';
-import type { Row } from '../../lib/equity/policy';
+import { rent60TwoBedroom, type Row } from '../../lib/equity/policy';
 import { POLICY_COLUMNS, buildEquityReport, equityFacts, equityPrompts, measureColumns, measureRows, policyRows, type LeverId, type TractInfo } from '../../lib/equity/export';
 import { downloadCsv, exportFilename, toCsv } from '../../lib/export/csv';
 import { mapSnapshot, printReport, reportFooter } from '../../lib/export/report';
@@ -20,7 +20,8 @@ import AnalysisChat from '../AnalysisChat';
 import EquityToolbar from './EquityToolbar';
 import MeasurePanel from './MeasurePanel';
 import PolicyPopover from './PolicySimulator';
-import { policiesOnLine } from '../../lib/equity/explain';
+import { explainPolicies, policiesOnLine } from '../../lib/equity/explain';
+import { useEquityReading } from '../../lib/equity/reading';
 import { usePolicy } from './usePolicy';
 import { nameOf } from './names';
 import { useEffect } from 'react';
@@ -128,6 +129,22 @@ export default function EquityPolicyView({ active = true }: { active?: boolean }
     () => equityFacts({ ami: level, def, median: med, available, n: rows.length, ranked, levers, nameOf, tractOf, selected: selectedFacts }),
     [level, def, med, available, rows.length, ranked, levers, selectedFacts],
   );
+  // What the switched-on policies change (exact sentences), and a VisionPitts-Chat reading of the whole tab.
+  const policyTexts = useMemo(
+    () =>
+      explainPolicies({
+        def,
+        values,
+        levers,
+        subsidy: { tracts: results.gaps.top.map((g) => g.id), homes: results.homes, total: results.gaps.total, fits: results.fits, ami: results.ami },
+        rent60: rent60TwoBedroom(hud)?.formula ?? null,
+        transitLabel: results.transitLabel,
+        nameOf,
+      }),
+    [def, values, levers, results],
+  );
+  const readingFacts = useMemo(() => (policyTexts.length ? `${facts}\nWHAT THE POLICIES THAT ARE ON CHANGE:\n${policyTexts.map((p) => `${p.name}: ${p.text}`).join('\n')}` : facts), [facts, policyTexts]);
+  const reading = useEquityReading(readingFacts, active);
   const prompts = useMemo(() => equityPrompts(def, level, levers, selectedId ? nameOf(selectedId) : null), [def, level, levers, selectedId]);
 
   const exportItems = [
@@ -205,7 +222,7 @@ export default function EquityPolicyView({ active = true }: { active?: boolean }
               aria-controls="equity-chat"
               title={chatOpen ? 'Close VisionPitts-Chat' : 'Ask VisionPitts-Chat about these numbers and Pittsburgh housing'}
               className={cx(
-                'flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-caption font-semibold text-white shadow-sm min-[2100px]:text-small transition-[background-color,box-shadow,transform] duration-150 active:scale-[0.97]',
+                'flex h-8 items-center gap-1 whitespace-nowrap rounded-lg px-2.5 text-caption font-semibold text-white shadow-sm min-[2100px]:text-small transition-[background-color,box-shadow,transform] duration-150 active:scale-[0.97]',
                 chatOpen ? 'bg-violet-800 ring-2 ring-violet-300' : 'bg-violet-600 hover:bg-violet-700 hover:shadow-md',
               )}
             >
@@ -228,6 +245,7 @@ export default function EquityPolicyView({ active = true }: { active?: boolean }
               hillshade={false}
               onSelect={(id) => select(useApp.getState().selectedId === id ? null : id)}
               onMapReady={onMapReady}
+              spotlightDim={0.4}
               tooltip={(id) => (
                 <div className="max-w-64">
                   <div className="font-semibold">{nameOf(id)}</div>
@@ -257,6 +275,8 @@ export default function EquityPolicyView({ active = true }: { active?: boolean }
             allValues={allValues}
             selectedId={selectedId}
             policiesLine={policiesOnLine(levers)}
+            policyTexts={policyTexts}
+            reading={reading}
             onPick={select}
           />
           </div>

@@ -208,8 +208,10 @@ export function classOf(v: number, breaks: number[]): number {
 }
 
 /** Light to dark = less to more need. */
-export const NEED_PALETTE = ['#fdf4e3', '#fbdcaa', '#f6b26b', '#e9824a', '#cc5234', '#8f2d2a'];
-export const FITS_COLOR = '#8fc7ad';
+/** Need ramp, light to deep violet (the app's accent), so the selection spotlight's shade reads over every class. */
+export const NEED_PALETTE = ['#f4f0fe', '#ddd3fb', '#c0acf5', '#9e82ea', '#7c58d8', '#5a36b0'];
+/** "$0 or less: the market already fits": a calm teal, apart from the need ramp. */
+export const FITS_COLOR = '#9fd8c7';
 
 export interface Legend {
   /** Per tract: palette index into `colors`, or null (no data). */

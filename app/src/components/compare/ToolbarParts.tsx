@@ -54,7 +54,7 @@ export function ToolSeg<T extends string>({
             onClick={() => onChange(o.value)}
             className={cx(
               "relative whitespace-nowrap rounded-md font-semibold transition-colors",
-              compact ? "px-2 text-caption" : "px-3 text-small",
+              compact ? "px-1.5 text-caption" : "px-3 text-small",
               on
                 ? "text-violet-800"
                 : "text-slate-600 hover:bg-white/60 hover:text-slate-900",

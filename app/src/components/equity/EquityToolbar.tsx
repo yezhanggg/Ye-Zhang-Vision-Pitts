@@ -73,7 +73,7 @@ function LeverChips({ on, onToggle, homesText, onHomes }: { on: Record<LeverId, 
               <span className="max-[1799px]:hidden">{LEVER_SHORT[id]}</span>
             </button>
             {id === 'voucher' && v && (
-              <label title="Homes per tract" className="mr-1 flex items-center gap-1 text-caption text-slate-600">
+              <label title="Homes per tract" className="mr-0.5 flex items-center gap-1 text-caption text-slate-600">
                 <span className="max-[1799px]:hidden">×</span>
                 <input
                   type="number"
@@ -82,7 +82,7 @@ function LeverChips({ on, onToggle, homesText, onHomes }: { on: Record<LeverId, 
                   value={homesText}
                   onChange={(e) => onHomes(e.target.value)}
                   aria-label="Homes per tract"
-                  className="h-5 w-11 rounded bg-stone-50 px-1 text-right text-caption font-semibold text-slate-900 ring-1 ring-stone-300 tnum focus:outline-none focus:ring-violet-400"
+                  className="h-5 w-10 rounded bg-stone-50 px-1 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none text-right text-caption font-semibold text-slate-900 ring-1 ring-stone-300 tnum focus:outline-none focus:ring-violet-400"
                 />
                 <span className="max-[1799px]:hidden">homes</span>
               </label>
@@ -141,8 +141,8 @@ export default function EquityToolbar({
   chatSlot?: ReactNode;
 }) {
   return (
-    <div className="flex shrink-0 flex-nowrap items-center gap-x-2 gap-y-1.5 overflow-x-auto rounded-xl max-[1399px]:flex-wrap max-[1399px]:overflow-visible bg-white px-3 py-1.5 shadow-sm ring-1 ring-stone-200/80 min-[1800px]:gap-x-4" aria-label="Equity and policy settings">
-      <div className="flex min-w-fit flex-[6_1_0%] items-center gap-1.5">
+    <div className="flex shrink-0 flex-nowrap items-center gap-x-1.5 gap-y-1.5 min-[1600px]:gap-x-2 overflow-x-auto rounded-xl max-[1399px]:flex-wrap max-[1399px]:overflow-visible bg-white px-3 py-1.5 shadow-sm ring-1 ring-stone-200/80 min-[1800px]:gap-x-4" aria-label="Equity and policy settings">
+      <div className="flex min-w-fit flex-[6_1_0%] items-center gap-1 min-[1600px]:gap-1.5">
         <Step n={1} word="Measure">
           <InfoTip label="About the equity measures" side="bottom" width={320}>
             {about}
@@ -153,7 +153,7 @@ export default function EquityToolbar({
         </div>
       </div>
       <Divider />
-      <div className="flex shrink-0 items-center gap-1.5">
+      <div className="flex shrink-0 items-center gap-1 min-[1600px]:gap-1.5">
         <Step n={2} word="Income">
           <InfoTip label="About the income level" side="bottom" width={280}>
             <span className="block">Shared with the Place tab. The rent gap and the subsidy use the 2-bedroom rent a 3-person household at this level can pay.</span>
@@ -170,14 +170,14 @@ export default function EquityToolbar({
         />
       </div>
       <Divider />
-      <div className="flex min-w-fit flex-[7_1_0%] items-center gap-1.5">
+      <div className="flex min-w-fit flex-[7_1_0%] items-center gap-1 min-[1600px]:gap-1.5">
         <Step n={3} word="Policies">{policySlot}</Step>
         <div className="min-w-fit flex-1">
           <LeverChips on={on} onToggle={onToggle} homesText={homesText} onHomes={onHomes} />
         </div>
       </div>
       <Divider />
-      <div className="flex shrink-0 items-center gap-1.5">
+      <div className="flex shrink-0 items-center gap-1 min-[1600px]:gap-1.5">
         <Step n={4} word="Export" />
         {exportSlot}
         {chatSlot}
