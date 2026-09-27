@@ -4,6 +4,7 @@ import { FMR_2BR, activeFactorIds, askingRents, hasAskingRents, meta, scoring, s
 import { FACTOR_COPY, GLOSSARY, PRESSURE_HOW, RENT_HOW, RENT_WHY_INFO, SCORE_HOW, factorName } from '../lib/copy';
 import { useApp, type DetailsTab } from '../lib/store';
 import { cx, fmtInt, fmtMoney, fmtSignedPct } from '../lib/format';
+import PlanningInputsDetails from './place/PlanningInputsDetails';
 import { RELIABILITY, catalogue, groups, hasBrowser, levelMeta, variables, variablesByGroup } from '../lib/explore/catalog';
 
 const WEB_SERVICES = [
@@ -144,6 +145,7 @@ export default function DetailsModal() {
             )}
             <div className={cx('space-y-6 px-6 py-5', tab !== 'sources' && 'hidden')}>
               <p className="text-small text-slate-600">What is observed data, and what is a value judgment.</p>
+              <PlanningInputsDetails />
               <section>
                 <h3 className="mb-2 text-body font-semibold text-emerald-800">Observed data: where the numbers come from</h3>
                 <div className="overflow-hidden rounded-xl ring-1 ring-stone-200">
@@ -347,6 +349,9 @@ export default function DetailsModal() {
               <section className="text-small text-slate-700">
                 <h3 className="mb-1 text-body font-semibold text-slate-900">How AI is used</h3>
                 The language model never computes scores or queries data. Code computes every number. When an AI-written explanation appears (DeepSeek or Claude, whichever this deployment is configured with), it was generated from the computed values only, and every number in the text was checked against those values before display; otherwise a template sentence built from the same values is shown.
+                <p className="mt-1.5">
+                  <span className="font-semibold text-slate-900">VisionPitts-Chat</span>, the question box in Explore and Analysis, is powered by DeepSeek (the deepseek-flash model). It answers only about Pittsburgh housing, from the facts this tool sends with each question; in Analysis, an answer with a figure that cannot be traced to those facts is withheld.
+                </p>
               </section>
               {meta.built_at && <p className="text-caption text-slate-500">Data built {meta.built_at.slice(0, 19).replace('T', ' ')} UTC · scoring config v{scoring.version}</p>}
             </div>

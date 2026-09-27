@@ -14,7 +14,7 @@ import { cityView, type View } from '../lib/analysis/framing';
 import { topMargin } from '../lib/scoring';
 import { hasPlaceData, hud as hudTable, placeById, placeFor } from '../lib/place/data';
 import { FIXTURE_HUD, FIXTURE_PLACES } from '../lib/place/fixture';
-import { LEVEL_LABEL } from '../lib/place/plan';
+import { AGE_LABEL, LEVEL_LABEL, sizeWord } from '../lib/place/plan';
 import { usePlan } from '../lib/place/planStore';
 import type { Recommendation } from '../lib/place/recommend';
 import { suggestAll } from '../lib/place/suggest';
@@ -22,7 +22,13 @@ import { STANCE_LABEL } from '../lib/place/thresholds';
 import type { HudTable, PlaceMeasures, Stance, Typology } from '../lib/place/types';
 import type { TractProps, Weights } from '../lib/types';
 import MapView from './MapView';
+import ExportMenu from './export/ExportMenu';
+import { buildPlaceReport, MEASURE_COLUMNS, placeMeasureRows } from '../lib/export/builders/place';
+import { downloadCsv, exportFilename, toCsv } from '../lib/export/csv';
+import { getMap, registerMap } from '../lib/export/mapRegistry';
+import { mapSnapshot, printReport } from '../lib/export/report';
 import Rail, { RailSection } from './Rail';
+import { useTour } from '../lib/tour';
 import AnalysisChat from './AnalysisChat';
 import PanelFrame, { RightColumn } from './PanelFrame';
 import DataLimitsPanel from './DataLimitsPanel';
@@ -33,7 +39,7 @@ import FocusPicker from './place/FocusPicker';
 import PlanAnswer from './place/PlanAnswer';
 import PlanInputs from './place/PlanInputs';
 import PlaceFolds, { Fold } from './place/PlaceFolds';
-import SuggestionLegend from './place/SuggestionLegend';
+import SuggestionLegend, { FLOOD_FILL } from './place/SuggestionLegend';
 import { ConfChip, Dot, Explainer, InfoTip, ObservedBadge, SectionTitle } from './primitives';
 
 /** Map hover card. `weights` (the Match view passes them) lets it tell "every factor is zero" from "no data". */
@@ -256,7 +262,7 @@ function placeDataFor(geoid: string): { place: PlaceMeasures | null; hud: HudTab
   return { place: null, hud: null };
 }
 
-function DetailHeader({ t, onClose }: { t: TractProps; onClose?: () => void }) {
+function DetailHeader({ t, onClose, actions }: { t: TractProps; onClose?: () => void; actions?: React.ReactNode }) {
   return (
     <div className="sticky top-0 z-10 border-b border-stone-100 bg-white/95 px-5 pb-3 pt-4 backdrop-blur">
       <div className="flex items-start justify-between gap-2">
@@ -267,6 +273,8 @@ function DetailHeader({ t, onClose }: { t: TractProps; onClose?: () => void }) {
             {t.focus && <span className="ml-2 rounded-full bg-violet-50 px-2 py-px text-caption font-semibold text-violet-700 ring-1 ring-violet-200">demo</span>}
           </div>
         </div>
+        <div className="flex shrink-0 items-center gap-1">
+        {actions}
         {onClose && (
           <button onClick={onClose} className="rounded-lg p-1.5 text-slate-500 hover:bg-stone-100 hover:text-slate-900" aria-label="Clear selection">
             <svg viewBox="0 0 20 20" className="h-4 w-4">
@@ -274,8 +282,36 @@ function DetailHeader({ t, onClose }: { t: TractProps; onClose?: () => void }) {
             </svg>
           </button>
         )}
+        </div>
       </div>
     </div>
+  );
+}
+
+/** Export for one place: the place report (PDF via print) and one CSV row per measure. */
+function PlaceExport({ t, place, hud, rec }: { t: TractProps; place: PlaceMeasures; hud: HudTable; rec: Recommendation }) {
+  const plan = usePlan();
+  const input = () => ({ t, place, hud, rec, plan: { focus: rec.stance, level: plan.level, size: plan.size, age: plan.age, homes: plan.homes, flood: plan.flood, transitMi: plan.transitMi }, typeLabel: (k: Typology) => typologyById.get(k)?.label ?? k });
+  const name = tractLabel(t);
+  return (
+    <ExportMenu
+      items={[
+        {
+          label: 'Report (PDF)',
+          hint: 'Answer, evidence tables, map and sources',
+          onSelect: async () => {
+            const ui = useApp.getState().ui;
+            const map = await mapSnapshot(getMap('place'), { crop: { top: 70, bottom: 20, left: ui.left ? 390 : 0, right: ui.right ? 470 : 0 } });
+            printReport(buildPlaceReport({ ...input(), map, filename: exportFilename('place', name, 'pdf') }));
+          },
+        },
+        {
+          label: 'Data (CSV)',
+          hint: 'One row per measure, with units and sources',
+          onSelect: () => downloadCsv(exportFilename('place', name, 'csv'), toCsv(placeMeasureRows(t, place, hud) as unknown as Record<string, unknown>[], MEASURE_COLUMNS)),
+        },
+      ]}
+    />
   );
 }
 
@@ -291,9 +327,9 @@ export function TractDetail({ t, r, weights, rec, fitOrder, onClose }: { t: Trac
   if (place && hud && rec) {
     return (
       <div>
-        <DetailHeader t={t} onClose={onClose} />
+        <DetailHeader t={t} onClose={onClose} actions={<PlaceExport t={t} place={place} hud={hud} rec={rec} />} />
         <div className="space-y-3 p-5">
-          <PlanAnswer rec={rec} place={place} hud={hud} level={plan.level} household={plan.household} homes={plan.homes} />
+          <PlanAnswer rec={rec} hud={hud} level={plan.level} size={plan.size} age={plan.age} homes={plan.homes} />
           <PlaceFolds t={t} place={place} hud={hud} rec={rec} level={plan.level} fitOrder={fitOrder ?? (r.ranking as Typology[])} />
           <Fold title="Data limits" headline="what these numbers cannot tell you">
             <DataLimitsPanel t={t} />
@@ -326,6 +362,7 @@ const TYPOLOGY_INDEX = new Map(scoring.typologies.map((t, i) => [t.id, i]));
 
 /** Analysis → Match: pick a place, a focusing issue and who you are planning for; read the suggestion and its numbers. */
 export default function MatchView() {
+  const tourCue = useTour((s) => s.cue);
   // The reference (Balanced) is not a stance, so a first visit that lands on it moves to Anti-displacement, once.
   // A link that carries custom weights (matchPreset === null) or any stance is left alone; so is every later visit.
   useEffect(() => {
@@ -356,18 +393,25 @@ export default function MatchView() {
   const fitOrders = useMemo(() => new Map([...results].map(([id, r]) => [id, r.ranking as Typology[]])), [results]);
   const suggestions = useMemo(() => {
     if (!hasPlaceData || !hudTable) return new Map<string, Recommendation>();
-    return suggestAll(placeById, hudTable, focus, { level: plan.level, household: plan.household, transitMi: plan.transitMi }, fitOrders);
-  }, [focus, plan.level, plan.household, plan.transitMi, fitOrders]);
+    return suggestAll(placeById, hudTable, focus, { level: plan.level, size: plan.size, age: plan.age, flood: plan.flood, transitMi: plan.transitMi }, fitOrders);
+  }, [focus, plan.level, plan.size, plan.age, plan.flood, plan.transitMi, fitOrders]);
   const { paint, counts } = useMemo(() => {
     const values = new Map<string, number | null>();
-    const counts: Record<string, number> = { none: 0 };
+    const counts: Record<string, number> = { none: 0, flood: 0 };
+    // Tracts above the reader's flood limit get their own swatch (after the five type colors) and their own count.
+    const floodIdx = TYPOLOGY_COLORS.length;
     for (const t of rankedTracts) {
       const rec = suggestions.get(t.GEOID);
       const lead = rec?.types[0]?.typology ?? null;
+      if (!lead && rec?.floodLimit?.blocked) {
+        values.set(t.GEOID, floodIdx);
+        counts.flood += 1;
+        continue;
+      }
       values.set(t.GEOID, lead ? TYPOLOGY_INDEX.get(lead) ?? null : null);
       counts[lead ?? 'none'] = (counts[lead ?? 'none'] ?? 0) + 1;
     }
-    const paint: MapPaint = { kind: 'cat', palette: TYPOLOGY_COLORS, values };
+    const paint: MapPaint = { kind: 'cat', palette: [...TYPOLOGY_COLORS, FLOOD_FILL], values };
     return { paint, counts };
   }, [suggestions]);
 
@@ -378,7 +422,7 @@ export default function MatchView() {
   const buildingColor = lead ? typologyById.get(lead)?.color : null;
   const padding = useMemo(() => ({ top: 90, bottom: 90, left: ui.left ? 420 : 70, right: ui.right ? 500 : 70 }), [ui.left, ui.right]);
   const focusLabel = STANCE_LABEL[focus];
-  const noneLabel = focus === 'market_led' ? 'No suggestion (the market test fails or cannot run)' : focus === 'transit_first' ? 'No suggestion (no under-served renters at this level, or frequent transit farther than you chose)' : 'No suggestion (no under-served renters at this level)';
+  const noneLabel = focus === 'market_led' || plan.level === 'market' ? 'No suggestion (the market test fails or cannot run)' : focus === 'transit_first' ? 'No suggestion (no under-served renters at this level, or frequent transit farther than you chose)' : focus === 'climate_resilient' ? 'No suggestion (over 5% of land in a flood zone, transit too far, or no under-served renters)' : 'No suggestion (no under-served renters at this level)';
 
   // On entry with no tract the camera frames the whole city inside the space the panels leave. Measured once, from
   // this element's size, before the map mounts; with a tract selected the map flies to it as before.
@@ -409,9 +453,11 @@ export default function MatchView() {
           idleOrbit
           initialView={view ?? undefined}
           tooltip={(id) => <SuggestTooltip id={id} rec={suggestions.get(id)} />}
+          cue={tourCue?.part === 'analysis' ? tourCue : null}
+          onMapReady={registerMap('place')}
         />
       )}
-      <Rail float title={UI.matchTab}>
+      <Rail float title={UI.matchTab} maxHeightClass="max-h-[calc(100%-4.75rem-12.5rem)]">
         <RailSection id="priorities" title="Focusing issue">
           <FocusPicker
             value={focus}
@@ -424,15 +470,17 @@ export default function MatchView() {
         <RailSection id="colorBy" title="Who you’re planning for">
           <PlanInputs />
         </RailSection>
-        <AdvancedSettings weights={weights} onChange={setWeights} custom={!isStance(preset)} onReset={() => applyPreset(focus)} />
+        <AdvancedSettings focus={focus} weights={weights} onChange={setWeights} custom={!isStance(preset)} onReset={() => applyPreset(focus)} />
       </Rail>
       <RightColumn>
         <AnalysisChat />
         <PanelFrame inline>{t && r ? <TractDetail t={t} r={r} weights={weights} rec={rec} fitOrder={fitOrders.get(t.GEOID)} onClose={() => select(null)} /> : <StartCard />}</PanelFrame>
       </RightColumn>
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={`absolute bottom-3 z-20 transition-[left] duration-200 ${ui.left ? 'left-[364px] xl:left-[384px]' : 'left-3'}`}>
-        <SuggestionLegend focus={focusLabel} level={LEVEL_LABEL[plan.level]} counts={counts} noneLabel={noneLabel} />
-      </motion.div>
+      {(
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="absolute bottom-3 left-3 z-20 w-[340px] xl:w-[360px]">
+          <SuggestionLegend focus={focusLabel} level={[plan.size === 'auto' ? '' : sizeWord(plan.size), plan.age === 'any' ? '' : AGE_LABEL[plan.age].toLowerCase(), LEVEL_LABEL[plan.level]].filter(Boolean).join(' · ')} counts={counts} noneLabel={noneLabel} />
+        </motion.div>
+      )}
     </div>
   );
 }

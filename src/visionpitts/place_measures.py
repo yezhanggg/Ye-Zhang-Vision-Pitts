@@ -21,6 +21,8 @@ Measures (plan section 2):
            weighted by 2020 block population.
   flood    HAND inundation share (terrain screen) and the FEMA NFHL Special Flood Hazard Area share (Tier 2).
   zoning   WPRDC zoning district land shares and the unverified by-right table in config/zoning_rules.json (Tier 2).
+  land use county assessment class/use per parcel -> residential / commercial / industrial / vacant / institutional /
+           other shares of parcel land (LOTAREA) and of parcels, plus vacant lots (Tier 2).
   access   jobs within 1 mile (LEHD LODES 8 WAC 2023, C000 at 2020 work blocks), distance to the nearest public school
            and elementary school (NCES CCD 2024 directory), distance to the nearest supermarket / grocery and the count of
            everyday services within half a mile (OpenStreetMap via Overpass). Same block-point method as transit.
@@ -108,6 +110,9 @@ SALE_SINCE = "2023-01-01"
 RESIDENTIAL_USES = {"SINGLE FAMILY", "ROWHOUSE", "TOWNHOUSE", "TWO FAMILY", "THREE FAMILY", "FOUR FAMILY", "CONDOMINIUM"}
 TWO_TO_FOUR_USES = {"TWO FAMILY", "THREE FAMILY", "FOUR FAMILY"}
 VALID_SALE = "VALID SALE"
+LAND_USE_CLASSES = ["residential", "commercial", "industrial", "vacant", "institutional", "other"]
+PUBLIC_HOUSING_USES = ("OWNED BY METRO HOUSING", "HUD PROJ")
+INSTITUTIONAL_USES = {"CHURCHES, PUBLIC WORSHIP", "CEMETERY/MONUMENTS", "DAYCARE/PRIVATE SCHOOL"}
 
 TRACTS_CSV = PROCESSED / "tracts.csv"
 ACS_TRACT_CSV = PROCESSED / "acs_tract.csv"
@@ -809,11 +814,66 @@ def parcel_measures(assess: pd.DataFrame, pin_tract: pd.Series, nbrs: dict[str, 
     return out
 
 
+def land_use_class(classdesc: str | None, usedesc: str | None) -> str:
+    """County assessment class + use -> residential / commercial / industrial / vacant / institutional / other.
+
+    Vacant first (any use containing VACANT: vacant land, vacant commercial or industrial land, >10 acres vacant);
+    then government, charitable-exempt (class OTHER), churches, cemeteries and private schools/daycare as
+    institutional; residential class, apartment buildings (APART: ..., assessed as commercial) and public housing
+    (housing authority and HUD project parcels, assessed as government) as residential;
+    then the commercial and industrial classes; utilities, railroads, agriculture and anything else as other.
+    """
+    c = (classdesc or "").strip().upper() if isinstance(classdesc, str) else ""
+    u = (usedesc or "").strip().upper() if isinstance(usedesc, str) else ""
+    if "VACANT" in u:
+        return "vacant"
+    if u.startswith(PUBLIC_HOUSING_USES):  # housing authority and HUD project parcels are homes, whatever the owner class
+        return "residential"
+    if c in ("GOVERNMENT", "OTHER") or u in INSTITUTIONAL_USES or u.startswith("OWNED BY"):
+        return "institutional"
+    if c == "RESIDENTIAL" or u.startswith("APART"):
+        return "residential"
+    if c == "COMMERCIAL":
+        return "commercial"
+    if c == "INDUSTRIAL":
+        return "industrial"
+    return "other"
+
+
+def land_use_measures(assess: pd.DataFrame, pin_tract: pd.Series) -> pd.DataFrame:
+    """Per tract: land-use shares of parcel land (assessment LOTAREA, sq ft) as lu_{class}, shares of parcels as
+    lu_n_{class}, lu_parcels (parcels) and lu_vacant_lots (vacant parcels). A tract whose parcels carry no lot area
+    falls back to the parcel shares for the land shares. `assess` needs PARID, CLASSDESC, USEDESC, LOTAREA."""
+    a = assess.copy()
+    a["GEOID"] = a["PARID"].map(pin_tract)
+    a = a[a["GEOID"].notna()]
+    a["cls"] = [land_use_class(c, u) for c, u in zip(a["CLASSDESC"], a["USEDESC"])]
+    a["area"] = pd.to_numeric(a["LOTAREA"], errors="coerce").astype(float).fillna(0.0).clip(lower=0)
+    geoids = pd.Index(sorted(set(a["GEOID"])))
+    n = a.groupby(["GEOID", "cls"]).size().unstack(fill_value=0).reindex(index=geoids, columns=LAND_USE_CLASSES, fill_value=0)
+    ar = a.groupby(["GEOID", "cls"])["area"].sum().unstack(fill_value=0.0).reindex(index=geoids, columns=LAND_USE_CLASSES, fill_value=0.0)
+    n_share = n.div(n.sum(axis=1).replace(0, np.nan), axis=0)
+    a_share = ar.div(ar.sum(axis=1).replace(0, np.nan), axis=0)
+    a_share = a_share.where(ar.sum(axis=1) > 0, n_share, axis=0)
+    out = pd.DataFrame(index=geoids)
+    for k in LAND_USE_CLASSES:
+        out[f"lu_{k}"] = a_share[k]
+        out[f"lu_n_{k}"] = n_share[k]
+    out["lu_parcels"] = n.sum(axis=1).astype(int)
+    out["lu_vacant_lots"] = n["vacant"].astype(int)
+    return out
+
+
 def parcels(tracts: gpd.GeoDataFrame, nbrs: dict[str, list[str]], refresh: bool = False) -> pd.DataFrame:
     pin_tract = parcel_tracts(tracts, refresh)
-    a = pd.read_csv(ASSESSMENTS_CSV, usecols=["PARID", "CLASSDESC", "USEDESC", "SALEDATE", "SALEPRICE", "SALEDESC"],
+    a = pd.read_csv(ASSESSMENTS_CSV, usecols=["PARID", "CLASSDESC", "USEDESC", "LOTAREA", "SALEDATE", "SALEPRICE", "SALEDESC"],
                     dtype=str, low_memory=False)
-    return parcel_measures(a, pin_tract, nbrs).reindex(pd.Index(tracts["GEOID"].astype(str)))
+    geoids = pd.Index(tracts["GEOID"].astype(str))
+    out = parcel_measures(a, pin_tract, nbrs)
+    attrs = dict(out.attrs)
+    out = out.join(land_use_measures(a, pin_tract)).reindex(geoids)
+    out.attrs.update(attrs)
+    return out
 
 
 # ------------------------------------------------------------------------------------------------ assemble and write
@@ -860,6 +920,17 @@ def _pct(v):
     return _num(v, 1)
 
 
+def _land_use_block(get) -> dict | None:
+    """land_use: shares of parcel land by class (4 dp), vacant_lots, parcels and the per-parcel shares; null until built."""
+    if get("lu_parcels") is None or pd.isna(get("lu_parcels")):
+        return None
+    block: dict = {k: _num(get(f"lu_{k}"), 4) for k in LAND_USE_CLASSES}
+    block["vacant_lots"] = _int(get("lu_vacant_lots"))
+    block["parcels"] = _int(get("lu_parcels"))
+    block["parcel_shares"] = {k: _num(get(f"lu_n_{k}"), 4) for k in LAND_USE_CLASSES}
+    return block
+
+
 def to_place_json(df: pd.DataFrame, rules: dict | None = None) -> dict:
     """{GEOID: PlaceMeasures} in exactly the plan's shape. Households as published, dollars integers, shares 4 dp,
     miles 2 dp, percents 1 dp. `zoning` is null until the Tier 2 columns exist (zoning_ok)."""
@@ -902,6 +973,7 @@ def to_place_json(df: pd.DataFrame, rules: dict | None = None) -> dict:
             },
             "flood": {"fema_sfha_pct": _pct(get("fema_sfha_pct")), "fema_zone": _str(get("fema_zone")), "hand_pct": _pct(get("hand_pct"))},
             "zoning": zoning_block,
+            "land_use": _land_use_block(get),
             "programs": {k: _bool(get(k)) for k in ("qct", "dda", "oz", "cdbg")},
             "displacement": {"score": _num(get("displacement_score"), 4), "conf": _str(get("displacement_conf"))},
         }
@@ -926,7 +998,7 @@ def to_hud_json(limits: dict | None, safmr: dict | None, fy: int = 2026, city: d
     return {"metro": metro, "safmr": dict(sorted((safmr or {}).get("safmr", {}).items())), "city": city or {"sale_median": None, "sale_n": None}}
 
 
-PLACE_KEYS = ["renter_hh", "bands", "types", "market", "stock", "transit", "access", "flood", "zoning", "programs", "displacement"]
+PLACE_KEYS = ["renter_hh", "bands", "types", "market", "stock", "transit", "access", "flood", "zoning", "land_use", "programs", "displacement"]
 
 
 def coverage(place: dict) -> dict[str, int]:

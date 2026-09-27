@@ -1,9 +1,13 @@
 // The Match map's legend: each ranked tract is colored by the housing type the rules suggest under the current
-// focusing issue and income level; grey where no one at that level is under-served (or the focus suggests nothing).
+// focusing issue and the household (size, age, income level); grey where no one at that level is under-served (or the focus suggests nothing).
 import { motion } from 'motion/react';
 import { scoring } from '../../lib/data';
 import { NO_DATA } from '../../lib/mapStyle';
 import { Dot } from '../primitives';
+
+/** Map fill for tracts above the reader's flood limit (a cool grey, apart from the "no suggestion" grey). */
+export const FLOOD_FILL = '#b8c2cf';
+const HATCH = `repeating-linear-gradient(135deg, ${FLOOD_FILL} 0 3px, #eef1f5 3px 6px)`;
 
 export default function SuggestionLegend({ focus, level, counts, noneLabel = 'No suggestion (no under-served renters at this level)' }: { focus: string; level: string; counts: Record<string, number>; noneLabel?: string }) {
   return (
@@ -26,6 +30,14 @@ export default function SuggestionLegend({ focus, level, counts, noneLabel = 'No
           {noneLabel} <span className="text-slate-500 tnum">{counts.none ?? 0}</span>
         </span>
       </div>
+      {(counts.flood ?? 0) > 0 && (
+        <div className="mt-0.5 flex items-center gap-1.5 text-caption text-slate-700">
+          <span className="h-3 w-4 shrink-0 rounded-sm ring-1 ring-slate-300" style={{ background: HATCH }} />
+          <span>
+            Above your flood limit <span className="text-slate-500 tnum">{counts.flood}</span>
+          </span>
+        </div>
+      )}
       <div className="mt-0.5 flex items-center gap-1.5 text-caption text-slate-600">
         <span className="h-3 w-4 shrink-0 rounded-sm" style={{ background: '#efede9' }} />
         Not ranked (fewer than 25 households)

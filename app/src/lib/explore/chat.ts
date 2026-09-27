@@ -247,37 +247,165 @@ export interface ChatMessage {
   unchecked?: boolean;
   /** Who wrote the answer ("DeepSeek", "Claude"). */
   provider?: string;
+  /** The model id the service reported, when it did. */
+  model?: string;
+  /** The service said every figure in the answer was matched to the facts. */
+  checked?: boolean;
   /** No answer: offline file, service down. Left out of the history sent back. */
   failed?: boolean;
 }
 interface ChatState {
   messages: ChatMessage[];
   busy: boolean;
+  /** The Explore box's thread is folded away. null: never set, the box decides. Kept across reloads. */
+  folded: boolean | null;
+  setFolded: (f: boolean) => void;
   /** `about` names what the question is about (boundary, place, painted variable); the same question about the same thing is answered from memory. */
   ask: (question: string, facts: () => Promise<string>, about?: string) => Promise<void>;
   clear: () => void;
 }
 /** Answers given in this visit, by what was asked about what. A repeat costs nothing. */
-const remembered = new Map<string, Pick<ChatMessage, 'text' | 'provider' | 'unchecked'>>();
+const remembered = new Map<string, Pick<ChatMessage, 'text' | 'provider' | 'model' | 'unchecked' | 'checked'>>();
 const memoKey = (about: string, q: string) => `${about}\n${q.toLowerCase().replace(/\s+/g, ' ').replace(/[?.!]+$/, '')}`;
 export const CHAT_COPY = {
   offline: 'The assistant needs the online version of this tool. This offline file still has the map, the data and every summary.',
   down: 'The assistant is not available right now. The summary panel has the same figures.',
   unchecked: 'Some figures in this answer could not be matched to the data. Check them in the summary.',
-  poweredBy: (who: string) => `Powered by ${who}`,
-  defaultProvider: 'DeepSeek',
+  /** The chat's name on screen; the model behind it is recorded in Details, not in the box. */
+  name: 'VisionPitts-Chat',
+  checked: 'checked against the tool’s numbers',
+  interrupted: 'The page was reloaded before this answer arrived. Ask again to get it.',
+  you: 'You',
+  assistant: 'Assistant',
 };
+
+// ------------------------------------------------------------------ the thread on screen
+export interface Exchange {
+  q: ChatMessage;
+  a: ChatMessage | null;
+}
+/**
+ * The conversation as the box shows it: each question with the answer that follows it, newest exchange first.
+ * The store (and the history sent to /api/chat) stays in the order the messages were written.
+ */
+/** Question-and-answer pairs, oldest first (the chat reads top to bottom, newest at the bottom). */
+export function exchangesOldestFirst(messages: readonly ChatMessage[]): Exchange[] {
+  return exchangesNewestFirst(messages).reverse();
+}
+
+export function exchangesNewestFirst(messages: readonly ChatMessage[]): Exchange[] {
+  const out: Exchange[] = [];
+  for (let i = 0; i < messages.length; i++) if (messages[i].role === 'user') out.push({ q: messages[i], a: messages[i + 1]?.role === 'assistant' ? messages[i + 1] : null });
+  return out.reverse();
+}
+
+// ------------------------------------------------------------------ kept across reloads
+export const CHAT_STORAGE_KEY = 'visionpitts.chat.v1';
+/** Only the last messages are kept. */
+export const CHAT_CAP = 30;
+export interface StorageLike {
+  getItem(k: string): string | null;
+  setItem(k: string, v: string): void;
+  removeItem(k: string): void;
+}
+export interface SavedChat {
+  messages: ChatMessage[];
+  folded: boolean | null;
+}
+const str = (v: unknown): v is string => typeof v === 'string';
+/** A stored message, checked field by field; anything malformed is dropped. */
+function cleanMessage(raw: unknown): ChatMessage | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  if ((r.role !== 'user' && r.role !== 'assistant') || !str(r.text) || !fin(r.id) || !fin(r.at)) return null;
+  const m: ChatMessage = { id: r.id, role: r.role, text: r.text, at: r.at };
+  if (str(r.provider)) m.provider = r.provider;
+  if (str(r.model)) m.model = r.model;
+  // An answer still being written when the page went away never arrives.
+  if (r.pending === true) return { ...m, text: CHAT_COPY.interrupted, failed: true };
+  if (r.unchecked === true) m.unchecked = true;
+  if (r.checked === true) m.checked = true;
+  if (r.failed === true) m.failed = true;
+  return m;
+}
+/** The last `cap` messages, never starting with an answer whose question was cut off. */
+export function capMessages(messages: readonly ChatMessage[], cap = CHAT_CAP): ChatMessage[] {
+  const out = messages.slice(-cap);
+  while (out.length && out[0].role === 'assistant') out.shift();
+  return out;
+}
+export function serializeChat(state: SavedChat, cap = CHAT_CAP): string {
+  return JSON.stringify({ v: 1, messages: capMessages(state.messages, cap), folded: state.folded });
+}
+/** Whatever can be trusted in a stored text; broken or foreign JSON gives an empty conversation. */
+export function deserializeChat(raw: string | null | undefined, cap = CHAT_CAP): SavedChat {
+  const empty: SavedChat = { messages: [], folded: null };
+  if (!raw) return empty;
+  try {
+    const j = JSON.parse(raw) as { v?: unknown; messages?: unknown; folded?: unknown };
+    if (!j || typeof j !== 'object' || j.v !== 1 || !Array.isArray(j.messages)) return empty;
+    const messages = j.messages.map(cleanMessage).filter((m): m is ChatMessage => !!m);
+    return { messages: capMessages(messages, cap), folded: typeof j.folded === 'boolean' ? j.folded : null };
+  } catch {
+    return empty;
+  }
+}
+/** The browser's storage, or null where it is blocked (private mode, sandboxed frames, tests). */
+export function browserStorage(): StorageLike | null {
+  try {
+    return typeof window !== 'undefined' && window.localStorage ? window.localStorage : null;
+  } catch {
+    return null;
+  }
+}
+export function loadChat(storage: StorageLike | null): SavedChat {
+  try {
+    return deserializeChat(storage?.getItem(CHAT_STORAGE_KEY));
+  } catch {
+    return { messages: [], folded: null };
+  }
+}
+export function saveChat(storage: StorageLike | null, state: SavedChat): void {
+  try {
+    if (!storage) return;
+    if (!state.messages.length && state.folded == null) storage.removeItem(CHAT_STORAGE_KEY);
+    else storage.setItem(CHAT_STORAGE_KEY, serializeChat(state));
+  } catch {
+    /* full or blocked: the conversation just is not kept */
+  }
+}
+/**
+ * What is written to storage is the store's messages as they are. A view that rewrites them for display
+ * (the Analysis gate, lib/analysis/strictChat) registers here how to undo that, so the originals are stored.
+ */
+let persistView: ((m: ChatMessage[]) => ChatMessage[]) | null = null;
+export function setPersistView(fn: ((m: ChatMessage[]) => ChatMessage[]) | null): void {
+  persistView = fn;
+}
+export const canonicalMessages = (m: ChatMessage[]): ChatMessage[] => (persistView ? persistView(m) : m);
 /** An answer is shown after at least this long, so the thinking animation always has time to read as thinking. */
 export const MIN_THINK_MS = 5000;
 /** A refusal (offline file, service down) still waits this long, so the box does not flicker. */
 export const MIN_FAIL_MS = 900;
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, Math.max(0, ms)));
-let seq = 0;
+const saved = loadChat(browserStorage());
+/** Ids go on from the highest one kept, so a new message never shares an id with a rehydrated one. */
+let seq = saved.messages.reduce((mx, m) => Math.max(mx, m.id), 0);
+seq += seq % 2;
 
 export const useChat = create<ChatState>((set, get) => ({
-  messages: [],
+  messages: saved.messages,
   busy: false,
-  clear: () => set({ messages: [] }),
+  folded: saved.folded,
+  setFolded: (f) => set({ folded: f }),
+  clear: () => {
+    set({ messages: [] });
+    try {
+      browserStorage()?.removeItem(CHAT_STORAGE_KEY);
+    } catch {
+      /* blocked storage */
+    }
+  },
   ask: async (question, facts, about) => {
     const q = question.trim();
     if (!q || get().busy) return;
@@ -295,16 +423,16 @@ export const useChat = create<ChatState>((set, get) => ({
     // Every outcome waits for its minimum, counted from the moment the question was sent.
     const finish = async (m: Partial<ChatMessage>) => {
       await wait((m.failed ? MIN_FAIL_MS : MIN_THINK_MS) - (Date.now() - at));
-      set({ busy: false, messages: get().messages.map((x) => (x.id === answerId ? { ...x, pending: false, ...m } : x)) });
+      set({ busy: false, messages: get().messages.map((x) => (x.id === answerId ? { ...x, pending: false, at: Date.now(), ...m } : x)) });
     };
     const known = key ? remembered.get(key) : undefined;
     if (known) return finish(known);
     if (typeof fetch !== 'function' || (typeof location !== 'undefined' && location.protocol === 'file:')) return finish({ text: CHAT_COPY.offline, failed: true });
     try {
       const res = await fetch('/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question: q, facts: await facts(), history: history.slice(-2) }) });
-      const j = (await res.json().catch(() => null)) as { ok?: boolean; text?: string; provider?: string; checked?: boolean } | null;
+      const j = (await res.json().catch(() => null)) as { ok?: boolean; text?: string; provider?: string; model?: string; checked?: boolean } | null;
       if (j?.ok && j.text) {
-        const answer = { text: j.text, provider: j.provider, unchecked: j.checked === false };
+        const answer = { text: j.text, provider: j.provider, model: j.model, unchecked: j.checked === false, checked: j.checked === true };
         if (key && !answer.unchecked) remembered.set(key, answer);
         await finish(answer);
       } else await finish({ text: CHAT_COPY.down, failed: true });
@@ -313,3 +441,16 @@ export const useChat = create<ChatState>((set, get) => ({
     }
   },
 }));
+
+// Every change to the conversation (or the fold) is written back, so a reload opens the same thread.
+{
+  const storage = browserStorage();
+  if (storage) {
+    let last: { messages: ChatMessage[]; folded: boolean | null } = { messages: useChat.getState().messages, folded: useChat.getState().folded };
+    useChat.subscribe((s) => {
+      if (s.messages === last.messages && s.folded === last.folded) return;
+      last = { messages: s.messages, folded: s.folded };
+      saveChat(storage, { messages: canonicalMessages(s.messages), folded: s.folded });
+    });
+  }
+}

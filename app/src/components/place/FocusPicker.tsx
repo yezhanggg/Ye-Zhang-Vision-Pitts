@@ -1,4 +1,4 @@
-// "Focusing issue" on Analysis > Match: three choices, one short line each. Picking one applies that stance's
+// "Focusing issue" on Analysis > Match: four choices, one short line each. Picking one applies that stance's
 // published preset (store.applyPreset), which only orders types inside the suggested set; the rules do the rest.
 import { cx } from '../../lib/format';
 import type { Stance } from '../../lib/place/types';
@@ -7,6 +7,7 @@ export const FOCUS: { id: Stance; label: string; line: string }[] = [
   { id: 'anti_displacement', label: 'Anti-displacement', line: 'Keep current renters housed' },
   { id: 'market_led', label: 'Market-led', line: 'Build what the market supports' },
   { id: 'transit_first', label: 'Transit-first', line: 'Homes near frequent transit' },
+  { id: 'climate_resilient', label: 'Climate-resilient', line: 'Out of flood zones, near frequent transit' },
 ];
 
 export default function FocusPicker({ value, onChange }: { value: Stance; onChange: (s: Stance) => void }) {

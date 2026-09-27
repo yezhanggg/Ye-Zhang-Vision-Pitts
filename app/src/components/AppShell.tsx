@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { motion } from 'motion/react';
-import { Home } from 'lucide-react';
+import { Compass, Home } from 'lucide-react';
+import { TOUR_COPY, useTour } from '../lib/tour';
+import TourLayer from './tour/TourLayer';
 import { sectionOf, useApp, type AnalysisMode } from '../lib/store';
 import { cx } from '../lib/format';
 import { UI } from '../lib/copy';
@@ -13,9 +15,9 @@ const SUBTABS: { id: AnalysisMode; label: string }[] = [
   { id: 'scenarios', label: UI.compareScenariosTab },
 ];
 
-function Pill<T extends string>({ items, value, onPick, ariaLabel, layoutId, size = 'md' }: { items: { id: T; label: string }[]; value: T; onPick: (id: T) => void; ariaLabel: string; layoutId: string; size?: 'md' | 'sm' }) {
+function Pill<T extends string>({ items, value, onPick, ariaLabel, layoutId, size = 'md', tour }: { items: { id: T; label: string }[]; value: T; onPick: (id: T) => void; ariaLabel: string; layoutId: string; size?: 'md' | 'sm'; tour?: string }) {
   return (
-    <nav aria-label={ariaLabel} className={cx('pointer-events-auto flex rounded-xl bg-white/95 shadow-lg ring-1 ring-black/5 backdrop-blur', size === 'md' ? 'p-1' : 'p-0.5')}>
+    <nav aria-label={ariaLabel} data-tour={tour} className={cx('pointer-events-auto flex rounded-xl bg-white/95 shadow-lg ring-1 ring-black/5 backdrop-blur', size === 'md' ? 'p-1' : 'p-0.5')}>
       {items.map((t) => {
         const on = value === t.id;
         return (
@@ -47,16 +49,21 @@ export default function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="relative h-full">
       <div className="absolute inset-0">{children}</div>
-      <div className="absolute left-3 top-3 z-30">
+      <div className="absolute left-3 top-3 z-30 flex items-center gap-1.5">
         <motion.button onClick={() => set({ view: 'landing' })} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.94 }} transition={SPRING_TAB} title={UI.homeTitle} className="flex items-center gap-1.5 rounded-xl bg-white/95 px-3 py-2 text-small font-semibold text-slate-700 shadow-lg ring-1 ring-black/5 backdrop-blur hover:bg-white hover:text-slate-900">
           <Home className="h-4 w-4" />
           {UI.home}
         </motion.button>
+        <motion.button onClick={() => useTour.getState().start()} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.94 }} transition={SPRING_TAB} title={TOUR_COPY.buttonTitle} className="flex items-center gap-1.5 rounded-xl bg-white/95 px-3 py-2 text-small font-semibold text-slate-700 shadow-lg ring-1 ring-black/5 backdrop-blur hover:bg-white hover:text-slate-900">
+          <Compass className="h-4 w-4" />
+          {TOUR_COPY.button}
+        </motion.button>
       </div>
       <div className="pointer-events-none absolute left-1/2 top-3 z-30 flex -translate-x-1/2 flex-col items-center gap-1.5">
-        <Pill items={sections} value={section} onPick={(id) => setMode(id === 'explore' ? 'explore' : lastAnalysis)} ariaLabel="Sections" layoutId="tab-pill" />
-        {section === 'analysis' && <Pill items={SUBTABS} value={mode as AnalysisMode} onPick={(id) => setMode(id)} ariaLabel="Analysis views" layoutId="subtab-pill" size="sm" />}
+        <Pill items={sections} value={section} onPick={(id) => setMode(id === 'explore' ? 'explore' : lastAnalysis)} ariaLabel="Sections" layoutId="tab-pill" tour="sections" />
+        {section === 'analysis' && <Pill items={SUBTABS} value={mode as AnalysisMode} onPick={(id) => setMode(id)} ariaLabel="Analysis views" layoutId="subtab-pill" size="sm" tour="subtabs" />}
       </div>
+      <TourLayer />
     </div>
   );
 }

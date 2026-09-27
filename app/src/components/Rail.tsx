@@ -24,14 +24,14 @@ function RailHeader({ title, onHide }: { title: string; onHide: () => void }) {
  * it reaches the bottom of the map), that folds into a small tab in its own corner, growing out of it and shrinking back into it. Docked (the compare views): an in-flow column that narrows
  * to a slim strip so the content under the maps gets the width. Both follow `ui.left`, which persists per browser.
  */
-export default function Rail({ children, title, float }: { children: ReactNode; title: string; float?: boolean }) {
+export default function Rail({ children, title, float, maxHeightClass }: { children: ReactNode; title: string; float?: boolean; /** Floating panel height cap (e.g. to leave room for a legend below it). */ maxHeightClass?: string }) {
   const open = useApp((s) => s.ui.left);
   const setUi = useApp((s) => s.setUi);
   if (float) {
     return (
       <AnimatePresence initial={false} mode="popLayout">
         {open ? (
-          <motion.aside key="rail" style={{ transformOrigin: 'top left' }} initial={{ opacity: 0, scale: 0.9, x: -14, filter: 'blur(6px)' }} animate={{ opacity: 1, scale: 1, x: 0, filter: 'blur(0px)' }} exit={{ opacity: 0, scale: 0.92, x: -14, filter: 'blur(6px)', transition: { duration: 0.18, ease: 'easeIn' } }} transition={SPRING_PANEL} className="absolute left-3 top-16 z-20 flex max-h-[calc(100%-4.75rem)] w-[340px] flex-col rounded-2xl bg-white/95 shadow-[0_10px_40px_-10px_rgba(15,23,42,0.25)] ring-1 ring-black/5 backdrop-blur xl:w-[360px]" aria-label={title}>
+          <motion.aside key="rail" data-tour="rail" style={{ transformOrigin: 'top left' }} initial={{ opacity: 0, scale: 0.9, x: -14, filter: 'blur(6px)' }} animate={{ opacity: 1, scale: 1, x: 0, filter: 'blur(0px)' }} exit={{ opacity: 0, scale: 0.92, x: -14, filter: 'blur(6px)', transition: { duration: 0.18, ease: 'easeIn' } }} transition={SPRING_PANEL} className={cx('absolute left-3 top-16 z-20 flex w-[340px] flex-col', maxHeightClass ?? 'max-h-[calc(100%-4.75rem)]', 'rounded-2xl bg-white/95 shadow-[0_10px_40px_-10px_rgba(15,23,42,0.25)] ring-1 ring-black/5 backdrop-blur xl:w-[360px]')} aria-label={title}>
             <RailHeader title={title} onHide={() => setUi({ left: false })} />
             <div className={BODY}>{children}</div>
           </motion.aside>

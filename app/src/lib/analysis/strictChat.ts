@@ -2,7 +2,7 @@
 // never shown there. While the Analysis tab is open the chat store's unchecked answers are rewritten to a refusal;
 // on leaving, the originals come back, so Explore's chat is exactly as it was. lib/explore/chat.ts is not edited.
 import { useLayoutEffect } from 'react';
-import { useChat } from '../explore/chat';
+import { setPersistView, useChat } from '../explore/chat';
 
 export const WITHHELD = 'The answer included figures that could not be matched to the tool’s data, so it is not shown. Every number on this panel is computed by code.';
 
@@ -53,9 +53,14 @@ export interface ChatLike<M> {
   subscribe(fn: () => void): () => void;
 }
 
-/** Withholds now and on every store change; the returned function stops watching and restores the originals. */
-export function strictSession<M extends Msg>(store: ChatLike<M>): () => void {
+/**
+ * Withholds now and on every store change; the returned function stops watching and restores the originals.
+ * Messages already in the store when it starts (a conversation rehydrated after a reload) are withheld like new ones.
+ * `persist`, when given, receives a function that undoes the rewrite (so storage keeps the originals), and null on stop.
+ */
+export function strictSession<M extends Msg>(store: ChatLike<M>, persist?: (view: ((m: M[]) => M[]) | null) => void): () => void {
   const held = new Map<number, M>();
+  persist?.((m) => restore(m, held));
   const pass = () => {
     const cur = store.getState().messages;
     const out = withhold(cur);
@@ -67,6 +72,7 @@ export function strictSession<M extends Msg>(store: ChatLike<M>): () => void {
   const off = store.subscribe(pass);
   return () => {
     off();
+    persist?.(null);
     const cur = store.getState().messages;
     const back = restore(cur, held);
     if (back !== cur) store.setState({ messages: back });
@@ -75,5 +81,5 @@ export function strictSession<M extends Msg>(store: ChatLike<M>): () => void {
 
 /** Mount in the Analysis view: the question box there never shows an unchecked answer. */
 export function useStrictChat(): void {
-  useLayoutEffect(() => strictSession(useChat), []);
+  useLayoutEffect(() => strictSession(useChat, setPersistView), []);
 }

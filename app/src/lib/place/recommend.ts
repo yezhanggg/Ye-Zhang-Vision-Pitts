@@ -9,8 +9,11 @@ import { CITY_MEDIAN_HOME_VALUE } from './context';
 import { DECIDE, G, TYPOLOGY_LABEL } from './copy';
 import { floodNote, lotPattern, zoningNote, type FloodNote, type LotPattern } from './feasibility';
 import { capitalize, fmtCount, fmtDollars, fmtMiles, fmtScore, fmtShare, isNum, joinAnd, NA, roundHalfEven } from './format';
-import { LEVEL_BAND, LEVEL_LABEL, levelPhrase, levelTarget, planTenants, transitTestMiles, type Household, type IncomeLevel } from './plan';
-import { DEFAULT_FIT_ORDER, DENSITY_ORDER, SERVES, STANCES, THRESHOLDS, TYPE_BEDROOMS, TYPOLOGIES, TYPOLOGY_BEDROOMS } from './thresholds';
+import {
+  LEVEL_LABEL, ceilingForSize, floodCheck, levelBands, levelPhrase, levelTarget, marketRent, planTenants, resolveHousehold, transitTestMiles,
+  type AgeGroup, type FloodCheck, type FloodRisk, type HouseholdSize, type MarketRent, type PlanLevel, type ResolvedHousehold,
+} from './plan';
+import { CLIMATE_ORDER, DEFAULT_FIT_ORDER, DENSITY_ORDER, SERVES, STANCES, THRESHOLDS, TYPE_BEDROOMS, TYPOLOGIES, TYPOLOGY_BEDROOMS } from './thresholds';
 import type { BandId, Bedrooms, HouseholdType, HudTable, PlaceMeasures, Stance, Typology } from './types';
 
 export type { Stance, Typology };
@@ -51,6 +54,14 @@ export interface Recommendation {
   flood: FloodNote;
   branch: Branch;
   fitOrder: Typology[];
+  /** The reader's flood limit against the FEMA share; null when no flood limit was passed. */
+  floodLimit: FloodCheck | null;
+  /** What the market asks here (2-bedroom asking rent, else ACS median rent): the price at market rate. */
+  marketRent: MarketRent;
+  /** The reader's income level, when one was passed. */
+  level: PlanLevel | null;
+  /** The household size used here (with 'auto', the largest CHAS type's size); null when no size was passed. */
+  household: ResolvedHousehold | null;
 }
 
 export interface RecommendOptions {
@@ -61,9 +72,13 @@ export interface RecommendOptions {
   /** Override the city median home value (defaults to meta.city_medians.med_home_value). */
   cityMedianValue?: number | null;
   /** The reader's income level (lib/place/plan): counts summed over every band at or below it, price at its ceiling. Overrides `band`. */
-  level?: IncomeLevel;
-  /** The reader's household: seniors, families, or anyone (the data's largest group). */
-  household?: Household;
+  level?: PlanLevel;
+  /** Household size (5 = 5 or more; 'auto' = this place's largest CHAS type): the HUD limit for that many persons and the home size. */
+  size?: HouseholdSize;
+  /** Age group: with the size it picks the CHAS household types (CHAS splits only at 62). */
+  age?: AgeGroup;
+  /** The flood risk the reader accepts: tracts whose FEMA flood-zone share is above the limit get no suggestion. */
+  flood?: FloodRisk;
   /** Transit-first passes when the nearest frequent stop is within this many miles of the average resident (replaces the share/departures rule). */
   transitMiles?: number;
 }
@@ -120,8 +135,17 @@ function fitToLead(t: Typology, lead: HouseholdType | null): number {
 
 const isLowBand = (band: BandId) => band === 'le30' || band === 'b30_50';
 
+type Prefer = 'seniors' | 'families' | undefined;
+/** 62 and older → seniors; 3 or more people (or 2 under 62) → families; else no preference. */
+const preferOf = (h: ResolvedHousehold | null, age: AgeGroup | undefined): Prefer => {
+  if (h?.auto) return h.type === 'elderly_alone' || h.type === 'elderly_family' ? 'seniors' : h.type === 'small_family' || h.type === 'large_family' ? 'families' : undefined;
+  return preferOfSize(h?.size, age);
+};
+const preferOfSize = (size: HouseholdSize | undefined, age: AgeGroup | undefined): Prefer =>
+  size === 'auto' ? undefined : age === 'senior62' && (size ?? 1) <= 2 ? 'seniors' : size != null && (size >= 3 || (size === 2 && age === 'under62')) ? 'families' : undefined;
+
 /** Seniors: senior housing first when it is in the set; families: the family types (2–4 unit conversion, townhome) first. */
-function preferFor(types: Typology[], household: Household | undefined): Typology[] {
+function preferFor(types: Typology[], household: Prefer): Typology[] {
   if (household === 'seniors') return [...types].sort((a, b) => Number(b === 'senior') - Number(a === 'senior'));
   if (household === 'families') {
     const fam = (t: Typology) => Number(t === 'duplex_triplex' || t === 'townhome');
@@ -289,6 +313,29 @@ function transitTest(p: PlaceMeasures): { passed: boolean | null; sentence: stri
     : { passed: false, sentence: `Fails the transit test: ${shareText}; ${depText}${dist}.` };
 }
 
+/** The fixed "why" line under Climate-resilient. */
+export const CLIMATE_WHY = 'Why: fewer car trips and less energy per home; embodied carbon is not modeled (no Pittsburgh data).';
+
+/**
+ * Climate-resilient (printed thresholds): FEMA flood-zone land at most 5% of the tract, and the nearest frequent stop
+ * within the planner's transit distance (½ mile when none was chosen). Both must pass; either unknown → incomplete.
+ */
+export function climateTest(p: PlaceMeasures, miles?: number): { passed: boolean | null; sentence: string; short: string } {
+  const max = THRESHOLDS.climate_flood_max_pct;
+  const femaRaw = p?.flood?.fema_sfha_pct;
+  const fema = isNum(femaRaw) ? femaRaw : 0;
+  const floodPass = isNum(femaRaw) ? fema <= max : null;
+  const floodText = floodPass == null ? `FEMA flood-zone share ${NA}` : floodPass ? `${fema.toFixed(1)}% of the land is in a FEMA flood zone, at or below the ${max}% mark (passes)` : `not suggested here: ${fema.toFixed(1)}% of land in a FEMA flood zone, above the ${max}% mark (${fema.toFixed(1)}% − ${max}% = ${(fema - max).toFixed(1)} points over)`;
+  const mi = isNum(miles) ? miles : THRESHOLDS.climate_transit_default_mi;
+  const t = transitTestMiles(p, mi);
+  const d = p?.transit?.freq_dist_mi;
+  const transitText = t.passed == null ? t.sentence.replace(/\.$/, '') : t.passed ? `the nearest frequent stop is ${fmtMiles(d)} away, within ${mi.toFixed(2)} miles (passes)` : `too far from frequent transit: the nearest frequent stop is ${fmtMiles(d)} away, beyond ${mi.toFixed(2)} miles (${fmtMiles(d)} − ${mi.toFixed(2)} miles = ${(d! - mi).toFixed(2)} miles too far)`;
+  const passed = floodPass === true && t.passed === true ? true : floodPass === false || t.passed === false ? false : null;
+  const head = passed === true ? 'Climate test passes: ' : passed === false ? 'Fails the climate test: ' : 'Climate test incomplete: ';
+  const short = floodPass === false ? `Not suggested here: ${fema.toFixed(1)}% of land in a FEMA flood zone (the mark is ${max}%)` : t.passed === false ? `Too far from frequent transit (nearest stop ${fmtMiles(d)}; you chose within ${mi.toFixed(2)} miles)` : passed == null ? 'Climate test incomplete (flood share or transit distance not available)' : 'Climate test passes';
+  return { passed, sentence: `${head}${floodText}; ${transitText}.${passed ? ' The focus asks for attached and multi-unit forms first.' : ''}`, short };
+}
+
 function antiDisplacementTest(p: PlaceMeasures, branch: Branch, served: BandId[], servedLabel?: string): { passed: boolean | null; sentence: string } {
   const s = p?.displacement?.score;
   const who = servedLabel ?? joinAnd(served.map((b) => BAND_LABEL[b]));
@@ -310,7 +357,8 @@ export function recommend(p: PlaceMeasures, hud: HudTable, stance: Stance, opts:
   // ---- band under the stance
   const level = opts.level;
   let target = level ? levelTarget(p, level) : targetBand(p, opts.band);
-  let served: BandId[] = level ? BAND_ORDER.filter((b) => BAND_ORDER.indexOf(b) <= BAND_ORDER.indexOf(LEVEL_BAND[level])) : [target.band];
+  let served: BandId[] = level ? levelBands(level) : [target.band];
+  const atMarket = level === 'market';
   if (stance === 'anti_displacement' && branch === 'high' && !opts.band && !level) {
     served = HIGH_BANDS;
     if (!served.includes(target.band)) {
@@ -323,14 +371,20 @@ export function recommend(p: PlaceMeasures, hud: HudTable, stance: Stance, opts:
   }
   const band = target.band;
   const phrase = level ? levelPhrase(level) : BAND_PHRASE[band];
-  const household = opts.household;
-  const tenants = level || (household && household !== 'anyone') ? planTenants(p, level ? served : [band], household ?? 'anyone', phrase) : tenantProfile(p, band);
+  const tenantBands = level ? served : [band];
+  const resolved = opts.size ? resolveHousehold(p, tenantBands, opts.size, opts.age ?? 'any') : null;
+  const size = resolved?.size;
+  const household = preferOf(resolved, opts.age);
+  const tenants = level || opts.size ? planTenants(p, tenantBands, opts.size ?? 3, opts.age ?? 'any', phrase) : tenantProfile(p, band);
+  const mRent = marketRent(p);
+  const floodLimit = opts.flood ? floodCheck(p, opts.flood) : null;
 
   // ---- price and market test
-  const pct = pctOf(band);
-  const price = pct ? ceilingRent(hud, pct, tenants.bedrooms, tenants.seniorAlone) : null;
+  const pct = atMarket ? null : pctOf(band);
+  const price = pct ? (size ? ceilingForSize(hud, pct, size) : ceilingRent(hud, pct, tenants.bedrooms, tenants.seniorAlone)) : null;
   const priceAlso = stance === 'anti_displacement' && branch === 'high' && pct === 30 && !level ? ceilingRent(hud, 50, tenants.bedrooms, tenants.seniorAlone) : null;
-  const twoBedroom = ceilingRent(hud, pct ?? 80, 2);
+  // The market check compares 2-bedroom with 2-bedroom (the only asking rent on file): the household's own price when it needs a 2-bedroom.
+  const twoBedroom = price && price.bedrooms === 2 ? price : ceilingRent(hud, pct ?? 80, 2);
   const m = p?.market;
   const market: MarketTest = twoBedroom
     ? marketTest(twoBedroom.rent, m?.asking_2br ?? null, m?.asking_conf ?? null, m?.safmr_2br ?? null)
@@ -344,7 +398,20 @@ export function recommend(p: PlaceMeasures, hud: HudTable, stance: Stance, opts:
   let stanceTest: { passed: boolean | null; sentence: string };
   let notServed: { bands: BandId[]; why: string };
 
-  if (stance === 'anti_displacement') {
+  if (atMarket) {
+    // Market rate: no HUD ceiling; the suggestion follows what the market pays (the Market-led test), and under
+    // Transit-first the transit test must pass too.
+    const mt = marketLedTest(p, cityMedian, hud?.city?.sale_median ?? null);
+    const tt = stance === 'transit_first' ? (isNum(opts.transitMiles) ? transitTestMiles(p, opts.transitMiles) : transitTest(p)) : stance === 'climate_resilient' ? climateTest(p, opts.transitMiles) : null;
+    const passed = tt ? (mt.passed === true && tt.passed === true ? true : mt.passed === false || tt.passed === false ? false : null) : mt.passed;
+    stanceTest = { passed, sentence: tt ? `${mt.sentence} ${tt.sentence}` : mt.sentence };
+    if (passed) {
+      types = stance === 'transit_first' ? DENSITY_ORDER.filter((t) => t !== 'adu' && t !== 'senior') : stance === 'climate_resilient' ? CLIMATE_ORDER.filter((t) => t !== 'senior') : fitOrder.filter((t) => t !== 'senior');
+      types = preferFor(types, household);
+      not.push({ typology: 'senior', because: 'age-restricted affordable apartments are a subsidized product; at market rate the market test does not speak to them' });
+    }
+    notServed = notServedByMarket(p, hud, types[0] ?? null);
+  } else if (stance === 'anti_displacement') {
     stanceTest = antiDisplacementTest(p, branch, served, level ? `households ${LEVEL_LABEL[level]}` : undefined);
     const additive: Typology[] = ['adu', 'duplex_triplex'];
     const newBuild: Typology[] = ['senior', 'small_apartment'];
@@ -367,6 +434,14 @@ export function recommend(p: PlaceMeasures, hud: HudTable, stance: Stance, opts:
       not.push({ typology: 'senior', because: 'age-restricted affordable apartments are a subsidized product; the market test does not speak to them' });
     }
     notServed = notServedByMarket(p, hud, types[0] ?? null);
+  } else if (stance === 'climate_resilient') {
+    const ct = climateTest(p, opts.transitMiles);
+    stanceTest = { passed: ct.passed, sentence: ct.sentence };
+    if (ct.passed) {
+      types = preferFor(CLIMATE_ORDER.filter((t) => !(t === 'townhome' && isLowBand(band))), household);
+      if (isLowBand(band)) not.push({ typology: 'townhome', because: townhomeLowBandReason(c) });
+    }
+    notServed = notServedIncomeRestricted(served);
   } else {
     stanceTest = isNum(opts.transitMiles) ? transitTestMiles(p, opts.transitMiles) : transitTest(p);
     if (stanceTest.passed) {
@@ -379,29 +454,44 @@ export function recommend(p: PlaceMeasures, hud: HudTable, stance: Stance, opts:
 
   // No band is under-served on the evidence (a park, a campus, a zero-renter tract): the need-driven stances recommend nothing.
   // The reader chose seniors or families and CHAS counts none of them at this level: nothing to build for them here.
-  const noHousehold = !!household && household !== 'anyone' && !tenants.available;
+  const noHousehold = !!size && !tenants.available;
   const noNeed = !target.available || noHousehold;
-  if (noNeed && stance !== 'market_led') {
+  const marketRule = stance === 'market_led' || atMarket;
+  if (noNeed && !marketRule) {
     types = [];
     not.length = 0;
-    notServed = { bands: [], why: noHousehold && target.available ? `nothing is recommended, because CHAS counts no ${household === 'seniors' ? 'senior' : 'family'} renter households ${phrase} here` : 'nothing is recommended, because no band is under-served on the evidence' };
+    notServed = { bands: [], why: noHousehold && target.available ? `nothing is recommended, because CHAS counts no renter households of this size and age ${phrase} here` : 'nothing is recommended, because no band is under-served on the evidence' };
+  }
+  // Senior housing is age-restricted: never suggested for households under 62.
+  if (opts.age === 'under62' && types.includes('senior')) {
+    types = types.filter((t) => t !== 'senior');
+    not.push({ typology: 'senior', because: 'age-restricted to 62 and older; you chose under 62' });
+  }
+  // Above the reader's flood limit: no suggestion here, and the reason is the flood share.
+  if (floodLimit?.blocked) {
+    types = [];
+    not.length = 0;
+    notServed = { bands: [], why: `nothing is suggested, because ${floodLimit.sentence.replace(/\.$/, '')}` };
   }
 
-  const recTypes: RecommendedType[] = types.map((t) => ({ typology: t, because: becauseFor(t, c, stance), bedrooms: stance === 'market_led' ? TYPOLOGY_BEDROOMS[t] : bedroomsFor(t, tenants) }));
+  const recTypes: RecommendedType[] = types.map((t) => ({ typology: t, because: becauseFor(t, c, atMarket ? 'market_led' : stance), bedrooms: size ? tenants.bedrooms : stance === 'market_led' ? TYPOLOGY_BEDROOMS[t] : bedroomsFor(t, tenants) }));
   const lead = recTypes[0]?.typology ?? null;
   // A market-rate product serves whatever bands its price reaches, not the under-served band.
-  if (stance === 'market_led') served = lead ? BAND_ORDER.filter((b) => !notServed.bands.includes(b)) : [];
+  if (stance === 'market_led' && !atMarket) served = lead ? BAND_ORDER.filter((b) => !notServed.bands.includes(b)) : [];
 
   // ---- headline for the "Under each stance" table
   let headline: string;
-  if (lead && stance === 'market_led') {
+  if (floodLimit?.blocked) headline = `No suggestion: ${floodLimit.sentence.replace(/\.$/, '')}`;
+  else if (lead && atMarket) headline = `${capitalize(TYPOLOGY_LABEL[lead])} (${bedroomsWord(recTypes[0].bedrooms).replace(/^a /, '')}) at market rate; ${mRent.words}`;
+  else if (lead && stance === 'market_led') {
     const priceWord = lead === 'townhome'
       ? (isNum(m?.sale_median) ? `at the ${fmtDollars(m!.sale_median)} sale median` : isNum(m?.value_acs) ? `at the ${fmtDollars(m!.value_acs)} median home value` : 'at market prices')
       : (market.askingUsed != null ? `at the ${fmtDollars(market.askingUsed)} asked for a 2-bedroom` : 'at market rents');
     headline = `${capitalize(TYPOLOGY_LABEL[lead])} (${bedroomsWord(recTypes[0].bedrooms).replace(/^a /, '')}${lead === 'townhome' ? ', for sale' : ''}) ${priceWord}; serves ${bandsPhrase(served)}`;
   } else if (lead) headline = `${capitalize(TYPOLOGY_LABEL[lead])} (${bedroomsWord(recTypes[0].bedrooms).replace(/^a /, '')}) for ${level ? `households ${LEVEL_LABEL[level]}` : bandsPhrase(served)}${price ? ` at ${fmtDollars(price.rent)}${priceAlso ? `–${fmtDollars(priceAlso.rent)}` : ''} a month` : ''}`;
-  else if (stance === 'market_led') headline = stanceTest.passed === null ? 'Market test incomplete (asking rent or home value not available)' : 'No unsubsidized product is supported here';
-  else if (noNeed) headline = noHousehold && target.available ? `No ${household === 'seniors' ? 'senior' : 'family'} renter households ${phrase} on the evidence` : level ? `No under-served renters ${phrase} on the evidence (CHAS counts none paying more than 30% of income)` : 'No under-served band on the evidence (CHAS counts no cost-burdened renters here)';
+  else if (marketRule) headline = stanceTest.passed === null ? 'Market test incomplete (asking rent or home value not available)' : 'No unsubsidized product is supported here';
+  else if (noNeed) headline = noHousehold && target.available ? `No renter households of this size and age ${phrase} on the evidence` : level ? `No under-served renters ${phrase} on the evidence (CHAS counts none paying more than 30% of income)` : 'No under-served band on the evidence (CHAS counts no cost-burdened renters here)';
+  else if (stance === 'climate_resilient') headline = climateTest(p, opts.transitMiles).short;
   else if (stance === 'transit_first' && isNum(opts.transitMiles)) headline = stanceTest.passed === null ? `Transit measures ${NA}` : `Fails the transit test (nearest frequent stop ${fmtMiles(p?.transit?.freq_dist_mi)}; you chose within ${opts.transitMiles.toFixed(2)} miles)`;
   else if (stance === 'transit_first') headline = stanceTest.passed === null ? `Transit measures ${NA}` : `Fails the transit test (${fmtShare(p?.transit?.freq_share_qmi)} within a quarter mile; ${fmtCount(p?.transit?.departures_qmi)} departures)`;
   else headline = 'No type under this stance';
@@ -413,6 +503,8 @@ export function recommend(p: PlaceMeasures, hud: HudTable, stance: Stance, opts:
     G.types(recTypes, stance),
     ...G.not(not),
     stanceTest.sentence,
+    ...(stance === 'climate_resilient' ? [CLIMATE_WHY] : []),
+    ...(floodLimit ? [`Flood limit: ${floodLimit.sentence}`] : []),
     G.notServed(notServed.bands, notServed.why),
     G.decide,
   ];
@@ -420,6 +512,7 @@ export function recommend(p: PlaceMeasures, hud: HudTable, stance: Stance, opts:
   return {
     stance, band: target, tenants, price, market, types: recTypes, not, notServed: notServed.bands, stanceTest, lines, decide: DECIDE,
     lead, headline, servedBands: served, notServedWhy: notServed.why, priceAlso, twoBedroom, lot, flood, branch, fitOrder,
+    floodLimit, marketRent: mRent, level: level ?? null, household: resolved,
   };
 }
 

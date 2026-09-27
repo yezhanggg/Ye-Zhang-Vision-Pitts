@@ -160,9 +160,9 @@ export function FactorCard({ f, t, weight, topTypology }: { f: FactorDef; t: Tra
       {f.id === 'need' && hudLine() && <div className="text-caption text-slate-600">{hudLine()}</div>}
       {!isFlag && (
         <>
-          <div className="relative mt-2.5 h-2 rounded-full bg-gradient-to-r from-stone-100 via-stone-200 to-stone-300">
-            <div className="absolute top-[-3px] h-[14px] w-px bg-slate-500" style={{ left: '50%' }} title="City middle" />
-            {x == null ? <div className="hatch absolute inset-0 rounded-full" /> : <motion.div className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-slate-900 shadow" initial={false} animate={{ left: `${x * 100}%` }} transition={{ type: 'spring', stiffness: 260, damping: 28 }} />}
+          <div className="relative mt-2.5 h-2.5 bg-stone-100">
+            {x == null ? <div className="hatch absolute inset-0" /> : <motion.div className="absolute inset-y-0 left-0 bg-slate-700" initial={false} animate={{ width: `${Math.max(1.5, x * 100)}%` }} transition={{ type: 'spring', stiffness: 260, damping: 28 }} />}
+            <div className="absolute -inset-y-[3px] w-px bg-slate-400" style={{ left: '50%' }} title="City middle" />
           </div>
           <div className="mt-1 flex justify-between text-caption text-slate-600">
             <span>Lowest in city</span>

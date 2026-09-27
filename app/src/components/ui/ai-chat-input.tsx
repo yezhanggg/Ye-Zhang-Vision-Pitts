@@ -84,12 +84,14 @@ export interface PromptInputProps {
   openWidth?: number;
   /** No surface, ring, shadow or width of its own: the parent is the box. */
   bare?: boolean;
+  /** A shorter box with smaller text (the chat docked at the bottom of a column). */
+  small?: boolean;
   /** Told when the text area opens or closes, so a parent box can follow. */
   onOpenChange?: (open: boolean) => void;
 }
 
 export const PromptInput = forwardRef<HTMLDivElement, PromptInputProps>(function PromptInput(
-  { onSubmit, onKey, placeholder = 'Ask anything', className, defaultValue = '', value: controlled, onChange, busy = false, footer, voice = true, closedWidth = 320, openWidth = 440, bare = false, onOpenChange },
+  { onSubmit, onKey, placeholder = 'Ask anything', className, defaultValue = '', value: controlled, onChange, busy = false, footer, voice = true, closedWidth = 320, openWidth = 440, bare = false, small = false, onOpenChange },
   ref,
 ) {
   const [expanded, setExpanded] = useState(false);
@@ -97,7 +99,8 @@ export const PromptInput = forwardRef<HTMLDivElement, PromptInputProps>(function
   const [local, setLocal] = useState(defaultValue);
   const [recording, setRecording] = useState(false);
   const [levels, setLevels] = useState<number[]>(() => new Array(5).fill(0));
-  const [textHeight, setTextHeight] = useState(MIN_TEXT);
+  const minText = small ? 44 : MIN_TEXT, maxText = small ? 120 : MAX_TEXT, closedH = small ? 38 : CLOSED;
+  const [textHeight, setTextHeight] = useState(minText);
   const [scrolling, setScrolling] = useState(false);
 
   const isControlled = controlled !== undefined;
@@ -256,10 +259,10 @@ export const PromptInput = forwardRef<HTMLDivElement, PromptInputProps>(function
     el.style.height = current;
     void el.offsetHeight;
     el.style.transition = '';
-    const next = Math.max(MIN_TEXT, Math.min(wanted, MAX_TEXT));
+    const next = Math.max(minText, Math.min(wanted, maxText));
     el.style.height = `${next}px`;
     setTextHeight(next);
-    setScrolling(wanted > MAX_TEXT);
+    setScrolling(wanted > maxText);
     const t = setTimeout(updateFades, 0);
     return () => clearTimeout(t);
   }, [value, expanded]);
@@ -315,7 +318,7 @@ export const PromptInput = forwardRef<HTMLDivElement, PromptInputProps>(function
             textRef.current?.focus();
           }
         }}
-        style={{ borderRadius: bare ? 0 : 24, height: expanded ? boxHeight : CLOSED, transition: smooth ? 'height 0.15s ease-out' : `height 0.4s ${SPRING}` }}
+        style={{ borderRadius: bare ? 0 : 24, height: expanded ? boxHeight : closedH, transition: smooth ? 'height 0.15s ease-out' : `height 0.4s ${SPRING}` }}
         className={cx('relative w-full overflow-hidden', !bare && 'bg-white/95 shadow-lg ring-1 ring-black/5 backdrop-blur focus-within:ring-2 focus-within:ring-violet-300', expanded ? 'cursor-text' : 'cursor-default')}
       >
         <textarea
@@ -337,7 +340,8 @@ export const PromptInput = forwardRef<HTMLDivElement, PromptInputProps>(function
           tabIndex={expanded ? 0 : -1}
           style={{ transition: smooth ? 'height 0.15s ease-out' : `opacity 0.3s ease-out, transform 0.3s ease-out, height 0.4s ${SPRING}` }}
           className={cx(
-            'scroll-quiet absolute inset-x-0 top-0 z-[1] w-full resize-none bg-transparent py-3.5 pl-4 pr-12 text-body leading-[22px] text-slate-900 outline-none placeholder:font-medium placeholder:text-slate-500',
+            'scroll-quiet absolute inset-x-0 top-0 z-[1] w-full resize-none bg-transparent pl-4 pr-12 text-slate-900 outline-none placeholder:font-medium placeholder:text-slate-500',
+            small ? 'py-2.5 text-small leading-[20px]' : 'py-3.5 text-body leading-[22px]',
             expanded ? 'translate-y-0 scale-100 opacity-100' : 'pointer-events-none -translate-y-1 scale-95 opacity-0',
             scrolling ? 'overflow-y-auto' : 'overflow-y-hidden',
             recording && 'pointer-events-none',
@@ -354,14 +358,14 @@ export const PromptInput = forwardRef<HTMLDivElement, PromptInputProps>(function
           }}
           tabIndex={expanded ? -1 : 0}
           style={{ transition: smooth ? 'none' : `all 0.4s ${SPRING}` }}
-          className={cx('absolute inset-x-0 top-0 z-[1] cursor-text truncate py-[15px] pl-4 pr-12 text-left text-body font-medium leading-[18px] text-slate-500 outline-none', expanded ? 'pointer-events-none translate-y-1 scale-105 opacity-0' : 'translate-y-0 scale-100 opacity-100')}
+          className={cx('absolute inset-x-0 top-0 z-[1] cursor-text truncate pl-4 pr-12 text-left font-medium leading-[18px] text-slate-500 outline-none', small ? 'py-[10px] text-small' : 'py-[15px] text-body', expanded ? 'pointer-events-none translate-y-1 scale-105 opacity-0' : 'translate-y-0 scale-100 opacity-100')}
         >
           {placeholder}
         </button>
 
         {footer && <div className={cx('absolute bottom-2.5 left-4 right-28 z-[3] truncate text-caption text-slate-500 transition-opacity duration-300', expanded && !recording ? 'opacity-100' : 'pointer-events-none opacity-0')}>{footer}</div>}
 
-        <div className={cx('absolute bottom-2 right-12 z-[3] flex h-8 items-center justify-end gap-[3px] transition-all duration-300', recording ? 'w-16 opacity-100' : 'pointer-events-none w-0 opacity-0')} aria-hidden>
+        <div className={cx('absolute right-12 z-[3]', small ? 'bottom-[3px]' : 'bottom-2', ' flex h-8 items-center justify-end gap-[3px] transition-all duration-300', recording ? 'w-16 opacity-100' : 'pointer-events-none w-0 opacity-0')} aria-hidden>
           {levels.map((v, i) => (
             <div key={i} className="w-1 rounded-full bg-violet-600 transition-[height] duration-75 ease-out" style={{ height: Math.max(4, v * 24) }} />
           ))}
@@ -376,7 +380,7 @@ export const PromptInput = forwardRef<HTMLDivElement, PromptInputProps>(function
           onClick={action}
           disabled={showSpin}
           aria-label={showStop ? 'Stop recording' : showSpin ? 'Waiting for the answer' : showMic ? 'Speak instead of typing' : 'Go'}
-          className={cx('absolute bottom-2 right-2 z-[3] flex h-8 w-8 items-center justify-center rounded-full text-white outline-none transition-all duration-300 focus-visible:ring-2 focus-visible:ring-violet-300', showArrow && !hasValue ? 'bg-slate-300' : 'bg-violet-600 hover:bg-violet-700')}
+          className={cx('absolute right-2 z-[3] flex h-8 w-8', small ? 'bottom-[3px]' : 'bottom-2', ' items-center justify-center rounded-full text-white outline-none transition-all duration-300 focus-visible:ring-2 focus-visible:ring-violet-300', showArrow && !hasValue ? 'bg-slate-300' : 'bg-violet-600 hover:bg-violet-700')}
         >
           <span className="relative flex h-full w-full items-center justify-center">
             <span className={cx(face, showArrow ? 'rotate-0 scale-100 opacity-100' : 'pointer-events-none rotate-45 scale-50 opacity-0')}>

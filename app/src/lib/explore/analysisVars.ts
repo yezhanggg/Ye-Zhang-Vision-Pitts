@@ -35,6 +35,7 @@ export const ANALYSIS_GROUPS: GroupDef[] = [
   { id: 'an_ami', label: 'Income bands (AMI)' },
   { id: 'an_rents', label: 'Rents' },
   { id: 'an_lens', label: 'Market dynamics' },
+  { id: 'an_land', label: 'Land use' },
   { id: 'an_inputs', label: 'Measured values' },
 ];
 const ANALYSIS_GROUP_IDS = new Set(ANALYSIS_GROUPS.map((g) => g.id));
@@ -119,7 +120,20 @@ const inputVars: AnalysisVar[] = [
   def('an_svi', 'Social vulnerability', 'an_inputs', 'pct', 'Input', 'CDC Social Vulnerability Index 2022, percentile within Pennsylvania (higher = more vulnerable).', { kind: 'quantile' }, field('svi_overall')),
 ];
 
-export const ANALYSIS_VARS: AnalysisVar[] = [...answerVars, ...amiVars, ...lensVars, ...rentVars, ...inputVars];
+// Land use from the county assessment (class and use of every parcel), place.json `land_use` (Tier 2 build).
+type LandUseKey = 'residential' | 'commercial' | 'industrial' | 'vacant' | 'institutional' | 'other' | 'vacant_lots';
+type LandUse = Partial<Record<LandUseKey, number | null>>;
+const landUse = (k: LandUseKey) => (t: TractProps) => num((placeFor(t.GEOID) as { land_use?: LandUse | null } | null)?.land_use?.[k] ?? null);
+const LAND = 'Allegheny County property assessments (2026), share of parcel land (lot area) in the tract.';
+const landVars: AnalysisVar[] = [
+  def('an_land_res', 'Residential land', 'an_land', 'share', 'Parcels', `${LAND} Homes of every size, apartment buildings and public housing.`, { kind: 'quantile' }, landUse('residential')),
+  def('an_land_com', 'Commercial land', 'an_land', 'share', 'Parcels', `${LAND} Shops, offices, mixed retail with homes above, parking.`, { kind: 'quantile' }, landUse('commercial')),
+  def('an_land_ind', 'Industrial land', 'an_land', 'share', 'Parcels', `${LAND} Warehouses and manufacturing.`, { kind: 'quantile' }, landUse('industrial')),
+  def('an_land_vacant', 'Vacant land', 'an_land', 'share', 'Parcels', `${LAND} Parcels assessed as vacant land (residential, commercial or industrial).`, { kind: 'quantile' }, landUse('vacant')),
+  def('an_land_vacant_lots', 'Vacant lots', 'an_land', 'count', 'Parcels', 'Number of parcels the county assesses as vacant land (Allegheny County property assessments, 2026).', { kind: 'quantile' }, landUse('vacant_lots')),
+];
+
+export const ANALYSIS_VARS: AnalysisVar[] = [...answerVars, ...amiVars, ...lensVars, ...rentVars, ...inputVars, ...landVars];
 export const analysisVarById = new Map(ANALYSIS_VARS.map((v) => [v.id, v]));
 
 /** The variable's value for every city tract, as a ValueMap (no margins: these are not survey estimates). */

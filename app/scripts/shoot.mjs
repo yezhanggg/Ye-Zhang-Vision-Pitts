@@ -56,5 +56,15 @@ await shot('10-place-summary', 4500);
 // Explore: one variable for a municipality (rank, distribution, city/county bars, 2014-2024 line).
 await open('#m=explore&L=buildings,muni,city&g=muni&v=med_gross_rent&u=muni:4200366264', 'text=How this compares');
 await shot('11-municipality-detail', 4500);
+// The quick tour, step 3: the summary panel lit, the rest dimmed, the map flown to Hazelwood.
+await open('#m=explore', 'text=Boundary');
+await page.waitForTimeout(3000);
+await page.getByRole('button', { name: 'Tour', exact: true }).click();
+await page.waitForTimeout(1200);
+await page.getByRole('button', { name: 'Got it' }).click();
+await page.waitForTimeout(3500);
+await page.getByRole('button', { name: 'Got it' }).click();
+await shot('13-tour', 4500);
+await page.keyboard.press('Escape');
 console.log('console errors:', errors.filter((e) => !/openfreemap|favicon|404|api\/explain|mapterhorn|Failed to fetch|AJAXError/.test(e)));
 await browser.close();

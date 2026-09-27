@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { useChat, type ChatMessage } from '../explore/chat';
+import { canonicalMessages, deserializeChat, serializeChat, setPersistView, useChat, type ChatMessage } from '../explore/chat';
 import { WITHHELD, restore, strictSession, withhold } from './strictChat';
 
 const msg = (id: number, role: 'user' | 'assistant', text: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({ id, role, text, at: 0, ...extra });
@@ -65,5 +65,19 @@ describe('strictSession on the chat store', () => {
     useChat.setState({ messages: [] });
     stop();
     expect(useChat.getState().messages).toEqual([]);
+  });
+  it('withholds unchecked answers rehydrated after a reload, and storage keeps the originals', () => {
+    const saved = serializeChat({ messages: [msg(1, 'user', 'Rent?'), msg(2, 'assistant', 'Rent is $1,995.', { unchecked: true, provider: 'Test' }), msg(3, 'user', 'Ok?'), msg(4, 'assistant', 'Checked.', { checked: true })], folded: null });
+    useChat.setState({ messages: deserializeChat(saved).messages });
+    const stop = strictSession(useChat, setPersistView);
+    const shown = useChat.getState().messages;
+    expect(shown[1]).toMatchObject({ text: WITHHELD, failed: true, unchecked: false });
+    expect(shown[3].text).toBe('Checked.');
+    // what would be written to storage now is the original, still marked unchecked
+    const stored = canonicalMessages(shown);
+    expect(stored[1]).toMatchObject({ text: 'Rent is $1,995.', unchecked: true });
+    stop();
+    expect(canonicalMessages(useChat.getState().messages)).toBe(useChat.getState().messages);
+    expect(useChat.getState().messages[1].text).toBe('Rent is $1,995.');
   });
 });

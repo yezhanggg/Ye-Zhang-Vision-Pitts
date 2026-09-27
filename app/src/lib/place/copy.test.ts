@@ -25,7 +25,7 @@ describe('formats', () => {
 
 describe('stance words and fixed sentences', () => {
   it('one meaning per stance, the anti-displacement caveat, the fixed decide line, the refusals', () => {
-    expect(Object.keys(STANCE_MEANING)).toEqual(['anti_displacement', 'market_led', 'transit_first']);
+    expect(Object.keys(STANCE_MEANING)).toEqual(['anti_displacement', 'market_led', 'transit_first', 'climate_resilient']);
     expect(STANCE_CAVEAT.anti_displacement).toContain('where risk is low it favors market-rate types');
     expect(DECIDE).toBe('This page does not choose. Site, scale, sponsor, financing, zoning relief and the neighborhood plan are decisions for people; the tool shows the evidence and the arithmetic.');
     expect(REFUSES).toContain('whether a project pencils');

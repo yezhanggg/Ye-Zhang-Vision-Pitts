@@ -8,6 +8,8 @@ import { useUnit } from '../../lib/explore/remote';
 import type { Loaded, UnitFC, ValueMap, VariableDef } from '../../lib/explore/types';
 import PlaceSummary, { VariableDetail } from './PlaceSummary';
 import { Explainer } from '../primitives';
+import ExportMenu from '../export/ExportMenu';
+import { profileExportItems } from '../export/exploreExport';
 
 /**
  * Right panel for a selected place. With a variable painted it shows that variable for this place and nothing
@@ -35,11 +37,14 @@ export default function PlaceCard({ selected, fc, variable = null, values = null
               {level !== 'muni' && typeof share === 'number' && share < 0.995 && <span className="text-caption">{EXPLORE_UI.insideCity(Math.max(1, Math.round(share * 100)))}</span>}
             </div>
           </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <ExportMenu items={profileExportItems(level, geoid, props, unit.values, variable, values)} />
           <button onClick={() => setBrowse({ selected: null })} className="rounded-lg p-1.5 text-slate-500 hover:bg-stone-100 hover:text-slate-900" aria-label={EXPLORE_UI.place.close} title={EXPLORE_UI.place.close}>
             <svg viewBox="0 0 20 20" className="h-4 w-4">
               <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </button>
+          </div>
         </div>
       </div>
       <div className="space-y-5 p-4">

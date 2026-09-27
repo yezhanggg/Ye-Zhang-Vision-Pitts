@@ -2,6 +2,7 @@ import { useApp } from '../../lib/store';
 import { BOUNDARY_ROWS, EXPLORE_UI, SETTING_ROWS } from '../../lib/explore/copy';
 import { cx } from '../../lib/format';
 import { Segmented } from '../primitives';
+import { hasZoning, useZoningLayer } from '../../lib/explore/zoning';
 
 /** Accessible toggle: a button with aria-pressed, a small track and knob, label and caption. */
 export function Switch({ on, onChange, label, caption, id, disabled }: { on: boolean; onChange: (on: boolean) => void; label: string; caption?: string; id?: string; disabled?: boolean }) {
@@ -43,6 +44,18 @@ export function BoundaryPanel() {
           <Switch key={row.id} id={`layer-${row.id}`} on={!!layers[row.id]} label={row.label} caption={row.caption} onChange={(on) => setLayer(row.id, on)} />
         ))}
       </div>
+      <ZoningSwitch />
+    </div>
+  );
+}
+
+/** The city zoning map: district polygons colored by family, drawn over whichever boundary is open. */
+function ZoningSwitch() {
+  const on = useZoningLayer((s) => s.on);
+  const set = useZoningLayer((s) => s.set);
+  return (
+    <div role="group" aria-label="Map layers" className="space-y-1.5 border-t border-stone-200/80 pt-2">
+      <Switch id="layer-zoning" on={on} disabled={!hasZoning} label="Zoning districts" caption={hasZoning ? 'City of Pittsburgh zoning map (WPRDC), colored by district family' : 'Zoning map not built yet'} onChange={set} />
     </div>
   );
 }

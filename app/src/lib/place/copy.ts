@@ -15,6 +15,7 @@ export const STANCE_MEANING: Record<Stance, string> = {
   anti_displacement: 'Add homes without pushing anyone out: where risk is high, only types that add units without demolition, priced for the households already here.',
   market_led: 'Recommend only what the market pays for today, and say plainly who that leaves out.',
   transit_first: 'Put the densest feasible homes where frequent transit already runs, and fail the place when it does not.',
+  climate_resilient: 'Keep new homes out of flood zones and near frequent transit, in attached and multi-unit forms.',
 };
 
 /** The stance's preset weights, in words (the digits live in config/scoring.json). */
@@ -22,12 +23,14 @@ export const STANCE_WEIGHTS_WORDS: Record<Stance, string> = {
   anti_displacement: 'Weights displacement risk most, need next, market strength least.',
   market_led: 'Weights market strength most; need, displacement risk and subsidy eligibility least.',
   transit_first: 'Weights transit access most; every other factor counts the same.',
+  climate_resilient: 'Weights flood exposure most, transit access next, 2–4 unit homes a little more, market strength least.',
 };
 
 export const STANCE_CAVEAT: Partial<Record<Stance, string>> = {
   anti_displacement: 'It ranks building types and protects no one by itself; where risk is low it favors market-rate types.',
   market_led: 'It never recommends a subsidized home, so where the market does not pay it recommends nothing.',
   transit_first: 'It reads transit as it runs in June 2026; a service cut or a new line changes the answer.',
+  climate_resilient: 'Flood reads FEMA zones only (no future-rain model); embodied carbon is not modeled (no Pittsburgh data).',
 };
 
 /** The fixed "You decide" sentence (plan §3). */
@@ -52,6 +55,7 @@ export const RULES_IN_WORDS: string[] = [
   `Anti-displacement: risk at or above ${THRESHOLDS.displacement_high} → only types that add homes without demolition, for the ≤50% band, subsidized; below ${THRESHOLDS.displacement_low} → affordable homes through gentle density; between → the target band with the same additive preference.`,
   'Market-led: only what the market pays (asking 2BR at or above the ZIP Fair Market Rent and sales at or above the city median), else "No unsubsidized product is supported here"; always says who is not served.',
   `Transit-first: at least ${fmtShare(THRESHOLDS.transit_share_qmi)} of residents within a quarter mile of a frequent stop (≥ ${THRESHOLDS.frequent_stop_departures} weekday departures) or ≥ ${fmtCount(THRESHOLDS.transit_departures_qmi)} weekday departures within a quarter mile, then the densest feasible type; else "fails the transit test".`,
+  `Climate-resilient: FEMA flood-zone land at most ${THRESHOLDS.climate_flood_max_pct}% of the tract (else "not suggested here") and the nearest frequent stop within the planner's transit distance (${THRESHOLDS.climate_transit_default_mi} mile when none is chosen; else "too far from frequent transit"), then attached and multi-unit forms before the ADU. Fewer car trips and less energy per home; embodied carbon is not modeled (no Pittsburgh data).`,
   `Lot pattern: ADUs and 2–4 conversions read as supported at ${fmtShare(THRESHOLDS.lot_units_2_4_share)} of homes in 2–4 unit buildings or ${THRESHOLDS.lot_parcels_2_4} such parcels; new build on vacant land at ${THRESHOLDS.lot_vacant_parcels} vacant parcels, else infill only. Flood: FEMA share above ${THRESHOLDS.flood_check_site_pct}% reads "check the site". Zoning: by right at ${THRESHOLDS.zoning_by_right_share_pct}% land share, unverified. None of these is a gate.`,
   `A for-sale home is within a band's reach at up to ${THRESHOLDS.own_price_to_income} times the band's four-person income limit (a rule of thumb, not underwriting).`,
 ];

@@ -332,13 +332,12 @@ export function HistogramChart({ data, fmt, marker, refs, many }: { data: Histog
 }
 
 // ------------------------------------------------------------------ rank / percentile bar
-/** A 0–1 position on a track with the label at the marker. */
+/** A 0–1 value as a plain filled bar (no knob, so it never reads as a slider). */
 export function RankBar({ pct, label, color = SERIES.place }: { pct: number | null; label?: string; color?: string }) {
   if (pct == null) return <div className="hatch h-2 rounded-full" />;
   return (
-    <div className="relative h-2 rounded-full bg-stone-200" role="img" aria-label={label ?? `${Math.round(pct * 100)}%`}>
-      <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.max(2, pct * 100)}%`, background: color, opacity: 0.35 }} />
-      <span className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-white" style={{ left: `${pct * 100}%`, background: color }} />
+    <div className="relative h-2.5 bg-stone-100" role="img" aria-label={label ?? `${Math.round(pct * 100)}%`}>
+      <div className="absolute inset-y-0 left-0" style={{ width: `${Math.max(2, pct * 100)}%`, background: color, opacity: 0.8 }} />
     </div>
   );
 }

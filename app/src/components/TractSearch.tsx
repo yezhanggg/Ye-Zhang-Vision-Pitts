@@ -21,6 +21,8 @@ interface Props {
   currentLabel?: string | null;
   /** Message for a result that falls outside the resolvable area. */
   outsideText?: string;
+  /** Compact 40 px field (Compare places toolbar). */
+  dense?: boolean;
 }
 
 const GROUP_TITLE: Record<string, string> = { neighborhood: 'Neighborhoods', tract: 'Census tracts', address: 'Addresses & places' };
@@ -72,7 +74,7 @@ export async function enterWith(q: string, resolve: (r: GeoResult) => Resolved, 
   return outside ?? { ok: false, reason: 'notfound' };
 }
 
-export default function TractSearch({ value, onChange, tag, tagColor = '#7c3aed', placeholder = UI.searchPlaceholder, showQuickPicks = true, exclude, label = 'Search', resolve, currentLabel, outsideText = UI.outsideCity }: Props) {
+export default function TractSearch({ value, onChange, tag, tagColor = '#7c3aed', placeholder = UI.searchPlaceholder, showQuickPicks = true, exclude, label = 'Search', resolve, currentLabel, outsideText = UI.outsideCity, dense = false }: Props) {
   const pin = useApp((s) => s.pin);
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
@@ -158,7 +160,7 @@ export default function TractSearch({ value, onChange, tag, tagColor = '#7c3aed'
   return (
     <div className="space-y-2">
       <div className="relative">
-        <div className={cx('flex items-center gap-2 rounded-xl bg-white px-3 py-2.5 ring-1 transition-shadow', open ? 'ring-violet-400 shadow-[0_0_0_4px_rgba(124,58,237,0.12)]' : 'ring-stone-300 hover:ring-stone-400')}>
+        <div className={cx('flex items-center gap-2 bg-white px-3 ring-1 transition-shadow', dense ? 'h-10 rounded-lg pl-2' : 'rounded-xl py-2.5', open ? 'ring-violet-400 shadow-[0_0_0_4px_rgba(124,58,237,0.12)]' : 'ring-stone-300 hover:ring-stone-400')}>
           {tag ? (
             <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-caption font-bold text-white" style={{ background: tagColor }}>
               {tag}

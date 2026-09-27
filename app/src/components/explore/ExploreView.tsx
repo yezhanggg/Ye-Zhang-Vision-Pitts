@@ -19,13 +19,17 @@ import MapView, { type IntroPhase, type OverlayLayer } from '../MapView';
 import IntroOverlay from '../IntroOverlay';
 import PanelFrame, { RightColumn } from '../PanelFrame';
 import Rail, { RailSection } from '../Rail';
+import TourNotice from '../tour/TourNotice';
+import { useTour } from '../../lib/tour';
 import ChatBox from './ChatBox';
-import DataLegend from './DataLegend';
+import DataLegend, { ZoningLegend } from './DataLegend';
 import DataPanel from './DataPanel';
-import DataTooltip from './DataTooltip';
+import DataTooltip, { ZoningTooltip } from './DataTooltip';
+import { useZoningLayer, zoningFC, zoningPaint } from '../../lib/explore/zoning';
 import { BoundaryPanel, SettingsPanel } from './LayersPanel';
 import PlaceCard from './PlaceCard';
 import VariableSummary from './VariableSummary';
+import { registerMap } from '../../lib/export/mapRegistry';
 
 /** The built-in tract layers are hidden in Explore; this keeps their paint effect inert. */
 const EMPTY_PAINT: MapPaint = { kind: 'cat', palette: ['#e7e5e4'], values: new Map() };
@@ -33,6 +37,8 @@ const zoomWidth = (z0: number, w0: number, z1: number, w1: number) => ['interpol
 
 type BoundaryId = 'tracts' | 'bg' | 'zcta' | 'muni' | 'city';
 const NEUTRAL_FILL = { color: '#64748b', opacity: 0.08 };
+const ZONING_OPACITY = ['interpolate', ['linear'], ['zoom'], 11, 0.72, 15, 0.5] as unknown as ExpressionSpecification;
+const ZONING_LINE: OverlayLayer['line'] = { color: '#ffffff', width: zoomWidth(10, 0.4, 15, 1.4), opacity: 0.9 };
 const SKIP_KEY = 'visionpitts.skipIntro';
 const readSkip = () => {
   try {
@@ -85,6 +91,8 @@ export default function ExploreView() {
   const hintClosed = useApp((s) => s.hintClosed);
   const setBrowse = useApp((s) => s.setBrowse);
   const set = useApp((s) => s.set);
+  const zoningOn = useZoningLayer((s) => s.on);
+  const [zoningHover, setZoningHover] = useState<string | null>(null);
   // The globe → Pittsburgh flight plays once after the landing page's Open button (not on deep links, not with reduced motion).
   const [intro] = useState(() => useApp.getState().introNonce > 0 && !useApp.getState().introDone && !readSkip() && !lite);
   const [phase, setPhase] = useState<IntroPhase>(intro ? 'spin' : 'done');
@@ -141,13 +149,21 @@ export default function ExploreView() {
         onSelect: (geoid) => setBrowse({ selected: { level, geoid } }),
       });
     }
+    // The zoning map sits over the boundary fill (its own hover tooltip); clicks still reach the boundary below.
+    if (zoningOn) {
+      out.push({ id: 'zoning', data: zoningFC as OverlayLayer['data'], idField: 'code', line: ZONING_LINE, fill: { paint: zoningPaint, opacity: ZONING_OPACITY }, interactive: true, tooltip: (code) => <ZoningTooltip code={code} /> });
+    }
     if (cityOnly) out.push({ id: 'city', data: cityGeo.data, idField: 'GEOID', line: lineFor('city', false), selectedId: null });
     return out;
-  }, [open, layerId, level, cityOnly, browseGeo.data, cityGeo.data, selected, fillPaint, browseIndex, variable, values, setBrowse]);
+  }, [open, layerId, level, cityOnly, browseGeo.data, cityGeo.data, selected, fillPaint, browseIndex, variable, values, setBrowse, zoningOn]);
 
   const chat = useMemo<ChatScope>(() => ({ level, cityOnly, fc: browseGeo.data, selected: selected?.geoid ?? null, variable, values, weights }), [level, cityOnly, browseGeo.data, selected, variable, values, weights]);
   const panelKey = selected ? `place:${selected.level}:${selected.geoid}:${variable?.id ?? ''}` : variable ? `var:${variable.id}` : 'overview';
-  const showHint = phase === 'done' && open && !variable && !selected && !hintClosed;
+  const tourActive = useTour((s) => s.active);
+  const noticeClosed = useTour((s) => s.noticeClosed);
+  const tourCue = useTour((s) => s.cue);
+  const showNotice = phase === 'done' && !noticeClosed && !tourActive;
+  const showHint = phase === 'done' && open && !variable && !selected && !hintClosed && !tourActive;
 
   return (
     <div className="relative h-full">
@@ -163,7 +179,11 @@ export default function ExploreView() {
         pin={pin}
         elevationReadout
         overlays={overlays}
-        onHover={(id) => {
+        onHover={(id, overlayId) => {
+          if (overlayId === 'zoning') {
+            setZoningHover(id);
+            return;
+          }
           if (useApp.getState().hoverId !== id) set({ hoverId: id });
         }}
         padding={padding}
@@ -173,6 +193,8 @@ export default function ExploreView() {
           setPhase(p);
           if (p === 'done') set({ introDone: true });
         }}
+        cue={tourCue?.part === 'explore' ? tourCue : null}
+        onMapReady={registerMap('explore')}
       />
       <IntroOverlay
         phase={phase}
@@ -200,7 +222,7 @@ export default function ExploreView() {
       {phase === 'done' && (
         <RightColumn>
           <ChatBox scope={chat} resolve={resolve} onGo={(geoid) => setBrowse({ selected: { level, geoid } })} />
-          <PanelFrame inline open={panelOpen} onToggle={(o) => set({ browsePanel: o })} title={EXPLORE_UI.summaryTab}>
+          <PanelFrame inline tourId="summary" open={panelOpen} onToggle={(o) => set({ browsePanel: o })} title={EXPLORE_UI.summaryTab}>
             <AnimatePresence mode="wait" initial={false}>
               <motion.div key={panelKey} className={selected || variable ? undefined : 'h-full'} initial={lite ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={lite ? undefined : { opacity: 0, y: -6 }} transition={{ duration: 0.16 }}>
                 {selected ? <PlaceCard selected={selected} fc={browseGeo.data} variable={variable} values={loaded} /> : variable && loaded ? <VariableSummary variable={variable} level={level} values={loaded} fc={browseGeo.data} /> : <EmptySummary />}
@@ -209,9 +231,10 @@ export default function ExploreView() {
           </PanelFrame>
         </RightColumn>
       )}
+      <TourNotice show={showNotice} />
       <AnimatePresence>
         {showHint && (
-          <motion.div key="hint" initial={lite ? false : { opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="absolute left-1/2 top-16 z-20 -translate-x-1/2" role="status">
+          <motion.div key="hint" layout={!lite} initial={lite ? false : { opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className={cx('absolute left-1/2 z-20 -translate-x-1/2', showNotice ? 'top-[6.75rem]' : 'top-16')} role="status">
             <div className="flex items-center gap-2 rounded-full bg-slate-900/90 py-1.5 pl-3.5 pr-1.5 text-small font-medium text-white shadow-lg backdrop-blur">
               <MousePointerClick className="h-4 w-4 shrink-0 text-violet-200" />
               <span className="whitespace-nowrap">{EXPLORE_UI.hint}</span>
@@ -223,9 +246,10 @@ export default function ExploreView() {
         )}
       </AnimatePresence>
       <AnimatePresence>
-        {phase === 'done' && variable && values && (
-          <motion.div key="legend" initial={lite ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className={cx('absolute bottom-3 z-20 transition-[left] duration-200', left ? 'left-[364px] xl:left-[384px]' : 'left-3')}>
-            <DataLegend variable={variable} level={level} values={values} breaks={breaks} ext={ext} hoverId={hoverId} />
+        {phase === 'done' && ((variable && values) || zoningOn) && (
+          <motion.div key="legend" initial={lite ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className={cx('absolute bottom-3 z-20 flex items-end gap-2 transition-[left] duration-200', left ? 'left-[364px] xl:left-[384px]' : 'left-3')}>
+            {variable && values && <DataLegend variable={variable} level={level} values={values} breaks={breaks} ext={ext} hoverId={hoverId} />}
+            {zoningOn && <ZoningLegend hoverCode={zoningHover} />}
           </motion.div>
         )}
       </AnimatePresence>

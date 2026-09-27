@@ -15,8 +15,13 @@ const yn = (v: boolean | null) => (v == null ? NA : v ? 'yes' : 'no');
 
 /** District shares as "R1D-M 62% · LNC 20%", largest first, shares under 1% dropped. */
 export function districtText(shares: Record<string, number>): string {
+  // place.json stores land shares as 0–1 fractions; older data used percents. Scale fractions to percents.
+  const vals = Object.values(shares).filter(isNum);
+  const scale = vals.length && Math.max(...vals) <= 1 ? 100 : 1;
   const rows = Object.entries(shares)
-    .filter(([, v]) => isNum(v) && v >= 1)
+    .filter(([, v]) => isNum(v))
+    .map(([k, v]) => [k, v * scale] as [string, number])
+    .filter(([, v]) => v >= 1)
     .sort((a, b) => b[1] - a[1]);
   return rows.length ? rows.map(([k, v]) => `${k} ${Math.round(v)}%`).join(' · ') : NA;
 }

@@ -5,6 +5,7 @@ import { allResults } from '../lib/derived';
 import { buildPaint } from '../lib/paint';
 import { HERO_VIEW } from '../lib/mapStyle';
 import { presetWeights, useApp } from '../lib/store';
+import { useTour } from '../lib/tour';
 import MapView from './MapView';
 import { AboutModal } from './LandingModals';
 
@@ -39,6 +40,7 @@ export default function LandingPage() {
   const enter = () => {
     const s = useApp.getState();
     // A fresh visit starts clean: nothing selected, nothing painted, the summary folded away and the tip back.
+    useTour.getState().reset();
     useApp.setState({ view: 'app', mode: 'explore', introNonce: s.introNonce + 1, introDone: false, hintClosed: false, browsePanel: false, browse: { level: s.browse.level, variable: null, selected: null } });
   };
 

@@ -210,7 +210,10 @@ SOURCES: list[dict] = [
          method="Districts (zon_new) grouped into families (config/zoning_rules.json); share of each tract polygon's area in "
                 "each family (EPSG:2272). By-type annotations (ADU, 2-3 unit, townhome, small apartment, senior housing) read "
                 "yes / conditional / no / unknown when >= 5% of the tract's land lies in a family the table marks so, in that "
-                "order. Cached under data/raw/benchmark/zoning/.",
+                "order. Cached under data/raw/benchmark/zoning/. The Explore zoning map (app/src/data/zoning_districts.json, "
+                "src/visionpitts/zoning_map.py) dissolves the polygons by district code, simplifies them at 5 m in EPSG:2272, "
+                "keeps 5-decimal coordinates and colors nine display families; each district carries the same unverified "
+                "by-right statuses.",
          caveats="The by-right table is UNVERIFIED (verified: false) and must be confirmed against Pittsburgh Code Title 9; the "
                  "ADU column depends on the 2025 ordinance. Shown as an annotation, never a gate; programs (QCT, DDA, OZ, CDBG) "
                  "are a separate line. Mount Oliver Borough polygons are unmapped."),
@@ -228,7 +231,11 @@ SOURCES: list[dict] = [
          method="Parcels placed in tracts by the representative point of their polygon (cached in data/interim). Per tract: "
                 "median SALEPRICE of VALID SALE records dated on or after 2023-01-01 for residential dwelling uses (single family, "
                 "rowhouse, townhouse, two/three/four family, condominium) and its count; the same pooled over queen neighbors; "
-                "count of two- to four-family parcels; count of parcels whose use contains VACANT.",
+                "count of two- to four-family parcels; count of parcels whose use contains VACANT. Land use: each parcel's CLASSDESC "
+                "and USEDESC map to residential (residential class, apartment buildings and public housing), commercial, industrial, vacant (use "
+                "contains VACANT), institutional (government, charitable-exempt, churches, cemeteries, private schools) or other "
+                "(utilities, railroads, agriculture); per tract the share of parcel land (LOTAREA) and of parcels in each class "
+                "and the vacant-lot count.",
          caveats="FAIRMARKETTOTAL is a 2012 base-year assessment and is never read. Few tracts have many valid sales in 33 "
                  "months; the count is shown beside every median. Condominium units are separate parcels."),
     dict(id="lodes_wac", name="LEHD LODES 8 Workplace Area Characteristics, Pennsylvania, all jobs (S000, JT00), 2023",

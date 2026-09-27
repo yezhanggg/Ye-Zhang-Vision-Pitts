@@ -33,8 +33,8 @@ describe('copy', () => {
     expect(fitText(0.744)).toBe('Best fit under your stance');
     expect(fitText(null)).toBe('No score');
   });
-  it('offers three stances; Balanced stays a labeled reference', () => {
-    expect([...APP_STANCES]).toEqual(['anti_displacement', 'market_led', 'transit_first']);
+  it('offers four stances; Balanced stays a labeled reference', () => {
+    expect([...APP_STANCES]).toEqual(['anti_displacement', 'market_led', 'transit_first', 'climate_resilient']);
     expect(isStance('balanced')).toBe(false);
     expect(isStance('market_led')).toBe(true);
     for (const s of APP_STANCES) expect(STANCE_MEANING[s]).toMatch(/\.$/);

@@ -12,14 +12,14 @@ const MEANINGFUL = 0.005;
 /** Always show at least this many compared rows, even when every gap is small. */
 const MIN_SHOWN = 3;
 
-/** Hex color with an alpha suffix, for a light tint of a side's color. */
+/** Hex color with an alpha suffix, for a light tint of a side's color ("14" is about 8%). */
 const tint = (hex: string, a: string) => (/^#[0-9a-f]{6}$/i.test(hex) ? `${hex}${a}` : hex);
 
 /**
- * "Why they differ" as a two-sided table: place A's column on the left, place B's on the right, the factor in the
- * middle with an arrow pointing to the side it favors for the basis type. Rows come from `factorDeltasSafe`; a factor
- * missing on either side reads "no data" in grey, never favors anyone and sits last. Factors with little effect are
- * folded under "Other factors (n)".
+ * "Why they differ" as a three-column table in the same row rhythm as At a glance: the factor, then place A's and
+ * place B's values right-aligned. The side a factor favors for the basis type gets a light tint of its color and a
+ * small ● marker. Rows come from `factorDeltasSafe`; a factor missing on either side reads "no data" in grey, never
+ * favors anyone and sits last. Factors with little effect are folded under "Other factors (n)".
  */
 export default function FactorDeltaBars({ rows, ta, tb, colorA, colorB, labelA, labelB, typology }: { rows: SafeDeltaRow[]; ta: TractProps; tb: TractProps; colorA: string; colorB: string; labelA: string; labelB: string; typology: string }) {
   const compared = rows.filter((r) => r.missing == null);
@@ -32,6 +32,14 @@ export default function FactorDeltaBars({ rows, ta, tb, colorA, colorB, labelA, 
   const val = (x: number | null, subsidy: boolean) => (x == null ? 'no data' : subsidy ? subsidyShort(x) : pctShort(x));
   const favors = (r: SafeDeltaRow): 'a' | 'b' | null => (r.gap == null || Math.abs(r.gap) < 0.002 ? null : r.gap > 0 ? 'a' : 'b');
 
+  const cols = (
+    <colgroup>
+      <col />
+      <col className="w-[30%]" />
+      <col className="w-[30%]" />
+    </colgroup>
+  );
+
   const row = (r: SafeDeltaRow) => {
     const sub = r.factor === 'subsidy_eligible';
     const gone = r.missing != null;
@@ -43,25 +51,20 @@ export default function FactorDeltaBars({ rows, ta, tb, colorA, colorB, labelA, 
       const win = f === side;
       const color = side === 'a' ? colorA : colorB;
       return (
-        <td className={cx('px-2 py-1.5 text-caption', side === 'a' ? 'rounded-l-md text-right' : 'rounded-r-md text-left', v == null ? 'italic text-slate-400' : win ? 'font-semibold' : 'text-slate-600')} style={win ? { color, background: tint(color, '14') } : undefined}>
+        <td className={cx('px-2 py-1.5 text-right text-small tnum', v == null ? 'text-caption text-slate-400' : 'font-medium text-slate-900')} style={win ? { background: tint(color, '14') } : undefined}>
+          {win && (
+            <span className="mr-1.5 align-middle text-[9px] leading-none" style={{ color }} aria-hidden>
+              ●
+            </span>
+          )}
           {val(v, sub)}
         </td>
       );
     };
     return (
-      <tr key={r.factor} data-row={r.factor} data-missing={r.missing ?? undefined} title={title} aria-label={`${fLabel(r.factor)}: ${title}`} className="border-t border-stone-100">
+      <tr key={r.factor} data-row={r.factor} data-missing={r.missing ?? undefined} title={title} aria-label={`${fLabel(r.factor)}: ${title}`} className="border-t border-stone-200/70">
+        <td className={cx('py-1.5 pr-2 text-small leading-snug', gone ? 'text-slate-400' : 'text-slate-600')}>{fLabel(r.factor)}</td>
         {cell('a')}
-        <td className={cx('px-1 py-1.5 text-center text-caption', gone ? 'text-slate-400' : 'font-medium text-slate-800')}>
-          <span className="inline-flex items-center gap-1">
-            <span className="w-3 text-right font-bold" style={{ color: colorA }} aria-hidden>
-              {f === 'a' ? '◀' : ''}
-            </span>
-            {fLabel(r.factor)}
-            <span className="w-3 text-left font-bold" style={{ color: colorB }} aria-hidden>
-              {f === 'b' ? '▶' : ''}
-            </span>
-          </span>
-        </td>
         {cell('b')}
       </tr>
     );
@@ -70,52 +73,36 @@ export default function FactorDeltaBars({ rows, ta, tb, colorA, colorB, labelA, 
   const head = (
     <thead>
       <tr className="text-caption">
-        <th className="w-[30%] px-2 pb-1.5 text-right font-semibold" style={{ color: colorA }}>
-          <span className="inline-flex items-center justify-end gap-1.5">
-            <span className="truncate" title={labelA}>{labelA}</span>
-            <span className="grid h-4 w-4 shrink-0 place-items-center rounded text-[10px] font-bold text-white" style={{ background: colorA }}>
-              A
-            </span>
-          </span>
-        </th>
-        <th className="px-1 pb-1.5 text-center font-medium text-slate-500">Factor</th>
-        <th className="w-[30%] px-2 pb-1.5 text-left font-semibold" style={{ color: colorB }}>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="grid h-4 w-4 shrink-0 place-items-center rounded text-[10px] font-bold text-white" style={{ background: colorB }}>
-              B
-            </span>
-            <span className="truncate" title={labelB}>{labelB}</span>
-          </span>
-        </th>
+        <th className="pb-1 text-left font-normal text-slate-500">Factor</th>
+        {([['A', labelA, colorA], ['B', labelB, colorB]] as const).map(([tag, label, color]) => (
+          <th key={tag} className="truncate border-b-2 pb-1 text-right font-medium" style={{ color, borderColor: color }} title={label}>
+            {tag}
+            <span className="mx-1 text-slate-300">·</span>
+            {label}
+          </th>
+        ))}
       </tr>
     </thead>
   );
 
   return (
-    <div className="rounded-xl bg-white p-2 ring-1 ring-stone-200/80">
-      <table className="w-full table-fixed border-separate border-spacing-0" data-testid="delta-rows">
+    <div>
+      <table className="w-full table-fixed border-collapse" data-testid="delta-rows">
+        {cols}
         {head}
-        <tbody>
-          {shown.map(row)}
-        </tbody>
+        <tbody className="border-b border-stone-200/70">{shown.map(row)}</tbody>
       </table>
       {rest.length > 0 && (
         <details className="group mt-1">
-          <summary className="cursor-pointer select-none rounded-md px-2 py-1 text-caption font-medium text-slate-600 hover:bg-stone-50">Other factors ({rest.length}) · little effect</summary>
-          <table className="w-full table-fixed border-separate border-spacing-0">
-            <colgroup>
-              <col className="w-[30%]" />
-              <col />
-              <col className="w-[30%]" />
-            </colgroup>
-            <tbody>
-              {rest.map(row)}
-            </tbody>
+          <summary className="cursor-pointer select-none py-1 text-caption text-slate-600 hover:text-slate-900">Other factors ({rest.length}) · little effect</summary>
+          <table className="w-full table-fixed border-collapse">
+            {cols}
+            <tbody className="border-b border-stone-200/70">{rest.map(row)}</tbody>
           </table>
         </details>
       )}
-      <p className="mt-1.5 px-2 text-caption text-slate-500">
-        <span style={{ color: colorA }}>◀</span> / <span style={{ color: colorB }}>▶</span> points to the place the factor favors for {typology}, using your priorities. Percentages compare each place with all residential city tracts.
+      <p className="mt-1.5 text-[11px] leading-snug text-slate-500">
+        ● and the shading mark the place the factor favors for {typology}, using your priorities. Percentages compare each place with all residential city tracts.
       </p>
     </div>
   );

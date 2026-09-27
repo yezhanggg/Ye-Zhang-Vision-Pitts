@@ -19,7 +19,7 @@ export type TypeBandId = 'le30' | 'b30_50' | 'b50_80' | 'gt80';
 export type HouseholdType = 'elderly_alone' | 'elderly_family' | 'small_family' | 'large_family' | 'other';
 export type HouseholdTypes = Record<HouseholdType, number>;
 
-export type Stance = 'anti_displacement' | 'market_led' | 'transit_first';
+export type Stance = 'anti_displacement' | 'market_led' | 'transit_first' | 'climate_resilient';
 export type Bedrooms = 0 | 1 | 2 | 3;
 export type Typology = 'adu' | 'duplex_triplex' | 'townhome' | 'small_apartment' | 'senior';
 export type ZoningStatus = 'yes' | 'conditional' | 'no' | 'unknown';

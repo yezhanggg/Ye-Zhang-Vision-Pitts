@@ -144,6 +144,39 @@
    "tie": true
   },
   {
+   "name": "all mid / climate_resilient",
+   "x": {
+    "need": 0.5,
+    "market_strength": 0.5,
+    "displacement_risk": 0.5,
+    "subsidy_eligible": 0.5,
+    "transit_access": 0.5,
+    "flood_exposure": 0.5,
+    "senior_demand": 0.5,
+    "small_multifamily_stock": 0.5
+   },
+   "weights": {
+    "need": 1,
+    "market_strength": 0.5,
+    "displacement_risk": 1,
+    "subsidy_eligible": 1,
+    "transit_access": 2,
+    "flood_exposure": 3,
+    "senior_demand": 1,
+    "small_multifamily_stock": 1.5
+   },
+   "scores": {
+    "adu": 0.5,
+    "duplex_triplex": 0.5,
+    "townhome": 0.5,
+    "small_apartment": 0.5,
+    "senior": 0.5
+   },
+   "top": "adu",
+   "margin": 0.0,
+   "tie": true
+  },
+  {
    "name": "high need low market / balanced",
    "x": {
     "need": 0.95,
@@ -273,6 +306,39 @@
    },
    "top": "senior",
    "margin": 0.001360329009806982,
+   "tie": true
+  },
+  {
+   "name": "high need low market / climate_resilient",
+   "x": {
+    "need": 0.95,
+    "market_strength": 0.1,
+    "displacement_risk": 0.8,
+    "subsidy_eligible": 1.0,
+    "transit_access": 0.6,
+    "flood_exposure": 0.2,
+    "senior_demand": 0.7,
+    "small_multifamily_stock": 0.3
+   },
+   "weights": {
+    "need": 1,
+    "market_strength": 0.5,
+    "displacement_risk": 1,
+    "subsidy_eligible": 1,
+    "transit_access": 2,
+    "flood_exposure": 3,
+    "senior_demand": 1,
+    "small_multifamily_stock": 1.5
+   },
+   "scores": {
+    "adu": 0.6944444444444445,
+    "duplex_triplex": 0.6753846153846155,
+    "townhome": 0.6522727272727273,
+    "small_apartment": 0.7584070796460177,
+    "senior": 0.7562737642585551
+   },
+   "top": "small_apartment",
+   "margin": 0.002133315387462642,
    "tie": true
   },
   {
@@ -408,6 +474,39 @@
    "tie": false
   },
   {
+   "name": "strong market low need / climate_resilient",
+   "x": {
+    "need": 0.1,
+    "market_strength": 0.95,
+    "displacement_risk": 0.2,
+    "subsidy_eligible": 0.0,
+    "transit_access": 0.5,
+    "flood_exposure": 0.1,
+    "senior_demand": 0.3,
+    "small_multifamily_stock": 0.2
+   },
+   "weights": {
+    "need": 1,
+    "market_strength": 0.5,
+    "displacement_risk": 1,
+    "subsidy_eligible": 1,
+    "transit_access": 2,
+    "flood_exposure": 3,
+    "senior_demand": 1,
+    "small_multifamily_stock": 1.5
+   },
+   "scores": {
+    "adu": 0.6483333333333333,
+    "duplex_triplex": 0.5769230769230769,
+    "townhome": 0.8397727272727272,
+    "small_apartment": 0.47300884955752215,
+    "senior": 0.5903041825095057
+   },
+   "top": "townhome",
+   "margin": 0.1914393939393939,
+   "tie": false
+  },
+  {
    "name": "partial subsidy, many 2-4 unit homes / balanced",
    "x": {
     "need": 0.6,
@@ -537,6 +636,39 @@
    },
    "top": "duplex_triplex",
    "margin": 0.029640151515151536,
+   "tie": false
+  },
+  {
+   "name": "partial subsidy, many 2-4 unit homes / climate_resilient",
+   "x": {
+    "need": 0.6,
+    "market_strength": 0.45,
+    "displacement_risk": 0.55,
+    "subsidy_eligible": 0.5,
+    "transit_access": 0.5,
+    "flood_exposure": 0.3,
+    "senior_demand": 0.2,
+    "small_multifamily_stock": 0.95
+   },
+   "weights": {
+    "need": 1,
+    "market_strength": 0.5,
+    "displacement_risk": 1,
+    "subsidy_eligible": 1,
+    "transit_access": 2,
+    "flood_exposure": 3,
+    "senior_demand": 1,
+    "small_multifamily_stock": 1.5
+   },
+   "scores": {
+    "adu": 0.661111111111111,
+    "duplex_triplex": 0.6853846153846154,
+    "townhome": 0.6261363636363635,
+    "small_apartment": 0.5730088495575221,
+    "senior": 0.5602661596958175
+   },
+   "top": "duplex_triplex",
+   "margin": 0.024273504273504387,
    "tie": false
   },
   {
@@ -672,6 +804,39 @@
    "tie": false
   },
   {
+   "name": "many residents 65 and over / climate_resilient",
+   "x": {
+    "need": 0.4,
+    "market_strength": 0.3,
+    "displacement_risk": 0.5,
+    "subsidy_eligible": 1.0,
+    "transit_access": 0.7,
+    "flood_exposure": 0.2,
+    "senior_demand": 0.98,
+    "small_multifamily_stock": 0.1
+   },
+   "weights": {
+    "need": 1,
+    "market_strength": 0.5,
+    "displacement_risk": 1,
+    "subsidy_eligible": 1,
+    "transit_access": 2,
+    "flood_exposure": 3,
+    "senior_demand": 1,
+    "small_multifamily_stock": 1.5
+   },
+   "scores": {
+    "adu": 0.628888888888889,
+    "duplex_triplex": 0.5953846153846154,
+    "townhome": 0.7113636363636364,
+    "small_apartment": 0.6805309734513274,
+    "senior": 0.7827376425855513
+   },
+   "top": "senior",
+   "margin": 0.07137400622191492,
+   "tie": false
+  },
+  {
    "name": "missing market / balanced",
    "x": {
     "need": 0.7,
@@ -801,6 +966,39 @@
    },
    "top": "small_apartment",
    "margin": 0.03681818181818186,
+   "tie": false
+  },
+  {
+   "name": "missing market / climate_resilient",
+   "x": {
+    "need": 0.7,
+    "market_strength": null,
+    "displacement_risk": 0.6,
+    "subsidy_eligible": 1.0,
+    "transit_access": 0.3,
+    "flood_exposure": 0.9,
+    "senior_demand": 0.5,
+    "small_multifamily_stock": 0.6
+   },
+   "weights": {
+    "need": 1,
+    "market_strength": 0.5,
+    "displacement_risk": 1,
+    "subsidy_eligible": 1,
+    "transit_access": 2,
+    "flood_exposure": 3,
+    "senior_demand": 1,
+    "small_multifamily_stock": 1.5
+   },
+   "scores": {
+    "adu": 0.2823529411764706,
+    "duplex_triplex": 0.33650793650793653,
+    "townhome": 0.17435897435897435,
+    "small_apartment": 0.4163636363636364,
+    "senior": 0.3246153846153846
+   },
+   "top": "small_apartment",
+   "margin": 0.07985569985569985,
    "tie": false
   },
   {
@@ -936,6 +1134,39 @@
    "tie": false
   },
   {
+   "name": "missing both new factors / climate_resilient",
+   "x": {
+    "need": 0.7,
+    "market_strength": 0.4,
+    "displacement_risk": 0.6,
+    "subsidy_eligible": 0.5,
+    "transit_access": 0.3,
+    "flood_exposure": 0.9,
+    "senior_demand": null,
+    "small_multifamily_stock": null
+   },
+   "weights": {
+    "need": 1,
+    "market_strength": 0.5,
+    "displacement_risk": 1,
+    "subsidy_eligible": 1,
+    "transit_access": 2,
+    "flood_exposure": 3,
+    "senior_demand": 1,
+    "small_multifamily_stock": 1.5
+   },
+   "scores": {
+    "adu": 0.25432098765432093,
+    "duplex_triplex": 0.26037735849056604,
+    "townhome": 0.1886363636363636,
+    "small_apartment": 0.3628318584070796,
+    "senior": 0.24935064935064932
+   },
+   "top": "small_apartment",
+   "margin": 0.10245449991651356,
+   "tie": false
+  },
+  {
    "name": "only need has data / balanced",
    "x": {
     "need": 0.7,
@@ -1068,6 +1299,39 @@
    "tie": true
   },
   {
+   "name": "only need has data / climate_resilient",
+   "x": {
+    "need": 0.7,
+    "market_strength": null,
+    "displacement_risk": null,
+    "subsidy_eligible": null,
+    "transit_access": null,
+    "flood_exposure": null,
+    "senior_demand": null,
+    "small_multifamily_stock": null
+   },
+   "weights": {
+    "need": 1,
+    "market_strength": 0.5,
+    "displacement_risk": 1,
+    "subsidy_eligible": 1,
+    "transit_access": 2,
+    "flood_exposure": 3,
+    "senior_demand": 1,
+    "small_multifamily_stock": 1.5
+   },
+   "scores": {
+    "adu": 0.7,
+    "duplex_triplex": 0.7,
+    "townhome": null,
+    "small_apartment": 0.7,
+    "senior": 0.7
+   },
+   "top": "adu",
+   "margin": 0.0,
+   "tie": true
+  },
+  {
    "name": "nothing / balanced",
    "x": {
     "need": null,
@@ -1187,6 +1451,39 @@
     "flood_exposure": 1,
     "senior_demand": 1,
     "small_multifamily_stock": 1
+   },
+   "scores": {
+    "adu": null,
+    "duplex_triplex": null,
+    "townhome": null,
+    "small_apartment": null,
+    "senior": null
+   },
+   "top": null,
+   "margin": null,
+   "tie": false
+  },
+  {
+   "name": "nothing / climate_resilient",
+   "x": {
+    "need": null,
+    "market_strength": null,
+    "displacement_risk": null,
+    "subsidy_eligible": null,
+    "transit_access": null,
+    "flood_exposure": null,
+    "senior_demand": null,
+    "small_multifamily_stock": null
+   },
+   "weights": {
+    "need": 1,
+    "market_strength": 0.5,
+    "displacement_risk": 1,
+    "subsidy_eligible": 1,
+    "transit_access": 2,
+    "flood_exposure": 3,
+    "senior_demand": 1,
+    "small_multifamily_stock": 1.5
    },
    "scores": {
     "adu": null,
@@ -1435,6 +1732,40 @@
    "tie": true
   },
   {
+   "name": "Hazelwood / climate_resilient",
+   "geoid": "42003562300",
+   "x": {
+    "need": 0.9122807017543859,
+    "market_strength": 0.2037037037037037,
+    "displacement_risk": 0.7169973031562846,
+    "subsidy_eligible": 1.0,
+    "transit_access": 0.5964912280701754,
+    "flood_exposure": 0.5789473684210527,
+    "senior_demand": 0.9210526315789473,
+    "small_multifamily_stock": 0.2807017543859649
+   },
+   "weights": {
+    "need": 1,
+    "market_strength": 0.5,
+    "displacement_risk": 1,
+    "subsidy_eligible": 1,
+    "transit_access": 2,
+    "flood_exposure": 3,
+    "senior_demand": 1,
+    "small_multifamily_stock": 1.5
+   },
+   "scores": {
+    "adu": 0.4839656955856994,
+    "duplex_triplex": 0.49226147397083586,
+    "townhome": 0.41291075376232955,
+    "small_apartment": 0.6467604570055269,
+    "senior": 0.6063494165547728
+   },
+   "top": "small_apartment",
+   "margin": 0.040411040450754054,
+   "tie": false
+  },
+  {
    "name": "Hazelwood / all weights zero",
    "geoid": "42003562300",
    "x": {
@@ -1673,6 +2004,40 @@
    "tie": false
   },
   {
+   "name": "Garfield / climate_resilient",
+   "geoid": "42003101900",
+   "x": {
+    "need": 0.5482456140350878,
+    "market_strength": 0.37962962962962965,
+    "displacement_risk": 0.4560768111691882,
+    "subsidy_eligible": 0.5,
+    "transit_access": 0.2807017543859649,
+    "flood_exposure": 0.4298245614035088,
+    "senior_demand": 0.21929824561403508,
+    "small_multifamily_stock": 0.6228070175438597
+   },
+   "weights": {
+    "need": 1,
+    "market_strength": 0.5,
+    "displacement_risk": 1,
+    "subsidy_eligible": 1,
+    "transit_access": 2,
+    "flood_exposure": 3,
+    "senior_demand": 1,
+    "small_multifamily_stock": 1.5
+   },
+   "scores": {
+    "adu": 0.5121166134134272,
+    "duplex_triplex": 0.52004505060397,
+    "townhome": 0.5182252517934088,
+    "small_apartment": 0.44323671674581844,
+    "senior": 0.44399224151556377
+   },
+   "top": "duplex_triplex",
+   "margin": 0.0018197988105611573,
+   "tie": true
+  },
+  {
    "name": "Middle Hill / balanced",
    "geoid": "42003050100",
    "x": {
@@ -1806,6 +2171,40 @@
    },
    "top": "senior",
    "margin": 0.02221290929973696,
+   "tie": false
+  },
+  {
+   "name": "Middle Hill / climate_resilient",
+   "geoid": "42003050100",
+   "x": {
+    "need": 0.8026315789473685,
+    "market_strength": 0.37037037037037035,
+    "displacement_risk": 0.6576788168388852,
+    "subsidy_eligible": 1.0,
+    "transit_access": 0.6491228070175439,
+    "flood_exposure": 0.5175438596491229,
+    "senior_demand": 0.9736842105263158,
+    "small_multifamily_stock": 0.5701754385964912
+   },
+   "weights": {
+    "need": 1,
+    "market_strength": 0.5,
+    "displacement_risk": 1,
+    "subsidy_eligible": 1,
+    "transit_access": 2,
+    "flood_exposure": 3,
+    "senior_demand": 1,
+    "small_multifamily_stock": 1.5
+   },
+   "scores": {
+    "adu": 0.5480375206927329,
+    "duplex_triplex": 0.5744089878277117,
+    "townhome": 0.4838934550702909,
+    "small_apartment": 0.6625112364247577,
+    "senior": 0.6486715278374935
+   },
+   "top": "small_apartment",
+   "margin": 0.013839708587264243,
    "tie": false
   },
   {
@@ -1945,6 +2344,40 @@
    "tie": false
   },
   {
+   "name": "Homewood North / climate_resilient",
+   "geoid": "42003130700",
+   "x": {
+    "need": 0.8421052631578947,
+    "market_strength": 0.018518518518518517,
+    "displacement_risk": 0.6135543710143928,
+    "subsidy_eligible": 1.0,
+    "transit_access": 0.8245614035087719,
+    "flood_exposure": 0.7368421052631579,
+    "senior_demand": 0.7280701754385965,
+    "small_multifamily_stock": 0.3684210526315789
+   },
+   "weights": {
+    "need": 1,
+    "market_strength": 0.5,
+    "displacement_risk": 1,
+    "subsidy_eligible": 1,
+    "transit_access": 2,
+    "flood_exposure": 3,
+    "senior_demand": 1,
+    "small_multifamily_stock": 1.5
+   },
+   "scores": {
+    "adu": 0.41247636827601986,
+    "duplex_triplex": 0.4537190036584541,
+    "townhome": 0.3143490355608039,
+    "small_apartment": 0.6609140599051746,
+    "senior": 0.5578645493862471
+   },
+   "top": "small_apartment",
+   "margin": 0.10304951051892752,
+   "tie": false
+  },
+  {
    "name": "Lower Lawrenceville / balanced",
    "geoid": "42003060300",
    "x": {
@@ -2078,6 +2511,40 @@
    },
    "top": "townhome",
    "margin": 0.08781717572917025,
+   "tie": false
+  },
+  {
+   "name": "Lower Lawrenceville / climate_resilient",
+   "geoid": "42003060300",
+   "x": {
+    "need": 0.5131578947368421,
+    "market_strength": 0.9629629629629629,
+    "displacement_risk": 0.273795476892822,
+    "subsidy_eligible": 0.5,
+    "transit_access": 0.49122807017543857,
+    "flood_exposure": 0.8508771929824561,
+    "senior_demand": 0.18421052631578946,
+    "small_multifamily_stock": 0.5877192982456141
+   },
+   "weights": {
+    "need": 1,
+    "market_strength": 0.5,
+    "displacement_risk": 1,
+    "subsidy_eligible": 1,
+    "transit_access": 2,
+    "flood_exposure": 3,
+    "senior_demand": 1,
+    "small_multifamily_stock": 1.5
+   },
+   "scores": {
+    "adu": 0.321931357948022,
+    "duplex_triplex": 0.3579208648654387,
+    "townhome": 0.33314157723799087,
+    "small_apartment": 0.4023470585514351,
+    "senior": 0.298346835043012
+   },
+   "top": "small_apartment",
+   "margin": 0.044426193685996374,
    "tie": false
   },
   {
@@ -2217,6 +2684,40 @@
    "tie": false
   },
   {
+   "name": "South Side Flats / climate_resilient",
+   "geoid": "42003160900",
+   "x": {
+    "need": 0.8026315789473685,
+    "market_strength": 0.8425925925925926,
+    "displacement_risk": 0.19229645730189127,
+    "subsidy_eligible": 0.0,
+    "transit_access": 0.32456140350877194,
+    "flood_exposure": 0.9736842105263158,
+    "senior_demand": 0.5087719298245614,
+    "small_multifamily_stock": 0.5964912280701754
+   },
+   "weights": {
+    "need": 1,
+    "market_strength": 0.5,
+    "displacement_risk": 1,
+    "subsidy_eligible": 1,
+    "transit_access": 2,
+    "flood_exposure": 3,
+    "senior_demand": 1,
+    "small_multifamily_stock": 1.5
+   },
+   "scores": {
+    "adu": 0.23864480887933073,
+    "duplex_triplex": 0.28108994595254494,
+    "townhome": 0.2166249189091139,
+    "small_apartment": 0.29991779504160776,
+    "senior": 0.20497435246901446
+   },
+   "top": "small_apartment",
+   "margin": 0.01882784908906282,
+   "tie": false
+  },
+  {
    "name": "Squirrel Hill North / balanced",
    "geoid": "42003140300",
    "x": {
@@ -2353,6 +2854,40 @@
    "tie": false
   },
   {
+   "name": "Squirrel Hill North / climate_resilient",
+   "geoid": "42003140300",
+   "x": {
+    "need": 0.34649122807017546,
+    "market_strength": 0.8981481481481481,
+    "displacement_risk": 0.2871836671324328,
+    "subsidy_eligible": 0.0,
+    "transit_access": 0.543859649122807,
+    "flood_exposure": 0.2807017543859649,
+    "senior_demand": 0.6578947368421053,
+    "small_multifamily_stock": 0.8947368421052632
+   },
+   "weights": {
+    "need": 1,
+    "market_strength": 0.5,
+    "displacement_risk": 1,
+    "subsidy_eligible": 1,
+    "transit_access": 2,
+    "flood_exposure": 3,
+    "senior_demand": 1,
+    "small_multifamily_stock": 1.5
+   },
+   "scores": {
+    "adu": 0.6505198659820095,
+    "duplex_triplex": 0.6537104712465681,
+    "townhome": 0.706736182661893,
+    "small_apartment": 0.4889829351879712,
+    "senior": 0.5753811677370237
+   },
+   "top": "townhome",
+   "margin": 0.05302571141532486,
+   "tie": false
+  },
+  {
    "name": "Beechview / balanced",
    "geoid": "42003191600",
    "x": {
@@ -2486,6 +3021,40 @@
    },
    "top": "townhome",
    "margin": 0.052893357953463005,
+   "tie": false
+  },
+  {
+   "name": "Beechview / climate_resilient",
+   "geoid": "42003191600",
+   "x": {
+    "need": 0.24561403508771928,
+    "market_strength": 0.35185185185185186,
+    "displacement_risk": 0.42632038963353974,
+    "subsidy_eligible": 0.5,
+    "transit_access": 0.05263157894736842,
+    "flood_exposure": 0.21052631578947367,
+    "senior_demand": 0.8508771929824561,
+    "small_multifamily_stock": 0.7631578947368421
+   },
+   "weights": {
+    "need": 1,
+    "market_strength": 0.5,
+    "displacement_risk": 1,
+    "subsidy_eligible": 1,
+    "transit_access": 2,
+    "flood_exposure": 3,
+    "senior_demand": 1,
+    "small_multifamily_stock": 1.5
+   },
+   "scores": {
+    "adu": 0.5876764912025138,
+    "duplex_triplex": 0.5819195405501879,
+    "townhome": 0.6465616941552355,
+    "small_apartment": 0.36431746069547594,
+    "senior": 0.5503681385057408
+   },
+   "top": "townhome",
+   "margin": 0.058885202952721705,
    "tie": false
   }
  ],

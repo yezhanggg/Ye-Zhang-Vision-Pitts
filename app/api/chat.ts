@@ -4,6 +4,9 @@
 //  1. The model receives the question and a facts text the browser built from the tool's own published data: census
 //     values, the tool's analysis of city tracts, area aggregates of asking rents. It never sees raw records and
 //     never computes a score.
+//  1b. Scope: Pittsburgh / Allegheny County housing and the tool's data. Other questions get one polite sentence (a
+//     permissive keyword pre-check catches the obvious ones before any model call). In-scope questions the facts do
+//     not cover may get general background from the model, labelled as such and without figures.
 //  2. Every number in the answer must appear in the facts or in the conversation. If some cannot be traced, the model
 //     gets one retry that names them; if the second answer still has some, it is returned with checked:false and the
 //     app says so beside the answer.
@@ -35,7 +38,11 @@ interface Provider {
 
 export const LIMITS = { question: 400, facts: 16000, history: 2, turn: 1500 };
 const MAX_TOKENS = 380;
-export const FACTS_ACK = 'Understood. I will answer from these facts only.';
+export const FACTS_ACK = 'Understood. I will answer from these facts first.';
+/** The one-sentence answer to a question outside the tool's scope. */
+export const DECLINE = 'I can only help with Pittsburgh housing and the data in VisionPitts.';
+/** How an answer from general knowledge (not from the facts) is labelled. */
+export const GENERAL_LABEL = 'General background (not from VisionPitts data)';
 const TEMPERATURE = 0.2;
 
 export function pickProvider(env: Record<string, string | undefined>): Provider | null {
@@ -51,13 +58,44 @@ export function pickProvider(env: Record<string, string | undefined>): Provider 
 export const SYSTEM = `You are the assistant inside VisionPitts, a housing data map of Pittsburgh and Allegheny County, Pennsylvania.
 You answer questions from residents, planners and community staff in plain language.
 
+Scope: Pittsburgh and Allegheny County housing, neighborhoods, affordability, rents, zoning, transit, flooding, demographics, housing policy and programs, and the data in this tool. If a question is about anything else, reply with exactly this one sentence and nothing more: "${DECLINE}"
+
 Rules:
-1. Use only the FACTS given at the start of the conversation. They come from the tool's own data. If they do not cover the question, say so in one sentence and name what the facts do cover.
-2. Never invent, estimate or calculate a number. Quote figures exactly as they are written in the facts. Compare with words (higher, lower, about the same, the highest nearby) instead of working out differences or percentages.
-3. Describe the data, not the people: no stereotypes, no judgments about residents, no advice on where to live, invest or build.
-4. "Asking rent" figures come from licensed listings and lean toward market-rate units. Say so only when you quote an asking rent. "Median gross rent" is a census figure and needs no such note.
-5. Plain text only: no markdown, no asterisks, no headings. At most 120 words.
-6. Begin with one or two plain sentences that answer the question. When asked to describe the surroundings, name the nearest places and say what stands out about them and about the selected place. Add short lines that start with "• " only to compare figures, five lines at most. Do not repeat the facts line by line.`;
+1. Answer from the FACTS given at the start of the conversation first. They come from the tool's own data. When they cover the question, use only them.
+2. When the question is in scope but the facts do not cover it, you may add a short explanation from general knowledge in plain words. Put it after any answer from the facts, on its own line beginning "${GENERAL_LABEL}: ". In that part state no figures at all: no numbers, years, amounts or percentages that are not written in the facts.
+3. Never invent, estimate or calculate a number. Quote figures exactly as they are written in the facts. Compare with words (higher, lower, about the same, the highest nearby) instead of working out differences or percentages.
+4. Describe the data, not the people: no stereotypes, no judgments about residents, no advice on where to live, invest or build.
+5. "Asking rent" figures come from licensed listings and lean toward market-rate units. Say so only when you quote an asking rent. "Median gross rent" is a census figure and needs no such note.
+6. Plain text only: no markdown, no asterisks, no headings. At most 120 words.
+7. Begin with one or two plain sentences that answer the question. When asked to describe the surroundings, name the nearest places and say what stands out about them and about the selected place. Add short lines that start with "• " only to compare figures, five lines at most. Do not repeat the facts line by line.`;
+
+// A light pre-check, so an obviously unrelated request never reaches (or bills) the model. It is permissive on purpose:
+// it only declines when the question reads as a known off-topic request AND names nothing in scope (a housing word,
+// Pittsburgh, or any place written in the facts). Everything else goes to the model, which applies the scope rule.
+const OFF_TOPIC = [
+  /\b(recipe|cook(ing)?|bake|baking)\b/,
+  /\b(write|compose)\b.*\b(poem|song|story|essay|lyrics|haiku)\b/,
+  /\b(poem|haiku|limerick|joke|riddle)\b/,
+  /\b(python|javascript|typescript|c\+\+|sql query|html|css|regex|debug)\b/,
+  /\bwrite (me )?(some |a )?(code|script|program|function)\b/,
+  /\b(translate|translation)\b/,
+  /\b(stock|crypto|bitcoin|forex)\b/,
+  /\b(movie|film|tv show|netflix|celebrity|video game)\b/,
+  /\b(horoscope|zodiac|astrology)\b/,
+  /\b(diagnos\w*|symptom|medication|prescription)\b/,
+  /\b(homework|solve for x|derivative|integral|equation)\b/,
+  /\b(capital of|president of|who won|world cup|super bowl|olympics)\b/,
+];
+const IN_SCOPE = /\b(pittsburgh|allegheny|pennsylvania|pa\b|pgh|neighbou?rhood|tract|block group|municipalit|borough|township|housing|house|home|homes|rent|rents|renter|renting|lease|landlord|tenant|evict|afford|income|mortgage|property|zoning|zone|density|units?|building|develop|transit|bus|port authority|prt|commute|flood|river|demograph|population|census|acs|poverty|vacan|displace|gentrif|equity|lihtc|subsid|voucher|section 8|hud|fmr|policy|program|tax|assess|market|visionpitts|map|data|score|match)/;
+/** True only for a question that is clearly about something outside the tool's scope. */
+export function offTopic(question: string, facts = ''): boolean {
+  const q = question.toLowerCase();
+  if (!OFF_TOPIC.some((re) => re.test(q))) return false;
+  if (IN_SCOPE.test(q)) return false;
+  // A place named in the facts (Hazelwood, Greenfield, Mt. Lebanon…) keeps the question in scope.
+  const names = new Set((facts.match(/\b[A-Z][a-z]{3,}\b/g) ?? []).map((w) => w.toLowerCase()));
+  return !q.split(/[^a-z]+/).some((w) => w.length >= 4 && names.has(w));
+}
 
 /** Trims and bounds what the browser sent. Null when it is not a usable request. */
 export function clean(body: unknown): ChatPayload | null {
@@ -151,7 +189,6 @@ const WARM_MAX = 200;
 export default async function handler(req: { method?: string; body?: unknown }, res: { status: (n: number) => { json: (b: unknown) => void } }) {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, reason: 'POST only' });
   const provider = pickProvider(process.env);
-  if (!provider) return res.status(200).json({ ok: false, reason: 'no_api_key' });
   let payload: ChatPayload | null;
   try {
     payload = clean(typeof req.body === 'string' ? JSON.parse(req.body) : req.body);
@@ -159,6 +196,9 @@ export default async function handler(req: { method?: string; body?: unknown }, 
     payload = null;
   }
   if (!payload) return res.status(400).json({ ok: false, reason: 'bad_request' });
+  // Declined without calling the model: no key needed, no tokens spent. It has no figures, so it is checked.
+  if (offTopic(payload.question, payload.facts)) return res.status(200).json({ ok: true, text: DECLINE, provider: provider?.label ?? 'VisionPitts', model: provider?.model, checked: true, unmatched: [], declined: true, usage: { input: 0, cached: 0, output: 0 } });
+  if (!provider) return res.status(200).json({ ok: false, reason: 'no_api_key' });
 
   const messages = buildMessages(payload);
   const cacheKey = JSON.stringify([provider.id, provider.model, messages]);

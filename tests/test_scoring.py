@@ -22,7 +22,8 @@ def test_config_is_v040_with_eight_factors_and_full_rows():
         assert list(row) == FIDS, k
     for p in CFG["presets"]:
         assert list(p["weights"]) == FIDS, p["id"]
-        assert p["weights"]["senior_demand"] == 1 and p["weights"]["small_multifamily_stock"] == 1
+        if p["id"] in ("balanced", "anti_displacement", "market_led", "transit_first"):  # links written before v0.4.0 fill new weights with 1
+            assert p["weights"]["senior_demand"] == 1 and p["weights"]["small_multifamily_stock"] == 1
     for ch in CFG["fit"]["changes"]:
         t, f = ch["cell"].split(".")
         assert CFG["fit"]["matrix"][t][f] == ch["to"], ch

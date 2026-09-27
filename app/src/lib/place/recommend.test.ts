@@ -228,6 +228,7 @@ describe('underEachStance', () => {
       anti_displacement: ['small_apartment', 'senior', 'adu', 'duplex_triplex', 'townhome'],
       market_led: ['townhome', 'small_apartment', 'duplex_triplex', 'adu', 'senior'],
       transit_first: ['small_apartment', 'senior', 'townhome', 'duplex_triplex', 'adu'],
+      climate_resilient: ['small_apartment', 'duplex_triplex', 'townhome', 'senior', 'adu'],
     };
     const rows = underEachStance(HAZELWOOD, hud, orders);
     expect(rows.map((r) => r.stance)).toEqual(STANCES);

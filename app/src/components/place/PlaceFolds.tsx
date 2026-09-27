@@ -3,9 +3,9 @@
 import type { ReactNode } from 'react';
 import { typologyById } from '../../lib/data';
 import { isNum } from '../../lib/format';
-import { typeBandFor } from '../../lib/place/bands';
+import { sumBands, typeBandFor } from '../../lib/place/bands';
 import { fmtDollars, fmtHouseholds } from '../../lib/place/format';
-import { LEVEL_BAND, levelPhrase, type IncomeLevel } from '../../lib/place/plan';
+import { LEVEL_BAND, levelBands, levelPhrase, type PlanLevel } from '../../lib/place/plan';
 import type { Recommendation } from '../../lib/place/recommend';
 import { TYPOLOGY_LABEL } from '../../lib/place/thresholds';
 import type { HudTable, PlaceMeasures, Typology } from '../../lib/place/types';
@@ -38,10 +38,11 @@ export function Fold({ title, headline, children }: { title: string; headline: R
 
 const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
-export default function PlaceFolds({ t, place, hud, rec, level, fitOrder }: { t: TractProps; place: PlaceMeasures; hud: HudTable; rec: Recommendation; level: IncomeLevel; fitOrder: Typology[] }) {
+export default function PlaceFolds({ t, place, hud, rec, level, fitOrder }: { t: TractProps; place: PlaceMeasures; hud: HudTable; rec: Recommendation; level: PlanLevel; fitOrder: Typology[] }) {
   const band = LEVEL_BAND[level];
-  const c = cumulative(place, band);
-  const types = typesUpTo(place, typeBandFor(band));
+  // Market rate reads the bands above 80% AMI only (CHAS types: ">80%"); the HUD levels read every band at or below.
+  const c = level === 'market' ? { hh: sumBands(place, levelBands(level)).hh } : cumulative(place, band);
+  const types = level === 'market' ? place.types?.gt80 ?? null : typesUpTo(place, typeBandFor(band));
   const lead = types ? (Object.entries(types) as [keyof typeof TYPE_LABEL, number][]).sort((a, b) => b[1] - a[1])[0] : null;
   const m = place.market;
   const askingShown = isNum(m.asking_2br) && m.asking_conf !== 'low';

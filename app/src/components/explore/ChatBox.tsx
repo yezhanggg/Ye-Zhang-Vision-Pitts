@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react';
 import { ChevronUp, MapPin, Sparkles, X } from 'lucide-react';
 import { localMatches, photonSuggest, type GeoResult, type Resolved } from '../../lib/geocode';
-import { CHAT_COPY, buildFacts, suggestions, useChat, type ChatMessage, type ChatScope } from '../../lib/explore/chat';
+import { CHAT_COPY, buildFacts, exchangesOldestFirst, suggestions, useChat, type ChatMessage, type ChatScope } from '../../lib/explore/chat';
+import { WITHHELD } from '../../lib/analysis/strictChat';
 import { unitTitle } from '../../lib/explore/catalog';
 import { EXPLORE_UI } from '../../lib/explore/copy';
 import { classify, unitMatches } from '../../lib/explore/intent';
@@ -44,6 +45,69 @@ function Thinking({ since }: { since: number }) {
   );
 }
 
+const timeOf = (at: number) => {
+  try {
+    return new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  } catch {
+    return '';
+  }
+};
+
+/** The small point a bubble has at its lower corner, on the speaker's side. */
+function Tail({ side, className }: { side: 'left' | 'right'; className: string }) {
+  return (
+    <svg aria-hidden viewBox="0 0 8 10" className={cx('absolute bottom-0 h-2.5 w-2', side === 'right' ? '-right-[6px]' : '-left-[6px] -scale-x-100', className)}>
+      <path d="M0 0 C0 6 3 9 8 10 L0 10 Z" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** A question, on the right. */
+function UserBubble({ m }: { m: ChatMessage }) {
+  return (
+    <div className="group flex flex-col items-end" data-role="user">
+      <div className="relative max-w-[85%] rounded-2xl rounded-br-md bg-violet-600 px-3 py-1.5 text-small text-white shadow-sm">
+        <span className="whitespace-pre-wrap break-words">{m.text}</span>
+        <Tail side="right" className="text-violet-600" />
+      </div>
+      <span className="mr-1 mt-0.5 text-[10.5px] leading-tight text-slate-400">{timeOf(m.at)}</span>
+    </div>
+  );
+}
+
+/** An answer (or the thinking mark while it is written), on the left. */
+function AnswerBubble({ q, a, fresh, lite }: { q: ChatMessage; a: ChatMessage | null; fresh: boolean; lite: boolean }) {
+  const thinking = !a || a.pending;
+  const withheld = !!a && a.text === WITHHELD;
+  const tone = thinking ? 'bg-white ring-stone-200 text-slate-800' : withheld ? 'bg-amber-50 ring-amber-200 text-amber-900' : a.failed ? 'bg-stone-100 ring-stone-200 text-slate-600' : 'bg-white ring-stone-200 text-slate-800';
+  const tail = thinking ? 'text-white' : withheld ? 'text-amber-50' : a.failed ? 'text-stone-100' : 'text-white';
+  const caption: string[] = [];
+  if (a && !thinking && !a.failed) {
+    if (a.checked) caption.push(CHAT_COPY.checked);
+  }
+  return (
+    <div className="flex flex-col items-start" data-role="assistant">
+      <div className={cx('relative max-w-[85%] rounded-2xl rounded-bl-md px-3 py-1.5 text-small shadow-sm ring-1', tone)}>
+        {thinking ? (
+          <Thinking since={q.at} />
+        ) : (
+          <motion.div initial={fresh ? { opacity: 0, y: 4 } : false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+            {/* Keyed by the text: an answer rewritten in place (the Analysis gate) starts over rather than keeping the old length. */}
+            <Reveal key={a.text} text={a.text} animate={!lite && fresh} className="break-words" />
+            {a.unchecked && <p className="mt-1.5 rounded-md bg-amber-50 px-2 py-1 text-caption text-amber-800 ring-1 ring-amber-200">{CHAT_COPY.unchecked}</p>}
+          </motion.div>
+        )}
+        <Tail side="left" className={tail} />
+      </div>
+      {!thinking && (
+        <span className="ml-1 mt-0.5 max-w-[85%] text-[10.5px] leading-tight text-slate-400">
+          {[...caption, timeOf(a.at)].filter(Boolean).join(' · ')}
+        </span>
+      )}
+    </div>
+  );
+}
+
 /** An answer that writes itself in, a couple of words at a time. `animate` is read once, when the answer arrives. */
 function Reveal({ text, animate, className }: { text: string; animate: boolean; className?: string }) {
   const tokens = useMemo(() => text.split(/(\s+)/), [text]);
@@ -59,7 +123,7 @@ function Reveal({ text, animate, className }: { text: string; animate: boolean; 
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  return <div className={cx('whitespace-pre-wrap', className)}>{n >= tokens.length ? text : tokens.slice(0, n).join('')}</div>;
+  return <div className={cx('whitespace-pre-wrap', className)}>{!animate || n >= tokens.length ? text : tokens.slice(0, n).join('')}</div>;
 }
 
 /**
@@ -67,7 +131,7 @@ function Reveal({ text, animate, className }: { text: string; animate: boolean; 
  * (lib/explore/intent): names and addresses go to the map search, which is free; only questions go to the
  * assistant. Suggested prompts, answers and the thinking mark all live inside the same box, which folds away.
  */
-export default function ChatBox({ scope, resolve, onGo, compact = false }: { scope: ChatScope; resolve: (r: GeoResult) => Resolved; /** Open this place (Explore: its summary; Analysis: its tract card). */ onGo: (geoid: string) => void; /** Over a view with no column of its own: stays a pill until it is used. */ compact?: boolean }) {
+export default function ChatBox({ scope, resolve, onGo, compact = false, fill = false, prompts: promptsOverride }: { /** Suggested questions to show instead of the generic ones. */ prompts?: string[]; scope: ChatScope; resolve: (r: GeoResult) => Resolved; /** Open this place (Explore: its summary; Analysis: its tract card). */ onGo: (geoid: string) => void; /** Over a view with no column of its own: stays a pill until it is used. */ compact?: boolean; /** Docked in a column of definite height: the box fills it and the thread scrolls inside, with no height cap. */ fill?: boolean }) {
   const messages = useChat((s) => s.messages);
   const busy = useChat((s) => s.busy);
   const ask = useChat((s) => s.ask);
@@ -78,18 +142,28 @@ export default function ChatBox({ scope, resolve, onGo, compact = false }: { sco
   const [value, setValue] = useState('');
   const [hi, setHi] = useState(0);
   const [inputOpen, setInputOpen] = useState(false);
-  const [folded, setFolded] = useState(compact);
+  // The Explore box remembers across reloads whether its thread was folded; a compact box always starts as a pill.
+  const storedFold = useChat((s) => s.folded);
+  const setStoredFold = useChat((s) => s.setFolded);
+  // A docked box (Equity & policy) always opens unfolded and does not touch Explore's remembered fold.
+  const [folded, setFoldedLocal] = useState(compact ? true : fill ? false : storedFold ?? false);
+  const setFolded = (f: boolean | ((f: boolean) => boolean)) =>
+    setFoldedLocal((cur) => {
+      const next = typeof f === 'function' ? f(cur) : f;
+      if (!compact && !fill && next !== storedFold) setStoredFold(next);
+      return next;
+    });
   const [remote, setRemote] = useState<{ q: string; items: GeoResult[] } | null>(null);
   const [status, setStatus] = useState<{ kind: 'busy' | 'error'; text: string; retry?: string } | null>(null);
   const list = useRef<HTMLDivElement>(null);
-  const lastQuestion = useRef<HTMLDivElement>(null);
   const lookup = useRef<AbortController | null>(null);
   /** Answers that were being written while this box was on screen: only those write themselves in. */
   const wasPending = useRef(new Set<number>());
 
   const props = useMemo(() => (scope.selected ? scope.fc.features.find((f) => f.properties.GEOID === scope.selected)?.properties ?? null : null), [scope.fc, scope.selected]);
   const name = props ? unitTitle(props) : null;
-  const prompts = useMemo(() => suggestions(name, scope.variable, scope.level), [name, scope.variable, scope.level]);
+  const generic = useMemo(() => suggestions(name, scope.variable, scope.level), [name, scope.variable, scope.level]);
+  const prompts = promptsOverride?.length ? promptsOverride : generic;
   const about = `${scope.level}|${scope.cityOnly ? 'city' : 'county'}|${scope.selected ?? ''}|${scope.variable?.id ?? ''}`;
   const outside = scope.level === 'muni' ? C.outside.muni : scope.cityOnly ? C.outside.city : C.outside.county;
 
@@ -194,18 +268,20 @@ export default function ChatBox({ scope, resolve, onGo, compact = false }: { sco
 
   // ---------------------------------------------------------------- the conversation
   useEffect(() => {
-    for (const m of messages) if (m.pending) wasPending.current.add(m.id);
-    // Bring the latest question to the top of the list, so its answer is read from the start.
-    const box = list.current, q = lastQuestion.current;
-    if (box && q) box.scrollTo({ top: q.offsetTop - 8, behavior: lite ? 'auto' : 'smooth' });
+    let fresh = false;
+    for (const m of messages) {
+      if (!m.pending || wasPending.current.has(m.id)) continue;
+      wasPending.current.add(m.id);
+      fresh = true;
+    }
+    // Like most chats, the newest exchange is at the bottom: a new question or answer scrolls the thread down to it
+    // (unless the reader has scrolled up to read something older while an answer is being written).
+    const el = list.current;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    if (fresh || nearBottom) requestAnimationFrame(() => el.scrollTo({ top: el.scrollHeight, behavior: lite || !fresh ? 'auto' : 'smooth' }));
   }, [messages, lite]);
-  const lastUserId = useMemo(() => [...messages].reverse().find((m) => m.role === 'user')?.id ?? null, [messages]);
-  const provider = useMemo(() => [...messages].reverse().find((m) => m.provider)?.provider ?? CHAT_COPY.defaultProvider, [messages]);
-  const exchanges = useMemo(() => {
-    const out: { q: ChatMessage; a: ChatMessage | null }[] = [];
-    for (let i = 0; i < messages.length; i++) if (messages[i].role === 'user') out.push({ q: messages[i], a: messages[i + 1]?.role === 'assistant' ? messages[i + 1] : null });
-    return out;
-  }, [messages]);
+  const exchanges = useMemo(() => exchangesOldestFirst(messages), [messages]);
 
   const quiet = compact && folded && !inputOpen;
   const hasAi = (prompts.length > 0 || messages.length > 0) && !quiet;
@@ -213,14 +289,25 @@ export default function ChatBox({ scope, resolve, onGo, compact = false }: { sco
   const showRows = typing && rows.length > 0;
   const showAi = hasAi && !typing && !folded;
   const wide = inputOpen || showRows || showAi || hasNotes;
+  // Open on the latest exchange whenever the thread comes into view (it is kept across reloads).
+  const threadShown = showAi && exchanges.length > 0;
+  // Once a conversation exists the box reads like most chats: name bar on top, the thread (oldest first), the suggested
+  // questions, then the input at the bottom (search results open below it). Before that, the input leads.
+  const chat = messages.length > 0 || fill;
+  useEffect(() => {
+    const el = list.current;
+    if (threadShown && el) el.scrollTop = el.scrollHeight;
+  }, [threadShown]);
 
   return (
-    <div className="pointer-events-auto ml-auto w-full overflow-hidden rounded-[24px] bg-white/95 shadow-lg ring-1 ring-black/5 backdrop-blur transition-[max-width,box-shadow] duration-500 ease-[cubic-bezier(0.175,0.885,0.32,1.1)] focus-within:ring-2 focus-within:ring-violet-300" style={{ maxWidth: wide ? 440 : 320 }}>
-      <PromptInput bare value={value} onChange={setValue} onSubmit={() => act(rows[hi])} onKey={onKey} onOpenChange={setInputOpen} busy={busy} placeholder={name ? C.askAbout(name) : C.ask} />
+    <div data-tour="ask" className={cx('pointer-events-auto ml-auto flex w-full flex-col overflow-hidden rounded-[24px] bg-white/95 shadow-lg ring-1 ring-black/5 backdrop-blur transition-[max-width,box-shadow] duration-500 ease-[cubic-bezier(0.175,0.885,0.32,1.1)] focus-within:ring-2 focus-within:ring-violet-300', fill && 'h-full min-h-0')} style={{ maxWidth: fill ? undefined : wide ? 440 : 320 }}>
+      <div className={cx('shrink-0', chat && 'order-3 border-t border-stone-200/70')}>
+      <PromptInput bare small={fill || chat} value={value} onChange={setValue} onSubmit={() => act(rows[hi])} onKey={onKey} onOpenChange={setInputOpen} busy={busy} placeholder={name ? C.askAbout(name) : C.ask} />
+      </div>
 
       <AnimatePresence initial={false}>
         {showRows && (
-          <motion.div key="rows" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={SOFT} className="overflow-hidden">
+          <motion.div key="rows" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={SOFT} className={cx('shrink-0 overflow-hidden', chat && 'order-4')}>
             <ul role="listbox" aria-label={C.results} className="border-t border-stone-200/70 p-1.5">
               {rows.map((row, i) => (
                 <li key={row.key}>
@@ -242,7 +329,7 @@ export default function ChatBox({ scope, resolve, onGo, compact = false }: { sco
 
       <AnimatePresence initial={false}>
         {hasNotes && !typing && (
-          <motion.div key="notes" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={SOFT} className="overflow-hidden">
+          <motion.div key="notes" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={SOFT} className={cx('shrink-0 overflow-hidden', chat && 'order-2')}>
             <div className="space-y-1 border-t border-stone-200/70 px-4 py-2">
               {status && (
                 <p role="status" className={cx('text-small', status.kind === 'error' ? 'text-rose-700' : 'text-slate-600')}>
@@ -272,9 +359,9 @@ export default function ChatBox({ scope, resolve, onGo, compact = false }: { sco
 
       <AnimatePresence initial={false}>
         {showAi && (
-          <motion.div key="ai" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={SOFT} className="overflow-hidden">
+          <motion.div key="ai" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={SOFT} className={cx('flex flex-col overflow-hidden', fill && 'min-h-0 flex-1', chat && 'order-1')}>
             {prompts.length > 0 && (
-              <div className="border-t border-stone-200/70 px-2 py-1.5" aria-label={C.prompts}>
+              <div className={cx('shrink-0 border-t border-stone-200/70 px-2 py-1.5', chat && 'order-2')} aria-label={C.prompts}>
                 {prompts.map((p, i) => (
                   <motion.button key={p} type="button" disabled={busy} onClick={() => send(p)} initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} transition={{ ...SOFT, delay: 0.04 * i }} className="flex w-full items-center gap-2 rounded-lg px-2 py-1 text-left text-small text-slate-500 transition-colors hover:bg-violet-50 hover:text-violet-800 disabled:opacity-50">
                     <Sparkles className="h-3.5 w-3.5 shrink-0 text-violet-400" />
@@ -284,22 +371,15 @@ export default function ChatBox({ scope, resolve, onGo, compact = false }: { sco
               </div>
             )}
             {exchanges.length > 0 && (
-              <div ref={list} className="scroll-quiet relative max-h-[38vh] overflow-y-auto border-t border-stone-200/70 px-4 py-2.5" aria-label={C.answers} aria-live="polite">
-                {exchanges.map(({ q, a }, i) => (
-                  <div key={q.id} ref={q.id === lastUserId ? lastQuestion : undefined} className={cx(i > 0 && 'mt-3 border-t border-stone-100 pt-3')}>
-                    <div className="text-small font-semibold text-slate-900">{q.text}</div>
-                    <div className="mt-1">
-                      {!a || a.pending ? (
-                        <Thinking since={q.at} />
-                      ) : (
-                        <motion.div initial={wasPending.current.has(a.id) ? { opacity: 0, y: 4 } : false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-                          <Reveal text={a.text} animate={!lite && wasPending.current.has(a.id)} className={cx('text-small', a.failed ? 'text-slate-600' : 'text-slate-700')} />
-                          {a.unchecked && <p className="mt-1 text-caption text-amber-800">{CHAT_COPY.unchecked}</p>}
-                        </motion.div>
-                      )}
-                    </div>
-                  </div>
-                ))}
+              <div ref={list} className={cx('scroll-quiet relative overflow-y-auto overflow-x-hidden border-t', fill ? 'min-h-0 flex-1 max-h-[calc(100vh-10rem)]' : 'max-h-[38vh]', 'border-stone-200/70 bg-stone-50/60 px-3.5 py-2.5')} aria-label={C.answers} aria-live="polite">
+                <AnimatePresence initial={false}>
+                  {exchanges.map(({ q, a }) => (
+                    <motion.div key={q.id} layout={!lite} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={SOFT} className="flex flex-col gap-1.5 pb-3 last:pb-0" data-testid="chat-exchange">
+                      <UserBubble m={q} />
+                      <AnswerBubble q={q} a={a} fresh={!!a && wasPending.current.has(a.id)} lite={lite} />
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
               </div>
             )}
           </motion.div>
@@ -308,9 +388,9 @@ export default function ChatBox({ scope, resolve, onGo, compact = false }: { sco
 
       <AnimatePresence initial={false}>
         {hasAi && !typing && (
-          <motion.div key="foot" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={SOFT} className="overflow-hidden">
-            <div className="flex items-center justify-between gap-2 border-t border-stone-200/70 py-1 pl-4 pr-1.5">
-              <span className="truncate text-caption text-slate-500">{CHAT_COPY.poweredBy(provider)}</span>
+          <motion.div key="foot" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={SOFT} className={cx('shrink-0 overflow-hidden', chat ? 'order-first' : fill && 'mt-auto')}>
+            <div className={cx('flex items-center justify-between gap-2 border-stone-200/70 py-1 pl-4 pr-1.5', chat ? 'border-b' : 'border-t')}>
+              <span className="truncate text-caption text-slate-500">{CHAT_COPY.name}</span>
               <span className="flex shrink-0 items-center gap-0.5">
                 {messages.length > 0 && !busy && (
                   <button onClick={clear} className="rounded-lg px-2 py-1 text-caption font-semibold text-slate-500 hover:bg-stone-100 hover:text-slate-900" title={C.clearTitle}>

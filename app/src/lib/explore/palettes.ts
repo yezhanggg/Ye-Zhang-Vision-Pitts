@@ -4,7 +4,7 @@
 // diverging ramp centred on the city value. Categorical Analysis layers (best fit, market classes) keep their own palettes.
 import type { VariableDef } from './types';
 
-export type ThemeId = 'money' | 'rent' | 'stress' | 'ami' | 'people' | 'age' | 'stock' | 'transit' | 'flood' | 'green' | 'edu' | 'diverging';
+export type ThemeId = 'money' | 'rent' | 'stress' | 'ami' | 'people' | 'age' | 'stock' | 'transit' | 'flood' | 'green' | 'edu' | 'landRes' | 'landCom' | 'landInd' | 'landVacant' | 'diverging';
 
 export const THEME_PALETTES: Record<ThemeId, string[]> = {
   /** Greens: money that is good for residents (income, home value). */
@@ -29,6 +29,14 @@ export const THEME_PALETTES: Record<ThemeId, string[]> = {
   green: ['#ffffcc', '#d9f0a3', '#addd8e', '#78c679', '#238443'],
   /** Indigo: education and work. */
   edu: ['#eef0fb', '#c3c9f0', '#8d97de', '#5a62c2', '#2f3585'],
+  /** Land-use yellows: residential land (the zoning map's residential color family). */
+  landRes: ['#fffbe0', '#fdeea0', '#f9d45c', '#e8a91c', '#a86b06'],
+  /** Land-use reds: commercial land. */
+  landCom: ['#fde8ea', '#f7b3bd', '#ec6f84', '#c8324d', '#86102a'],
+  /** Land-use purples: industrial land. */
+  landInd: ['#f1eef6', '#cfc6df', '#a697c2', '#7a669e', '#4d3a6e'],
+  /** Land-use browns/tans: vacant land and lots. */
+  landVacant: ['#f7f0e6', '#e3cfae', '#c9a576', '#a0703f', '#6b4220'],
   /** Orange (below the city) ↔ teal (above the city), neutral middle class around the city value. */
   diverging: ['#c85a12', '#f3b27a', '#f5f0d8', '#7cc3b8', '#0f766e'],
 };
@@ -56,6 +64,8 @@ const BY_ID: Record<string, ThemeId> = {
   wfh_share: 'transit', an_transit_departures: 'transit', an_transit_freq: 'transit',
   // Environment
   an_flood_fema: 'flood', an_flood_screen: 'flood', an_veg_cover: 'green',
+  // Land use (parcels)
+  an_land_res: 'landRes', an_land_com: 'landCom', an_land_ind: 'landInd', an_land_vacant: 'landVacant', an_land_vacant_lots: 'landVacant',
   // Education and work
   bachelors_share: 'edu', lfpr: 'edu',
 };
@@ -63,7 +73,7 @@ const BY_ID: Record<string, ThemeId> = {
 /** Fallback by catalogue group, for variables added later. */
 const BY_GROUP: Record<string, ThemeId> = {
   population: 'people', race: 'people', income: 'money', work_edu: 'edu', stock: 'stock', tenure: 'stock', cost: 'rent',
-  commute: 'transit', an_ami: 'ami', an_rents: 'rent', an_inputs: 'stock',
+  commute: 'transit', an_ami: 'ami', an_rents: 'rent', an_inputs: 'stock', an_land: 'landVacant',
 };
 
 export function themeOf(variable: Pick<VariableDef, 'id' | 'group'> | null | undefined): ThemeId {

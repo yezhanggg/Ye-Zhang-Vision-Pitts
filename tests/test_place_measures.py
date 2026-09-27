@@ -298,6 +298,67 @@ def test_parcel_measures_valid_recent_residential_sales_and_counts():
     assert out.attrs["city_sale_median"] == 175000
 
 
+@pytest.mark.parametrize("classdesc,usedesc,expected", [
+    ("RESIDENTIAL", "SINGLE FAMILY", "residential"),
+    ("RESIDENTIAL", "CONDOMINIUM", "residential"),
+    ("COMMERCIAL", "APART: 5-19 UNITS", "residential"),        # apartment buildings are assessed as commercial
+    ("COMMERCIAL", "APART:40+ UNITS", "residential"),
+    ("COMMERCIAL", "RETL/APT'S OVER", "commercial"),           # mixed retail stays commercial
+    ("COMMERCIAL", "OFFICE - 1-2 STORIES", "commercial"),
+    ("INDUSTRIAL", "WAREHOUSE", "industrial"),
+    ("RESIDENTIAL", "VACANT LAND", "vacant"),
+    ("COMMERCIAL", "VACANT COMMERCIAL LAND", "vacant"),
+    ("INDUSTRIAL", "VACANT INDUSTRIAL LAND", "vacant"),
+    ("AGRICULTURAL", ">10 ACRES VACANT", "vacant"),
+    ("GOVERNMENT", "MUNICIPAL GOVERNMENT", "institutional"),
+    ("GOVERNMENT", "PUBLIC PARK", "institutional"),
+    ("GOVERNMENT", "OWNED BY METRO HOUSING AU", "residential"),  # public housing is homes
+    ("GOVERNMENT", "HUD PROJ #202", "residential"),
+    ("OTHER", "CHARITABLE EXEMPTION/HOS/HOMES", "institutional"),
+    ("COMMERCIAL", "CHURCHES, PUBLIC WORSHIP", "institutional"),
+    ("RESIDENTIAL", "OWNED BY COLLEGE/UNIV/ACADEMY", "institutional"),
+    ("UTILITIES", "R.R. - USED IN OPERATION", "other"),
+    ("AGRICULTURAL", "LIVESTOCK O/T D & P-CAUV", "other"),
+    (None, None, "other"),
+    (float("nan"), "single family", "other"),
+])
+def test_land_use_class_maps_assessment_class_and_use(classdesc, usedesc, expected):
+    assert pm.land_use_class(classdesc, usedesc) == expected
+
+
+def test_land_use_measures_land_and_parcel_shares_with_vacant_lots():
+    pin_tract = pd.Series({"p1": "a", "p2": "a", "p3": "a", "p4": "a", "p5": "b", "p6": "b"})
+    assess = pd.DataFrame({
+        "PARID": ["p1", "p2", "p3", "p4", "p5", "p6", "p7"],
+        "CLASSDESC": ["RESIDENTIAL", "RESIDENTIAL", "COMMERCIAL", "GOVERNMENT", "RESIDENTIAL", "RESIDENTIAL", "INDUSTRIAL"],
+        "USEDESC": ["SINGLE FAMILY", "VACANT LAND", "OFFICE - 1-2 STORIES", "PUBLIC PARK", "CONDOMINIUM", "CONDOMINIUM", "WAREHOUSE"],
+        "LOTAREA": ["3000", "1000", "2000", "4000", "0", "0", "9999"],
+    })
+    out = pm.land_use_measures(assess, pin_tract)
+    assert list(out.index) == ["a", "b"]                                   # p7 is outside every tract
+    assert out.loc["a", "lu_residential"] == pytest.approx(0.3) and out.loc["a", "lu_vacant"] == pytest.approx(0.1)
+    assert out.loc["a", "lu_commercial"] == pytest.approx(0.2) and out.loc["a", "lu_institutional"] == pytest.approx(0.4)
+    assert out.loc["a", "lu_n_residential"] == pytest.approx(0.25) and out.loc["a", "lu_industrial"] == 0
+    assert out.loc["a", "lu_vacant_lots"] == 1 and out.loc["a", "lu_parcels"] == 4
+    assert out.loc["b", "lu_residential"] == 1.0 and out.loc["b", "lu_vacant_lots"] == 0   # no lot area: parcel shares
+
+
+def test_to_place_json_land_use_block_when_parcel_columns_exist():
+    df = _frame()
+    lu = pd.DataFrame({"lu_residential": [0.61234, np.nan], "lu_commercial": [0.1, np.nan], "lu_industrial": [0.0, np.nan],
+                       "lu_vacant": [0.2, np.nan], "lu_institutional": [0.08766, np.nan], "lu_other": [0.0, np.nan],
+                       "lu_vacant_lots": [310, np.nan], "lu_parcels": [1500, np.nan]}, index=df.index)
+    for k in pm.LAND_USE_CLASSES:
+        lu[f"lu_n_{k}"] = [1 / 6, np.nan]
+    place = pm.to_place_json(df.join(lu))
+    b = place["42003562300"]["land_use"]
+    assert set(b) == {*pm.LAND_USE_CLASSES, "vacant_lots", "parcels", "parcel_shares"}
+    assert b["residential"] == 0.6123 and b["vacant"] == 0.2 and b["vacant_lots"] == 310 and b["parcels"] == 1500
+    assert b["parcel_shares"]["other"] == 0.1667
+    assert place["42003999900"]["land_use"] is None
+    json.dumps(place, allow_nan=False)
+
+
 # ------------------------------------------------------------------------------------------------ JSON shape
 CONTRACT = {
     "renter_hh": None,
@@ -310,6 +371,7 @@ CONTRACT = {
     "access": {"jobs_1mi", "jobs_1mi_pct", "school_mi", "elem_mi", "grocery_mi", "services_halfmi"},
     "flood": {"fema_sfha_pct", "fema_zone", "hand_pct"},
     "zoning": None,
+    "land_use": None,
     "programs": {"qct", "dda", "oz", "cdbg"},
     "displacement": {"score", "conf"},
 }
@@ -390,7 +452,7 @@ def test_to_place_json_matches_the_contract_with_nulls_and_rounding():
                            "grocery_mi": 1.1, "services_halfmi": 2.3}
     assert place["42003999900"]["access"]["jobs_1mi"] is None
     assert h["flood"] == {"fema_sfha_pct": None, "fema_zone": None, "hand_pct": 17.1}
-    assert h["zoning"] is None
+    assert h["zoning"] is None and h["land_use"] is None            # Tier 2 parcels not built: null
     assert h["programs"] == {"qct": True, "dda": False, "oz": True, "cdbg": True}
     assert h["displacement"] == {"score": 0.717, "conf": "medium"}
     park = place["42003999900"]

@@ -6,6 +6,7 @@ import type { BrowseLevel, ValueMap, VariableDef } from '../../lib/explore/types
 import { classCounts, isAnalysis, type AnalysisVar } from '../../lib/explore/analysisVars';
 import { isDiverging, themePalette } from '../../lib/explore/palettes';
 import { cx } from '../../lib/format';
+import { ZONING_CAVEAT, ZONING_FAMILIES, zoningByCode, zoningCodesPerFamily } from '../../lib/explore/zoning';
 
 /** Anchors a label so it never spills past the ramp ends. */
 const anchor = (pos: number) => (pos < 0.12 ? 'translate-x-0' : pos > 0.88 ? '-translate-x-full' : '-translate-x-1/2');
@@ -143,6 +144,26 @@ export default function DataLegend({ variable, level, values, breaks, ext, hover
         </div>
         {analysis && <div>{EXPLORE_UI.cityTractsOnly}</div>}
       </div>
+    </div>
+  );
+}
+
+/** Legend for the zoning overlay: the family swatches (same style as the categorical Analysis legend). */
+export function ZoningLegend({ hoverCode }: { hoverCode: string | null }) {
+  const hovered = hoverCode ? zoningByCode.get(hoverCode)?.family ?? null : null;
+  return (
+    <div className="w-72 rounded-xl bg-white/95 px-3.5 py-3 shadow-lg ring-1 ring-black/5 backdrop-blur">
+      <div className="text-small font-semibold text-slate-900">Zoning districts</div>
+      <div className="mt-1 space-y-0.5">
+        {ZONING_FAMILIES.map((f, i) => (
+          <div key={f.id} className={cx('flex items-center gap-1.5 text-caption text-slate-800', hovered === f.id && 'font-semibold')}>
+            <span className={cx('h-3 w-4 shrink-0 rounded-sm ring-1 ring-black/10', hovered === f.id && 'ring-2 ring-slate-900')} style={{ background: f.color }} />
+            <span className="min-w-0 flex-1 truncate">{f.label}</span>
+            <span className="tnum text-slate-500" title="District codes">{zoningCodesPerFamily[i]}</span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-1 text-caption text-slate-600">City of Pittsburgh (WPRDC). By-right uses {ZONING_CAVEAT}.</div>
     </div>
   );
 }

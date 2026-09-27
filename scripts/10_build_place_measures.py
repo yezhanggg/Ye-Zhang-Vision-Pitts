@@ -4,7 +4,8 @@ Writes data/processed/place_measures.csv, app/src/data/place.json (128 city trac
 
 Run: uv run python scripts/10_build_place_measures.py            # Tier 1: CHAS bands and types, HUD API, market,
                                                                 #         stock, transit, access, HAND flood, programs
-     uv run python scripts/10_build_place_measures.py --tier2    # + zoning shares, FEMA SFHA share, parcel sales
+     uv run python scripts/10_build_place_measures.py --tier2    # + zoning shares and map, FEMA SFHA share, parcel
+                                                                #   sales and land use
      uv run python scripts/10_build_place_measures.py --refresh  # re-download the cached API / GeoJSON responses
 
 A Tier 2 source that fails is reported and its fields stay null; the JSON is always valid. Needs tracts.csv and
@@ -24,6 +25,7 @@ import pandas as pd
 
 from visionpitts import place_measures as pm
 from visionpitts import sources
+from visionpitts import zoning_map
 
 FOCUS_COLS = [
     "renter_hh", "le30_hh", "le30_moe", "le30_burden30", "le30_burden50", "b30_50_hh", "b30_50_burden30",
@@ -32,6 +34,7 @@ FOCUS_COLS = [
     "jobs_1mi", "jobs_1mi_pct", "school_mi", "elem_mi", "grocery_mi", "services_halfmi",
     "hand_pct", "fema_sfha_pct", "fema_zone", "sale_median", "sale_n", "sale_nbr_median", "parcels_2_4", "vacant_parcels",
     "zoning_bytype_adu", "zoning_bytype_duplex_triplex", "zoning_bytype_small_apartment", "displacement_score",
+    "lu_residential", "lu_commercial", "lu_industrial", "lu_vacant", "lu_institutional", "lu_other", "lu_vacant_lots", "lu_parcels",
 ]
 
 
@@ -92,19 +95,24 @@ def main() -> None:
         parts.append(hand.to_frame())
 
     rules = None
+    prc = None
     if args.tier2:
         print("tier 2")
         rules = pm.load_zoning_rules()
         zon = step("zoning (WPRDC districts)", pm.zoning, failures, tracts, None, rules, args.refresh)
         if zon is not None:
             parts.append(zon)
+        zmap = step("zoning map (districts dissolved by code)", zoning_map.build, failures, refresh=False)
+        if zmap is not None:
+            print(f"    wrote {zmap['path']} ({zmap['bytes']:,} bytes, {zmap['features']} districts, "
+                  f"{zmap['tolerance_m']:g} m / {zmap['dp']} dp)")
         sfha = step("FEMA NFHL download", pm.fema_download, failures, args.refresh)
         if sfha is not None:
             print(f"    {len(sfha)} SFHA polygons")
             fem = step("FEMA SFHA share", pm.fema_share, failures, tracts, sfha)
             if fem is not None:
                 parts.append(fem)
-        prc = step("parcels (sales since 2023, 2-4 family, vacant)", pm.parcels, failures, tracts, nbrs, args.refresh)
+        prc = step("parcels (sales since 2023, 2-4 family, vacant, land use)", pm.parcels, failures, tracts, nbrs, args.refresh)
         if prc is not None:
             parts.append(prc)
             print(f"    city-wide median valid residential sale since {pm.SALE_SINCE}: "

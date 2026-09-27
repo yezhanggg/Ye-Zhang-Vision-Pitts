@@ -35,7 +35,7 @@ export const scorePair = (a: number, b: number) => pointPair(a * 100, b * 100);
 export const fitText = (score: number | null): string => (score == null ? 'No score' : 'Best fit under your stance');
 
 /** The three stances the Analysis tab offers. Balanced stays in the config as the equal-weights reference (Compare scenarios). */
-export const APP_STANCES = ['anti_displacement', 'market_led', 'transit_first'] as const;
+export const APP_STANCES = ['anti_displacement', 'market_led', 'transit_first', 'climate_resilient'] as const;
 export type Stance = (typeof APP_STANCES)[number];
 export const isStance = (id: string | null | undefined): id is Stance => (APP_STANCES as readonly string[]).includes(id ?? '');
 
@@ -44,6 +44,7 @@ export const STANCE_MEANING: Record<string, string> = {
   anti_displacement: 'Protect the renters who live here now: need and displacement risk decide, market strength counts little.',
   market_led: 'Build where unsubsidized construction can work: market strength decides, need and risk count little.',
   transit_first: 'Put new homes where frequent buses and the T already run: transit access decides.',
+  climate_resilient: 'Keep new homes out of flood zones and near frequent transit: flood exposure decides, transit next.',
   balanced: 'Every factor counts the same: a reference, not a stance.',
 };
 /** The equal-weights reference, as Compare scenarios and the stance panel name it. */

@@ -10,6 +10,8 @@ import { EXPLORE_UI } from '../../lib/explore/copy';
 import { useReference } from '../../lib/explore/remote';
 import type { BrowseLevel, Estimate, Loaded, UnitFC, ValueMap, VariableDef } from '../../lib/explore/types';
 import { Button, SectionTitle } from '../primitives';
+import ExportMenu from '../export/ExportMenu';
+import { layerExportItems } from '../export/exploreExport';
 
 function RefStat({ k, e, variable }: { k: string; e: Estimate | null; variable: VariableDef }) {
   return (
@@ -39,9 +41,12 @@ function AnalysisSummary({ variable, values }: { variable: AnalysisVar; values: 
             <div className="text-small font-semibold text-violet-700">{group}</div>
             <h2 className="mt-1 font-display text-title font-bold text-slate-900">{variable.label}</h2>
           </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <ExportMenu items={layerExportItems(variable, 'tract', values, bundledGeo('tract'))} />
           <button onClick={() => setBrowse({ variable: null })} className="shrink-0 rounded-lg px-2 py-1 text-small font-semibold text-slate-600 hover:bg-stone-100 hover:text-slate-900">
             {EXPLORE_UI.clear}
           </button>
+          </div>
         </div>
         <p className="mt-2 text-body text-slate-700">{plainDescription(variable)}</p>
         <p className="mt-1 text-caption text-slate-600">
@@ -113,9 +118,12 @@ function AcsSummary({ variable, level, values, fc }: { variable: VariableDef; le
             <div className="text-small font-semibold text-violet-700">{group}</div>
             <h2 className="mt-1 font-display text-title font-bold text-slate-900">{variable.label}</h2>
           </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <ExportMenu items={layerExportItems(variable, level, values, fc ?? bundledGeo(level))} />
           <button onClick={() => setBrowse({ variable: null })} className="shrink-0 rounded-lg px-2 py-1 text-small font-semibold text-slate-600 hover:bg-stone-100 hover:text-slate-900">
             {EXPLORE_UI.clear}
           </button>
+          </div>
         </div>
         <p className="mt-2 text-body text-slate-700">{plainDescription(variable)}</p>
       </div>

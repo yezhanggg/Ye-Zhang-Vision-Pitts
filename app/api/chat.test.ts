@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FACTS_ACK, LIMITS, buildMessages, checkNumbers, clean, pickProvider, tidy } from './chat';
 
 const FACTS = `SELECTED PLACE
@@ -57,5 +57,66 @@ describe('buildMessages, tidy, pickProvider', () => {
     expect(pickProvider({})).toBeNull();
     expect(pickProvider({ DEEPSEEK_API_KEY: 'k', ANTHROPIC_API_KEY: 'a' })?.model).toBe('deepseek-flash');
     expect(pickProvider({ ANTHROPIC_API_KEY: 'a' })?.id).toBe('anthropic');
+  });
+});
+
+describe('scope', () => {
+  it('tells the model the scope, the one-sentence decline and how to label general background', async () => {
+    const { SYSTEM, DECLINE, GENERAL_LABEL } = await import('./chat');
+    expect(SYSTEM).toContain('Scope: Pittsburgh and Allegheny County housing');
+    expect(SYSTEM).toContain(`"${DECLINE}"`);
+    expect(SYSTEM).toContain(`${GENERAL_LABEL}: `);
+    expect(SYSTEM).toMatch(/facts first|FACTS given at the start of the conversation first/);
+    expect(DECLINE).toBe('I can only help with Pittsburgh housing and the data in VisionPitts.');
+  });
+  it('pre-checks only obviously off-topic questions and stays permissive for places and housing words', async () => {
+    const { offTopic } = await import('./chat');
+    expect(offTopic('Give me a recipe for chocolate cake')).toBe(true);
+    expect(offTopic('Write a poem about the ocean')).toBe(true);
+    expect(offTopic('Write me some python code to sort a list')).toBe(true);
+    expect(offTopic('Who won the world cup?')).toBe(true);
+    // housing words, Pittsburgh, and places named in the facts keep it in scope
+    expect(offTopic('Write a poem about rent in Pittsburgh')).toBe(false);
+    expect(offTopic('Any good cooking classes in Hazelwood?', FACTS)).toBe(false);
+    expect(offTopic('Tell me a joke about Greenfield', FACTS)).toBe(false);
+    // no off-topic marker: always left to the model
+    expect(offTopic('What is Squirrel Hill like?')).toBe(false);
+    expect(offTopic('Who is the mayor?')).toBe(false);
+    expect(offTopic('What is the zip code of Squirrel Hill?')).toBe(false);
+  });
+});
+
+describe('handler', () => {
+  const run = async (body: unknown) => {
+    const { default: handler } = await import('./chat');
+    let out: { status: number; body: Record<string, unknown> } = { status: 0, body: {} };
+    await handler({ method: 'POST', body }, { status: (n: number) => ({ json: (b: unknown) => (out = { status: n, body: b as Record<string, unknown> }) }) });
+    return out;
+  };
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+  it('declines an off-topic question in one sentence without calling the model', async () => {
+    vi.stubEnv('DEEPSEEK_API_KEY', 'k');
+    const fetchStub = vi.fn();
+    vi.stubGlobal('fetch', fetchStub);
+    const r = await run({ question: 'Give me a recipe for lasagna', facts: FACTS });
+    expect(fetchStub).not.toHaveBeenCalled();
+    expect(r.body).toMatchObject({ ok: true, text: 'I can only help with Pittsburgh housing and the data in VisionPitts.', checked: true, declined: true });
+  });
+  it('sends an in-scope question to the model with the scope rule in the system prompt', async () => {
+    vi.stubEnv('DEEPSEEK_API_KEY', 'k');
+    vi.stubEnv('EXPLAIN_PROVIDER', 'deepseek');
+    let sent: { messages: { role: string; content: string }[] } | null = null;
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init: { body: string }) => {
+      sent = JSON.parse(init.body);
+      return { ok: true, json: async () => ({ choices: [{ message: { content: 'Median gross rent in Hazelwood is $1,012.\nGeneral background (not from VisionPitts data): rents depend on many things.' } }], usage: {} }) };
+    }));
+    const r = await run({ question: 'What drives rent in Hazelwood?', facts: FACTS });
+    expect(sent!.messages[0].role).toBe('system');
+    expect(sent!.messages[0].content).toContain('I can only help with Pittsburgh housing and the data in VisionPitts.');
+    expect(r.body).toMatchObject({ ok: true, checked: true });
+    expect(String(r.body.text)).toContain('General background (not from VisionPitts data)');
   });
 });

@@ -19,9 +19,9 @@ function fitGlyph(d: number | undefined, topName: string | null): { glyph: strin
 
 function Strip({ x, grade, lite }: { x: number | null; grade: boolean; lite: boolean }) {
   return (
-    <div className="relative h-1.5 flex-1 rounded-full bg-gradient-to-r from-stone-100 via-stone-200 to-stone-300" title={x == null ? 'No data' : grade ? `Grade ${x}` : `Higher than ${Math.round(x * 100)}% of city tracts`}>
-      {!grade && <span className="absolute top-[-2px] h-[10px] w-px bg-slate-400" style={{ left: '50%' }} aria-hidden />}
-      {x == null ? <span className="hatch absolute inset-0 rounded-full" /> : <motion.span className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-slate-900 shadow" initial={false} animate={{ left: `${x * 100}%` }} transition={lite ? { duration: 0 } : { type: 'spring', stiffness: 260, damping: 28 }} />}
+    <div className="relative h-2 flex-1 bg-stone-100" title={x == null ? 'No data' : grade ? `Grade ${x}` : `Higher than ${Math.round(x * 100)}% of city tracts`}>
+      {x == null ? <span className="hatch absolute inset-0" /> : <motion.span className="absolute inset-y-0 left-0 bg-slate-700" initial={false} animate={{ width: `${Math.max(1.5, x * 100)}%` }} transition={lite ? { duration: 0 } : { type: 'spring', stiffness: 260, damping: 28 }} />}
+      {!grade && <span className="absolute -inset-y-[2px] w-px bg-slate-400" style={{ left: '50%' }} aria-hidden />}
     </div>
   );
 }

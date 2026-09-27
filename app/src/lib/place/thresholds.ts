@@ -27,6 +27,10 @@ export const THRESHOLDS = {
   lot_vacant_parcels: 100,
   /** FEMA flood-zone share above which multi-unit types read "check the site". */
   flood_check_site_pct: 15,
+  /** Climate-resilient: most of a tract's land that may sit in a FEMA flood zone (percent). */
+  climate_flood_max_pct: 5,
+  /** Climate-resilient: the transit distance when the planner chose none (miles). */
+  climate_transit_default_mi: 0.5,
   /** Flood word cut points on the FEMA share, in percent. */
   flood_minor_below_pct: 5,
   flood_moderate_upto_pct: 15,
@@ -50,9 +54,13 @@ export const DEFAULT_FIT_ORDER: Record<Stance, Typology[]> = {
   anti_displacement: ['senior', 'small_apartment', 'adu', 'duplex_triplex', 'townhome'],
   market_led: ['townhome', 'small_apartment', 'duplex_triplex', 'adu', 'senior'],
   transit_first: ['small_apartment', 'senior', 'townhome', 'duplex_triplex', 'adu'],
+  climate_resilient: ['small_apartment', 'duplex_triplex', 'townhome', 'senior', 'adu'],
 };
 
-export const STANCES: Stance[] = ['anti_displacement', 'market_led', 'transit_first'];
+/** Climate-resilient: attached and multi-unit forms first, the ADU (detached-scale) last. */
+export const CLIMATE_ORDER: Typology[] = ['small_apartment', 'duplex_triplex', 'townhome', 'senior', 'adu'];
+
+export const STANCES: Stance[] = ['anti_displacement', 'market_led', 'transit_first', 'climate_resilient'];
 export const TYPOLOGIES: Typology[] = ['adu', 'duplex_triplex', 'townhome', 'small_apartment', 'senior'];
 
 export const TYPOLOGY_LABEL: Record<Typology, string> = {
@@ -67,6 +75,7 @@ export const STANCE_LABEL: Record<Stance, string> = {
   anti_displacement: 'Anti-displacement',
   market_led: 'Market-led',
   transit_first: 'Transit-first',
+  climate_resilient: 'Climate-resilient',
 };
 
 /** Which household types each building type is built for (sets the bedrooms and the "because" line). */

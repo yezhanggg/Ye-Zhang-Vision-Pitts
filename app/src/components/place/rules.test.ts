@@ -24,7 +24,8 @@ describe('block A helpers', () => {
   });
   it('prints districts largest first and drops shares under 1%', () => {
     expect(districtText(HAZELWOOD.zoning!.shares)).toBe('P 45% · RIV-GI 12% · R1A-H 10% · H 10% · R1D-M 7% · RM-M 7% · LNC 2% · R2 1%');
-    expect(districtText({ A: 0.4 })).toBe('not available');
+    expect(districtText({ A: 0.4, B: 0.004 })).toBe('A 40%'); // fractions (place.json) scale to percents; under 1% dropped
+    expect(districtText({ A: 40, B: 0.4 })).toBe('A 40%'); // percents stay percents
   });
 });
 
@@ -91,9 +92,9 @@ describe('the rules adapter on Hazelwood', () => {
 });
 
 describe('fit order under each stance', () => {
-  it('re-scores the tract under the three published weight sets', () => {
+  it('re-scores the tract under the four published weight sets', () => {
     const f = fitUnderStances(T);
-    expect(Object.keys(f)).toEqual(['anti_displacement', 'market_led', 'transit_first']);
+    expect(Object.keys(f)).toEqual(['anti_displacement', 'market_led', 'transit_first', 'climate_resilient']);
     for (const k of Object.keys(f)) expect(f[k].result.ranking.length).toBeGreaterThan(0);
   });
 });
