@@ -8,7 +8,6 @@ import { CITY_GEOID, COUNTY_GEOID, bundledValues, hasHistoryFor, historyFor, ref
 import { fmtMoe, fmtValue, reliability } from '../../lib/explore/bins';
 import { RELIABILITY } from '../../lib/explore/catalog';
 import { EXPLORE_UI } from '../../lib/explore/copy';
-import { remoteConfigured } from '../../lib/explore/remote';
 import { composition } from '../../lib/explore/summary';
 import type { Estimate } from '../../lib/explore/types';
 import { fmtInt } from '../../lib/format';
@@ -81,7 +80,7 @@ export default function ScopeOverview() {
           </div>
           <Segmented value={scope} onChange={setScope} size="xs" options={[{ value: 'city', label: 'City' }, { value: 'county', label: 'County' }]} />
         </div>
-        <p className="mt-1 text-caption text-slate-600">Click a tract, ZIP code or municipality on the map, or pick a variable under Data, and this panel follows.</p>
+        <p className="mt-1 text-caption text-slate-600">Click a place on the map for its summary, or pick a variable under Data.</p>
       </div>
       <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-stone-200/70 ring-1 ring-stone-200/70">
         {TILES.map((id) => {
@@ -114,7 +113,7 @@ export default function ScopeOverview() {
         </Section>
       )}
       <Section title={C.analysis} sub={`Across the ${n} ranked city tracts, under ${preset}`}>
-        <button onClick={() => set({ browse: { level: 'tract', variable: 'an_watch_list', selected: null }, layers: { ...useApp.getState().layers, tracts: true } })} className="block w-full rounded-xl bg-rose-50 px-3 py-2 text-left ring-1 ring-rose-200 hover:bg-rose-100/70">
+        <button onClick={() => useApp.getState().setBrowse({ variable: 'an_watch_list', selected: null })} className="block w-full rounded-xl bg-rose-50 px-3 py-2 text-left ring-1 ring-rose-200 hover:bg-rose-100/70">
           <div className="text-small font-semibold text-rose-900">
             Watch list: <span className="tnum">{watch.length}</span> tracts with high need and a rising market
           </div>
@@ -140,8 +139,7 @@ export default function ScopeOverview() {
         </Button>
       </Section>
       <p className="text-caption text-slate-600">
-        {EXPLORE_UI.footer}
-        {remoteConfigured() ? ' · county-wide values load online, the city subset and every municipality are built in' : ' · city subset and every municipality built in'} ·{' '}
+        {EXPLORE_UI.footer} ·{' '}
         <button onClick={() => set({ sourcesOpen: true })} className="font-semibold text-violet-700 hover:underline">
           {EXPLORE_UI.sourcesLink}
         </button>

@@ -1,5 +1,5 @@
 // Smoke test + screenshots against the dev server (or a URL in argv[2]). Writes docs/screenshots/*.png.
-// Shots: landing (00), then the app's two sections: Explore (01-02), Analysis (03-06, 08) and the Sources modal (07).
+// Shots: landing (00), then the app's two sections: Explore (01-02, 10-12), Analysis (03-06, 08) and the Sources window (07).
 // The single-file export shot (09-single-file-export.png) comes from scripts/check_export.mjs.
 import { chromium } from 'playwright';
 const base = process.argv[2] || 'http://localhost:5173';
@@ -18,10 +18,10 @@ await page.goto(`${base}/`);
 await page.waitForSelector('text=Open VisionPitts', { timeout: 25000 });
 await shot('00-landing', 6000);
 // Explore: the first screen after Open (deep links skip the globe intro).
-await open('#m=explore', 'text=Layers');
+await open('#m=explore', 'text=Boundary');
 await shot('01-explore', 5000);
-// Explore: block groups colored by median gross rent, with tracts and the city limits on.
-await open('#m=explore&g=bg&v=med_gross_rent&L=buildings,tracts,bg,city', 'text=Median gross rent');
+// Explore: block groups colored by median gross rent, Pittsburgh only.
+await open('#m=explore&g=bg&v=med_gross_rent&L=buildings,bg,city', 'text=Median gross rent');
 await shot('02-explore-rent-bg', 5000);
 // Analysis > Match: Hazelwood under anti-displacement weights.
 await open(`#m=match&t=42003562300&${W}&c=top`, 'text=Best match here');
@@ -33,16 +33,18 @@ await open('#m=tracts&t=42003562300&b=42003140300&c=top', 'text=Why they differ'
 await shot('05-compare-tracts', 4500);
 await open('#m=scenarios&t=42003562300', 'text=How the two scenarios weigh things');
 await shot('06-compare-scenarios', 4500);
-// Sources & method: logo -> About -> Sources.
-await page.click('[title="About VisionPitts"]');
-await page.getByRole('button', { name: 'Sources', exact: true }).click();
+// Sources & method: Home -> the Sources door of the start page.
+await page.click('[title="Back to the start page"]');
+await page.waitForSelector('text=Open VisionPitts', { timeout: 25000 });
+await page.locator('button', { hasText: 'Every dataset, its vintage' }).click();
 await page.waitForSelector('text=Observed data: where the numbers come from', { timeout: 25000 });
 await shot('07-sources', 1500);
 // Analysis > Match: the asking-rent information layer (licensed listings, never scored).
 await open(`#m=match&${W}&c=info.rent_growth_existing`, 'text=Start here');
 await shot('08-asking-rents', 4500);
-// Explore: the place summary for a tract (tiles, tenure, stock, cost burden, 2014-2024 lines, the matchmaker block).
-await open('#m=explore&L=buildings,terrain,tracts,city&u=tract:42003562300', 'text=Key figures');
+// Explore: the place summary for a tract (tiles, tenure, stock, cost burden, 2014-2024 lines, the matchmaker block),
+// with the question box and its suggested prompts above it.
+await open('#m=explore&L=buildings,terrain,tracts,city&u=tract:42003562300', 'text=Who lives here');
 await shot('10-place-summary', 4500);
 // Explore: one variable for a municipality (rank, distribution, city/county bars, 2014-2024 line).
 await open('#m=explore&L=buildings,muni,city&g=muni&v=med_gross_rent&u=muni:4200366264', 'text=How this compares');

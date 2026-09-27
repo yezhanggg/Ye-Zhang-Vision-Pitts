@@ -1,13 +1,10 @@
-import type { Layers } from '../../lib/store';
 import { LEVEL_LABEL } from '../../lib/explore/catalog';
 import { NO_DATA, finite, fmtTick, fmtValue, paletteFor, refPosition } from '../../lib/explore/bins';
-import { BOUNDARY_STYLE, EXPLORE_UI } from '../../lib/explore/copy';
+import { EXPLORE_UI } from '../../lib/explore/copy';
 import { useReference } from '../../lib/explore/remote';
 import type { BrowseLevel, ValueMap, VariableDef } from '../../lib/explore/types';
 import { classCounts, isAnalysis, type AnalysisVar } from '../../lib/explore/analysisVars';
 import { cx } from '../../lib/format';
-
-const BOUNDARY_IDS = ['tracts', 'bg', 'zcta', 'muni', 'county', 'city'] as const;
 
 /** Anchors a label so it never spills past the ramp ends. */
 const anchor = (pos: number) => (pos < 0.12 ? 'translate-x-0' : pos > 0.88 ? '-translate-x-full' : '-translate-x-1/2');
@@ -24,7 +21,7 @@ function RefMark({ label, pos, value, up }: { label: string; pos: number; value:
 }
 
 /** Legend for an Analysis layer: the fixed ramp (percentiles, scores) or the class swatches, plus the tract-only note. */
-function AnalysisLegend({ variable, values, hoverId, scope }: { variable: AnalysisVar; values: ValueMap; hoverId: string | null; scope: string }) {
+function AnalysisLegend({ variable, values, hoverId }: { variable: AnalysisVar; values: ValueMap; hoverId: string | null }) {
   const hovered = hoverId ? values.get(hoverId) : undefined;
   const hoverClass = hovered && finite(hovered.est) && variable.classOf ? variable.classOf(hovered.est) : null;
   let body: React.ReactNode;
@@ -77,51 +74,25 @@ function AnalysisLegend({ variable, values, hoverId, scope }: { variable: Analys
           <span className={cx('h-3 w-4 rounded-sm', hovered && !finite(hovered.est) && 'ring-2 ring-slate-900')} style={{ background: NO_DATA }} />
           {EXPLORE_UI.legend.noData}
         </div>
-        <div className="tnum">{scope} · {EXPLORE_UI.analysisOnly}</div>
+        <div>{EXPLORE_UI.cityTractsOnly}</div>
       </div>
     </div>
   );
 }
 
 interface Props {
-  variable: VariableDef | null;
+  variable: VariableDef;
   level: BrowseLevel;
-  values: ValueMap | null;
+  values: ValueMap;
   breaks: number[];
   ext: [number, number] | null;
   hoverId: string | null;
-  layers: Layers;
-  scope: string;
 }
 
-/** Bottom-left legend: the five-class ramp with break labels, city/county marks and the hovered unit; boundary swatches otherwise. */
-export default function DataLegend({ variable, level, values, breaks, ext, hoverId, layers, scope }: Props) {
-  const ref = useReference(variable?.id ?? null);
-  if (!variable || !values) {
-    const on = BOUNDARY_IDS.filter((id) => layers[id]);
-    return (
-      <div className="w-60 rounded-xl bg-white/95 px-3.5 py-3 shadow-lg ring-1 ring-black/5 backdrop-blur">
-        <div className="text-small font-semibold text-slate-900">{EXPLORE_UI.legend.boundaries}</div>
-        <div className="mt-1 space-y-1">
-          {on.map((id) => {
-            const s = BOUNDARY_STYLE[id];
-            return (
-              <div key={id} className="flex items-center gap-2 text-caption text-slate-700">
-                <svg width="28" height="8" viewBox="0 0 28 8" aria-hidden>
-                  <line x1="1" y1="4" x2="27" y2="4" stroke={s.color} strokeWidth={s.legendWidth} strokeDasharray={s.dash?.map((d) => d * 2).join(' ')} strokeLinecap="round" />
-                </svg>
-                {s.label}
-              </div>
-            );
-          })}
-          {on.length === 0 && <div className="text-caption text-slate-600">No boundary layers on. Turn one on under Layers.</div>}
-        </div>
-        <div className="mt-1.5 border-t border-stone-200 pt-1.5 text-caption text-slate-600 tnum">{scope}</div>
-      </div>
-    );
-  }
-
-  if (isAnalysis(variable)) return <AnalysisLegend variable={variable} values={values} hoverId={hoverId} scope={scope} />;
+/** Bottom-left legend of the painted variable: the five-class ramp with break labels, city/county marks and the hovered unit. */
+export default function DataLegend({ variable, level, values, breaks, ext, hoverId }: Props) {
+  const ref = useReference(variable.id);
+  if (isAnalysis(variable)) return <AnalysisLegend variable={variable} values={values} hoverId={hoverId} />;
   const palette = paletteFor(breaks.length + 1);
   const n = palette.length;
   const unit = variable.unit;
@@ -161,7 +132,6 @@ export default function DataLegend({ variable, level, values, breaks, ext, hover
           <span className={cx('h-3 w-4 rounded-sm', hoverNoData && 'ring-2 ring-slate-900')} style={{ background: NO_DATA }} />
           {EXPLORE_UI.legend.noData}
         </div>
-        <div className="tnum">{scope}</div>
       </div>
     </div>
   );

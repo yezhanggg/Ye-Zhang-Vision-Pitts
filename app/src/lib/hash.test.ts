@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { encodeHash, parseHash } from './hash';
-import { defaultLayers, useApp, type AppState } from './store';
+import { defaultLayers, exclusiveLayers, useApp, type AppState } from './store';
 import { tractById, tracts } from './data';
 
 // A ranked city tract (Hazelwood) when the bundle has it, else any bundled tract.
@@ -21,13 +21,37 @@ describe('parseHash', () => {
     expect(p.weights?.displacement_risk).toBe(3);
   });
 
-  it('reads Explore layers, level and variable exactly as written', () => {
+  it('reads Explore layers, level and variable, and opens only the boundary being browsed', () => {
     const p = parseHash('m=explore&L=tracts,city&g=bg&v=pop');
     expect(p.mode).toBe('explore');
     expect(p.lastAnalysis).toBeUndefined();
-    // L lists the layers that are on; bg stays off here even though g=bg (the store turns it on via setBrowse, parseHash is pure).
-    expect(p.layers).toEqual({ buildings: false, terrain: false, hillshade: false, tracts: true, bg: false, zcta: false, muni: false, county: false, city: true });
+    // One boundary at a time: g=bg with a variable opens block groups and closes tracts; city = "Pittsburgh only".
+    expect(p.layers).toEqual({ buildings: false, terrain: false, hillshade: false, tracts: false, bg: true, zcta: false, muni: false, county: false, city: true });
     expect(p.browse).toEqual({ level: 'bg', variable: 'pop', selected: null });
+    expect(p.browsePanel).toBe(true);
+  });
+
+  it('keeps one boundary from an older link that lists several, and none when the link turned it off', () => {
+    const p = parseHash('m=explore&L=buildings,tracts,bg,zcta,county,city');
+    expect(p.layers).toEqual({ buildings: true, terrain: false, hillshade: false, tracts: true, bg: false, zcta: false, muni: false, county: false, city: true });
+    expect(parseHash('m=explore&L=buildings,city').layers?.tracts).toBe(false);
+  });
+
+  it('municipalities turn "Pittsburgh only" off, and a link without L opens the browsed boundary', () => {
+    const p = parseHash('m=explore&L=muni,city&g=muni');
+    expect(p.layers?.muni).toBe(true);
+    expect(p.layers?.city).toBe(false);
+    const q = parseHash('m=explore&g=zcta');
+    expect(q.layers?.zcta).toBe(true);
+    expect(q.layers?.tracts).toBe(false);
+    expect(q.browsePanel).toBe(false);
+  });
+
+  it('an Analysis layer is a tract layer', () => {
+    const p = parseHash('m=explore&g=zcta&v=an_watch_list');
+    expect(p.browse).toEqual({ level: 'tract', variable: 'an_watch_list', selected: null });
+    expect(p.layers?.tracts).toBe(true);
+    expect(p.layers?.zcta).toBe(false);
   });
 
   it('reads a selected unit', () => {
@@ -70,7 +94,7 @@ describe('encodeHash', () => {
     const state: AppState = {
       ...base(),
       mode: 'explore',
-      layers: { ...defaultLayers(false), bg: true },
+      layers: exclusiveLayers(defaultLayers(false), 'zcta'),
       browse: { level: 'zcta', variable: 'renter_share', selected: { level: 'zcta', geoid: '15207' } },
     };
     const p = parseHash(encodeHash(state));

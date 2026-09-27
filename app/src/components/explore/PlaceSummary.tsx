@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 import { FMR_2BR, askingRents, scoring, tractById } from '../../lib/data';
 import { stabilityFor, tLabel, useAllResults } from '../../lib/derived';
 import { matchPreset, useApp, type Level } from '../../lib/store';
-import { CITY_GEOID, COUNTY_GEOID, LEVEL_LABEL, RELIABILITY, hasHistoryFor, referenceSeries, reference, rentAreaFor, rentAreas, variableById, xwDominant, history } from '../../lib/explore/catalog';
+import { CITY_GEOID, COUNTY_GEOID, LEVEL_LABEL, RELIABILITY, hasHistoryFor, plainDescription, referenceSeries, reference, rentAreaFor, rentAreas, variableById, xwDominant, history } from '../../lib/explore/catalog';
 import { useSeries } from '../../lib/explore/remote';
 import { estimates, fmtMoe, fmtTick, fmtValue, reliability } from '../../lib/explore/bins';
 import { EXPLORE_UI } from '../../lib/explore/copy';
@@ -273,7 +273,6 @@ export default function PlaceSummary({ level, geoid, unit }: { level: Level; geo
 
 /** One variable for one place: value, rank among peers, distribution, comparison bars and the 2014–2024 line. */
 export function VariableDetail({ level, geoid, variable, values, unit }: { level: Level; geoid: string; variable: VariableDef; values: Loaded<ValueMap> | null; unit: Record<string, Estimate> | null }) {
-  const setBrowse = useApp((s) => s.setBrowse);
   const many = LEVEL_LABEL[level].many;
   const analysis = isAnalysis(variable) ? variable : null;
   const series = useSeries(analysis ? null : level, geoid, analysis ? null : variable.id);
@@ -306,7 +305,7 @@ export function VariableDetail({ level, geoid, variable, values, unit }: { level
             </div>
           </div>
         )}
-        <p className="mt-2 text-caption text-slate-600">{variable.description}</p>
+        <p className="mt-2 text-caption text-slate-600">{plainDescription(variable)}</p>
       </div>
       {hist.edges.length > 1 && (
         <Section title={C.distribution} sub={`All ${hist.n} ${many} with a value`}>
@@ -324,9 +323,6 @@ export function VariableDetail({ level, geoid, variable, values, unit }: { level
         </Section>
       )}
       {analysis?.group === 'an_rents' && <RentLine level={level} geoid={geoid} />}
-      <button onClick={() => setBrowse({ variable: null })} className="w-full rounded-xl bg-white px-3 py-2 text-small font-semibold text-violet-700 ring-1 ring-stone-200 hover:bg-violet-50">
-        {C.showEverything}
-      </button>
     </div>
   );
 }

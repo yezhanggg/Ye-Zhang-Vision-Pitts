@@ -170,6 +170,8 @@ export const UI = {
   copyLink: 'Copy link',
   linkCopied: 'Link copied ✓',
   aboutTitle: 'About VisionPitts',
+  home: 'Home',
+  homeTitle: 'Back to the start page',
   analysisCaption: 'Housing typology matchmaker · value judgments are labeled',
   // floating panels
   panels: 'Panels',
@@ -181,8 +183,7 @@ export const UI = {
   showPanel: 'Show panel',
   hideSummary: 'Hide summary',
   showSummary: 'Show summary',
-  reduceMotion: 'Reduce motion',
-  sourcesShort: 'Sources & method',
+  summaryTab: 'Summary',
 };
 
 export function directionWord(d: string | null | undefined): string {

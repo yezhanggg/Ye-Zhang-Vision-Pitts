@@ -13,7 +13,7 @@ page.on('request', (r) => { if (r.url().includes('supabase.co')) supabase.push(r
 await page.goto(file);
 await page.waitForSelector('text=Open VisionPitts', { timeout: 20000 });
 await page.click('text=Open VisionPitts');
-await page.waitForSelector('text=Layers', { timeout: 20000 });
+await page.waitForSelector('text=Boundary', { timeout: 20000 });
 // the globe intro runs after Open; cut it short so the rest of the check is deterministic
 await page.waitForTimeout(1500);
 const skip = page.locator('text=Skip intro');

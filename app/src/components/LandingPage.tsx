@@ -6,7 +6,6 @@ import { buildPaint } from '../lib/paint';
 import { HERO_VIEW } from '../lib/mapStyle';
 import { presetWeights, useApp } from '../lib/store';
 import MapView from './MapView';
-import Logo from './Logo';
 import { AboutModal, LimitsModal } from './LandingModals';
 
 function HeroMap() {
@@ -39,7 +38,8 @@ export default function LandingPage() {
   const set = useApp((s) => s.set);
   const enter = () => {
     const s = useApp.getState();
-    useApp.setState({ view: 'app', mode: 'explore', introNonce: s.introNonce + 1, introDone: false });
+    // A fresh visit starts clean: nothing selected, nothing painted, the summary folded away and the tip back.
+    useApp.setState({ view: 'app', mode: 'explore', introNonce: s.introNonce + 1, introDone: false, hintClosed: false, browsePanel: false, browse: { level: s.browse.level, variable: null, selected: null } });
   };
 
   return (
@@ -61,11 +61,6 @@ export default function LandingPage() {
 
       {/* the four doors */}
       <div className="scroll-quiet flex min-h-0 flex-col overflow-y-auto border-l border-stone-200/70 px-6 py-6 md:px-12 md:py-10">
-        <div className="flex items-center gap-2.5">
-          <Logo size={30} />
-          <span className="font-display text-title font-bold tracking-tight text-slate-900">VisionPitts</span>
-        </div>
-
         <div className="my-auto space-y-3 py-10">
           <Tile primary title="Open VisionPitts" sub="Browse the census, then match housing types to places." onClick={enter} />
           <Tile title="Sources" sub="Every dataset, its vintage, geography and caveats." onClick={() => set({ sourcesOpen: true })} />

@@ -2,16 +2,15 @@ import { useMemo } from 'react';
 import { matchPreset, useApp } from '../../lib/store';
 import { scoring } from '../../lib/data';
 import { classCounts, fmtAnalysis, isAnalysis, type AnalysisVar } from '../../lib/explore/analysisVars';
-import { LEVEL_LABEL, RELIABILITY, bundledGeo, groups, hasHistoryFor, referenceSeries, unitTitle } from '../../lib/explore/catalog';
+import { LEVEL_LABEL, RELIABILITY, bundledGeo, groups, hasHistoryFor, plainDescription, referenceSeries, unitTitle } from '../../lib/explore/catalog';
 import { histogram, topBottom } from '../../lib/explore/summary';
 import { HistogramChart, LineChart, SERIES, fmtK } from '../charts';
 import { estimates, fmtMoe, fmtTick, fmtValue, reliability, reliabilityMix } from '../../lib/explore/bins';
-import { EXPLORE_UI, scopeText } from '../../lib/explore/copy';
+import { EXPLORE_UI } from '../../lib/explore/copy';
 import { useReference } from '../../lib/explore/remote';
 import type { BrowseLevel, Estimate, Loaded, UnitFC, ValueMap, VariableDef } from '../../lib/explore/types';
 import { Button, ConfChip, InfoTip, SectionTitle } from '../primitives';
 
-const KIND_WORD: Record<string, string> = { median: 'Median · margin as published', sum: 'Sum of counts · root-sum-square margin', share: 'Share · ACS proportion margin' };
 const MIX = [
   { key: 'high', label: EXPLORE_UI.summary.high, color: '#10b981' },
   { key: 'medium', label: EXPLORE_UI.summary.medium, color: '#f59e0b' },
@@ -55,7 +54,7 @@ function AnalysisSummary({ variable, values }: { variable: AnalysisVar; values: 
             {EXPLORE_UI.clear}
           </button>
         </div>
-        <p className="mt-2 text-body text-slate-700">{variable.description}</p>
+        <p className="mt-2 text-body text-slate-700">{plainDescription(variable)}</p>
         <p className="mt-1 text-caption text-slate-600">
           {EXPLORE_UI.analysisOnly}
           {variable.group === 'an_match' && ` · ${EXPLORE_UI.analysisPriorities(preset)}`}
@@ -97,7 +96,7 @@ function AnalysisSummary({ variable, values }: { variable: AnalysisVar; values: 
           {EXPLORE_UI.intro.analysis}
         </Button>
       </div>
-      <p className="text-caption text-slate-600 tnum">{ests.length} of {values.data.size} city tracts · {EXPLORE_UI.analysisOnly}</p>
+      <p className="text-caption text-slate-600">{EXPLORE_UI.analysisOnly}</p>
     </div>
   );
 }
@@ -130,10 +129,7 @@ function AcsSummary({ variable, level, values, fc }: { variable: VariableDef; le
             {EXPLORE_UI.clear}
           </button>
         </div>
-        <p className="mt-2 text-body text-slate-700">{variable.description}</p>
-        <p className="mt-1 text-caption text-slate-600 tnum">
-          {variable.table_id} · {KIND_WORD[variable.kind] ?? variable.kind}
-        </p>
+        <p className="mt-2 text-body text-slate-700">{plainDescription(variable)}</p>
       </div>
       <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-stone-200/70 ring-1 ring-stone-200/70">
         <RefStat k="City of Pittsburgh" e={ref.city} variable={variable} />
@@ -192,9 +188,7 @@ function AcsSummary({ variable, level, values, fc }: { variable: VariableDef; le
           ))}
         </div>
       </section>
-      <p className="text-caption text-slate-600 tnum">
-        {scopeText(values.data.size, many, values.source === 'supabase')} · {EXPLORE_UI.footer}
-      </p>
+      <p className="text-caption text-slate-600">{EXPLORE_UI.footer}</p>
     </div>
   );
 }

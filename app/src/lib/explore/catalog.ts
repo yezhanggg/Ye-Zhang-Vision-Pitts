@@ -103,6 +103,12 @@ export function reference(varId: string | null): { city: Estimate | null; county
   return { city: c ? toEstimate(c) : null, county: k ? toEstimate(k) : null };
 }
 
+/**
+ * A variable's description without the census table numbers ("(B25064)", "(C17002; B17001 is not …)"). Explore shows
+ * this; the Sources window keeps the table of every variable with its table number.
+ */
+export const plainDescription = (v: Pick<VariableDef, 'description'>) => v.description.replace(/\s*\([^()]*\b[A-Z]{1,2}\d{4,5}[A-Z]?\b[^()]*\)/g, '').trim();
+
 /** Display name: city tracts show the neighborhood, everything else its published name. */
 export const unitTitle = (p: UnitProps | null | undefined) => (!p ? '—' : p.neighborhood ? String(p.neighborhood) : p.name);
 export const unitSubtitle = (p: UnitProps | null | undefined) => (p?.neighborhood ? p.name : null);

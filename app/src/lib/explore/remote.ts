@@ -169,26 +169,30 @@ const online = <T,>(data: T): Loaded<T> => ({ data, source: 'supabase' as DataSo
 /** Bundled data is the city subset, except for levels the bundle holds county-wide (municipalities). */
 const bundled = <T,>(data: T, level: GeoLevel): Loaded<T> => ({ data, source: 'bundled' as DataSource, scope: (isCountyWide(level) ? 'county' : 'city') as Scope });
 
-/** Geometry for a level: bundled first, county-wide when Supabase answers. */
-export function useGeo(level: GeoLevel): Loaded<UnitFC> {
-  const snapshot = (l: GeoLevel) => {
-    const r = geoResults.get(l);
-    return { level: l, ...(r ? online(r) : bundled(bundledGeo(l), l)) };
+/**
+ * Geometry for a level: bundled first, county-wide when Supabase answers. With `cityOnly` ("Pittsburgh only") the
+ * bundled city subset is the answer and nothing is requested.
+ */
+export function useGeo(level: GeoLevel, cityOnly = false): Loaded<UnitFC> {
+  const snapshot = (l: GeoLevel, only: boolean) => {
+    const r = only ? undefined : geoResults.get(l);
+    return { level: l, only, ...(r ? online(r) : bundled(bundledGeo(l), l)) };
   };
-  const [state, setState] = useState(() => snapshot(level));
+  const [state, setState] = useState(() => snapshot(level, cityOnly));
   useEffect(() => {
     let live = true;
-    const s = snapshot(level);
-    setState((prev) => (prev.level === level && prev.data === s.data ? prev : s));
-    if (s.source === 'supabase' || !remoteEnabled()) return;
+    const s = snapshot(level, cityOnly);
+    setState((prev) => (prev.level === level && prev.only === cityOnly && prev.data === s.data ? prev : s));
+    if (cityOnly || s.source === 'supabase' || !remoteEnabled()) return;
     void loadGeo(level).then((fc) => {
-      if (live && fc) setState({ level, ...online(fc) });
+      if (live && fc) setState({ level, only: false, ...online(fc) });
     });
     return () => {
       live = false;
     };
-  }, [level]);
-  return state;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [level, cityOnly]);
+  return state.level === level && state.only === cityOnly ? state : snapshot(level, cityOnly);
 }
 
 const bundledValueCache = new Map<string, ValueMap>();
@@ -202,12 +206,12 @@ function bundledVariable(level: GeoLevel, varId: string): ValueMap {
   return m;
 }
 
-/** One variable's values at a level, or null without a variable. Same bundled → online swap as useGeo. */
-export function useVariable(level: GeoLevel, varId: string | null): Loaded<ValueMap> | null {
-  const key = varId ? `${level}:${varId}` : null;
+/** One variable's values at a level, or null without a variable. Same bundled → online swap, and the same `cityOnly`, as useGeo. */
+export function useVariable(level: GeoLevel, varId: string | null, cityOnly = false): Loaded<ValueMap> | null {
+  const key = varId ? `${level}:${varId}:${cityOnly ? 'city' : 'all'}` : null;
   const snapshot = (k: string | null) => {
     if (!k || !varId) return null;
-    const r = valueResults.get(k);
+    const r = cityOnly ? undefined : valueResults.get(`${level}:${varId}`);
     return { key: k, ...(r ? online(r) : bundled(bundledVariable(level, varId), level)) };
   };
   const [state, setState] = useState(() => snapshot(key));
@@ -215,7 +219,7 @@ export function useVariable(level: GeoLevel, varId: string | null): Loaded<Value
     let live = true;
     const s = snapshot(key);
     setState((prev) => (prev?.key === s?.key && prev?.data === s?.data ? prev : s));
-    if (!s || !varId || s.source === 'supabase' || !remoteEnabled()) return;
+    if (!s || !varId || cityOnly || s.source === 'supabase' || !remoteEnabled()) return;
     void loadValues(level, varId).then((m) => {
       if (live && m) setState({ key: s.key, ...online(m) });
     });

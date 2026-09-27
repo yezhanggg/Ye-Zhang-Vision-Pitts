@@ -121,3 +121,17 @@ Hazelwood (hero, watch list) · Garfield · Middle Hill · Homewood North · Low
 | Analysis layers in Explore | Factor percentiles, scores under the current priorities, pressure, watch list, asking rents, raw inputs, painted for city tracts only with the Analysis palettes | Same values, same colours as the Analysis section, so the two screens never disagree. | |
 | Asking-rent areas | Yearly 2BR medians and distinct units per tract, ZIP and municipality, same suppression as tracts (10 per cell, 20 pooled) | Licensed aggregates only. | Ye |
 | Layout | Floating, collapsible panels with per-browser persistence; no numbered steps | Ye's request; defaults keep every panel open so a first visit and the smoke tests see the full interface. | Ye |
+
+### 10b. Additions of Sat 2026-09-26 (late): a plainer Explore and the question box
+
+| Choice | Value | Rationale | Revisit by |
+|---|---|---|---|
+| Boundaries | One open at a time (tracts, block groups, ZIP codes, municipalities); Data lists the variables of the open one; Analysis layers appear with tracts only | Ye's request: people see what they ask for. An older link that lists several boundaries opens the one being browsed. | Ye |
+| Pittsburgh only | On by default; shows the bundled city subset and the city limits, asks nothing of Supabase. Off = the whole county. Off and locked while municipalities are open | All 129 municipalities lie outside the city. ZIP codes that touch the city count as "in". | Ye |
+| Settings | Buildings, terrain, hill shading and the ⌘ flat-view hint, collapsed by default | They change how the map looks, not what it shows. | |
+| Hover | Name and the latest value only | Margins and reliability stay in the summary panel. | Ye |
+| Summary panel | Folded into a tab until a place or a variable is chosen; a variable plus a click shows that variable only; the Key figures table is gone; census table numbers show only in the Sources window | Ye's request. | Ye |
+| Click tip | "Click any boundary…" shows when nothing is painted or selected, can be closed, returns on every fresh opening of the tool (which also clears the selection and the painted variable) | Ye's request. | Ye |
+| Shell | No name or logo on the start page header or over the map; Home returns to the start page, where Sources, Limitations and About live; no Reduce motion switch (the system setting and `lite=1` still apply) | Ye's request. | Ye |
+| Question box | `app/api/chat.ts`, same provider as the explanation (DeepSeek flash). Facts: the selected place, places whose bounding-box centre lies within 3 miles (nearest 12, places under 50 residents left out; the 5 nearest when none is that close), city, county, the matchmaker's read, asking-rent aggregates. Numbers in the answer are checked against the facts; one retry, then a visible warning | The model rephrases, code computes. Distance between bounding-box centres is an approximation and is stated as such in the facts. | Ye |
+

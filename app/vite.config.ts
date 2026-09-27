@@ -19,21 +19,23 @@ function devApi(): Plugin {
       } catch {
         /* no root .env */
       }
-      server.middlewares.use('/api/explain', async (req, res) => {
-        const chunks: Buffer[] = [];
-        for await (const c of req) chunks.push(c as Buffer);
-        const mod = await server.ssrLoadModule('/api/explain.ts');
-        const shim = {
-          status: (code: number) => ({
-            json: (b: unknown) => {
-              res.statusCode = code;
-              res.setHeader('content-type', 'application/json');
-              res.end(JSON.stringify(b));
-            },
-          }),
-        };
-        await mod.default({ method: req.method, body: Buffer.concat(chunks).toString('utf8') }, shim);
-      });
+      for (const name of ['explain', 'chat']) {
+        server.middlewares.use(`/api/${name}`, async (req, res) => {
+          const chunks: Buffer[] = [];
+          for await (const c of req) chunks.push(c as Buffer);
+          const mod = await server.ssrLoadModule(`/api/${name}.ts`);
+          const shim = {
+            status: (code: number) => ({
+              json: (b: unknown) => {
+                res.statusCode = code;
+                res.setHeader('content-type', 'application/json');
+                res.end(JSON.stringify(b));
+              },
+            }),
+          };
+          await mod.default({ method: req.method, body: Buffer.concat(chunks).toString('utf8') }, shim);
+        });
+      }
     },
   };
 }

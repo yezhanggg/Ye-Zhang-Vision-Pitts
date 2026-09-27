@@ -26,6 +26,21 @@ export const LAYER_IDS: LayerId[] = ['buildings', 'terrain', 'hillshade', 'tract
 export type Layers = Record<LayerId, boolean>;
 /** The map layer that carries a browse level. */
 export const LAYER_FOR_LEVEL: Record<Level, LayerId> = { tract: 'tracts', bg: 'bg', zcta: 'zcta', muni: 'muni' };
+/** The boundaries of Explore. One is open at a time; the Data list and the summary follow the open one. */
+export const BOUNDARY_LAYERS: LayerId[] = ['tracts', 'bg', 'zcta', 'muni'];
+const LEVEL_FOR_LAYER: Partial<Record<LayerId, Level>> = { tracts: 'tract', bg: 'bg', zcta: 'zcta', muni: 'muni' };
+/** Analysis layers (ids `an_*`) exist for city tracts only. */
+export const isAnalysisId = (id: string | null | undefined) => !!id && id.startsWith('an_');
+/**
+ * Keeps `keep` as the only open boundary (none when null). `city` is the "Pittsburgh only" switch: it limits the
+ * shapes to the city and draws the city limits. Municipalities all lie outside the city, so opening them turns it off.
+ */
+export function exclusiveLayers(layers: Layers, keep: LayerId | null): Layers {
+  const out: Layers = { ...layers, county: false };
+  for (const id of BOUNDARY_LAYERS) out[id] = id === keep;
+  if (keep === 'muni') out.city = false;
+  return out;
+}
 
 export interface Browse {
   level: Level;
@@ -36,14 +51,15 @@ export interface Browse {
 }
 
 // ------------------------------------------------------------------ layout: floating panels and their sections
-/** Collapsible sections of the left panel. Explore uses search/layers/data; the Analysis views use the rest. */
-export type SectionId = 'search' | 'layers' | 'data' | 'place' | 'priorities' | 'colorBy' | 'save' | 'compare';
+/** Collapsible sections of the left panel. Explore uses search/layers (Boundary)/data/settings; the Analysis views use the rest. */
+export type SectionId = 'search' | 'layers' | 'data' | 'settings' | 'place' | 'priorities' | 'colorBy' | 'save' | 'compare';
 export type SectionState = 'open' | 'collapsed' | 'hidden';
-export const SECTION_IDS: SectionId[] = ['search', 'layers', 'data', 'place', 'priorities', 'colorBy', 'save', 'compare'];
+export const SECTION_IDS: SectionId[] = ['search', 'layers', 'data', 'settings', 'place', 'priorities', 'colorBy', 'save', 'compare'];
 export const SECTION_LABELS: Record<SectionId, string> = {
   search: 'Search',
-  layers: 'Layers',
+  layers: 'Boundary',
   data: 'Data',
+  settings: 'Settings',
   place: 'Find a place',
   priorities: 'What matters most',
   colorBy: 'Color the map by',
@@ -52,7 +68,7 @@ export const SECTION_LABELS: Record<SectionId, string> = {
 };
 /** Sections each mode shows, in panel order (the Panels menu lists these). */
 export const SECTIONS_FOR_MODE: Record<Mode, SectionId[]> = {
-  explore: ['search', 'layers', 'data'],
+  explore: ['search', 'layers', 'data', 'settings'],
   match: ['place', 'priorities', 'colorBy', 'save'],
   tracts: ['place', 'priorities', 'colorBy'],
   scenarios: ['place', 'compare', 'priorities'],
@@ -65,7 +81,8 @@ export interface UiState {
   sections: Record<SectionId, SectionState>;
 }
 const UI_KEY = 'visionpitts.ui';
-export const defaultUi = (): UiState => ({ left: true, right: true, sections: Object.fromEntries(SECTION_IDS.map((id) => [id, 'open'])) as Record<SectionId, SectionState> });
+/** Everything open except Settings, which most visits never need. */
+export const defaultUi = (): UiState => ({ left: true, right: true, sections: Object.fromEntries(SECTION_IDS.map((id) => [id, id === 'settings' ? 'collapsed' : 'open'])) as Record<SectionId, SectionState> });
 /** Layout preferences persist per browser; never in the URL. Anything unreadable falls back to the defaults. */
 function readUi(): UiState {
   const d = defaultUi();
@@ -121,7 +138,10 @@ try {
   /* no window in tests */
 }
 
-/** Hill shading is off by default so the basemap stays evenly toned; 3D relief and contours follow the Terrain layer. */
+/**
+ * Hill shading is off by default so the basemap stays evenly toned; 3D relief and contours follow the Terrain layer.
+ * Explore opens on census tracts with "Pittsburgh only" (`city`) on.
+ */
 export const defaultLayers = (lite = liteDefault): Layers => ({ buildings: true, terrain: !lite, hillshade: false, tracts: true, bg: false, zcta: false, muni: false, county: false, city: true });
 export const defaultBrowse = (): Browse => ({ level: 'tract', variable: null, selected: null });
 
@@ -149,6 +169,10 @@ export interface AppState {
   browse: Browse;
   /** Unit under the cursor in Explore (for the legend tick). */
   hoverId: string | null;
+  /** Explore's summary panel. Per visit, not stored: it opens when there is something to show and folds away after. */
+  browsePanel: boolean;
+  /** The "click a boundary" hint was closed. Per visit: it comes back each time the tool is opened. */
+  hintClosed: boolean;
   ui: UiState;
   set: (p: Partial<AppState>) => void;
   setUi: (p: Partial<UiState>) => void;
@@ -165,6 +189,14 @@ export interface AppState {
 }
 
 const initialScenarios = defaultScenarios();
+
+/** Explore's summary panel opens when a new unit or variable gives it something to show, and folds away when nothing is left. */
+function panelAfter(was: boolean, before: Browse, after: Browse): boolean {
+  const has = !!(after.selected || after.variable);
+  if (has && (after.selected !== before.selected || after.variable !== before.variable)) return true;
+  if (!has && (before.selected || before.variable)) return false;
+  return was;
+}
 
 export const useApp = create<AppState>((set, get) => ({
   view: 'landing',
@@ -186,6 +218,8 @@ export const useApp = create<AppState>((set, get) => ({
   layers: defaultLayers(),
   browse: defaultBrowse(),
   hoverId: null,
+  browsePanel: false,
+  hintClosed: false,
   ui: readUi(),
   set: (p) => set(p),
   setUi: (p) => {
@@ -236,6 +270,25 @@ export const useApp = create<AppState>((set, get) => ({
   },
   setLayer: (id, on) => {
     const s = get();
+    const level = LEVEL_FOR_LAYER[id];
+    if (level) {
+      // A boundary: opening one closes the others and the data follows it; closing it clears what was painted.
+      const same = level === s.browse.level;
+      const browse: Browse = on
+        ? { level, variable: same || (level === 'tract' ? true : !isAnalysisId(s.browse.variable)) ? s.browse.variable : null, selected: same ? s.browse.selected : null }
+        : { level: s.browse.level, variable: null, selected: null };
+      set({ layers: exclusiveLayers(s.layers, on ? id : null), browse, browsePanel: panelAfter(s.browsePanel, s.browse, browse) });
+      return;
+    }
+    if (id === 'city') {
+      // "Pittsburgh only". Municipalities all lie outside the city, so it stays off while they are open.
+      if (on && s.layers.muni) return;
+      const sel = s.browse.selected;
+      const keep = !on || !sel || (sel.level === 'tract' && tractById.has(sel.geoid));
+      const browse: Browse = keep ? s.browse : { ...s.browse, selected: null };
+      set({ layers: { ...s.layers, city: on }, browse, browsePanel: panelAfter(s.browsePanel, s.browse, browse) });
+      return;
+    }
     const patch: Partial<AppState> = { layers: { ...s.layers, [id]: on } };
     if (id === 'terrain' && on && s.lite) patch.lite = false;
     set(patch);
@@ -243,16 +296,17 @@ export const useApp = create<AppState>((set, get) => ({
   setBrowse: (p) => {
     const s = get();
     const browse: Browse = { ...s.browse, ...p };
-    const patch: Partial<AppState> = { browse };
-    // Choosing a level or a variable turns that level's map layer on so the choice is visible.
-    if ((p.level && p.level !== s.browse.level) || (p.variable && !s.browse.variable)) {
-      const layer = LAYER_FOR_LEVEL[browse.level];
-      if (!s.layers[layer]) patch.layers = { ...s.layers, [layer]: true };
-    }
+    // The selected unit and an Analysis layer decide the boundary; anything that no longer fits it is dropped.
+    if (p.selected) browse.level = p.selected.level;
+    else if (p.variable && isAnalysisId(p.variable)) browse.level = 'tract';
+    if (browse.selected && browse.selected.level !== browse.level) browse.selected = null;
+    if (browse.level !== 'tract' && isAnalysisId(browse.variable)) browse.variable = null;
+    const patch: Partial<AppState> = { browse, browsePanel: panelAfter(s.browsePanel, s.browse, browse) };
+    // Choosing a level, a variable or a unit opens that level's boundary (and only that one).
+    const layer = LAYER_FOR_LEVEL[browse.level];
+    if ((browse.level !== s.browse.level || p.variable || p.selected) && BOUNDARY_LAYERS.some((id) => s.layers[id] !== (id === layer))) patch.layers = exclusiveLayers(s.layers, layer);
     // A selected city tract is also the Analysis tract, so "Open in Analysis" lands on it.
     if (p.selected && p.selected.level === 'tract' && tractById.has(p.selected.geoid)) patch.selectedId = p.selected.geoid;
-    // Picking a unit or a variable brings the summary panel back if it was hidden.
-    if ((p.selected || p.variable) && !s.ui.right) patch.ui = { ...s.ui, right: true };
     set(patch);
   },
 }));

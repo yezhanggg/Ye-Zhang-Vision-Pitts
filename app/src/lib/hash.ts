@@ -1,10 +1,14 @@
 // The shareable part of the state lives in the URL hash.
 //   Explore:  m=explore  L=<layers on>  g=<level>  v=<variable>  u=<level:geoid>  p=<pin>  lite=1
+//             (one boundary is open at a time: the level being browsed decides which; `city` in L = "Pittsburgh only")
 //   Analysis: m=match|tracts|scenarios  t  b  w  s  sa  sb  c  L  p  lite
 // parseHash / encodeHash are pure so they can be unit-tested; readHash / startHashSync wire them to the store.
 import { activeFactorIds, scoring, tractById } from './data';
 import {
   defaultLayers,
+  exclusiveLayers,
+  isAnalysisId,
+  LAYER_FOR_LEVEL,
   LAYER_IDS,
   LEVELS,
   MAX_SCENARIOS,
@@ -125,10 +129,26 @@ export function parseHash(h: string): Partial<AppState> {
     const [lvl, geoid] = u.split(':');
     if (isLevel(lvl) && geoid && GEOID_RE.test(geoid)) browse.selected = { level: lvl, geoid };
   }
-  if (Object.keys(browse).length) patch.browse = { level: 'tract', variable: null, selected: null, ...browse };
+  if (Object.keys(browse).length) {
+    const b: Browse = { level: 'tract', variable: null, selected: null, ...browse };
+    // The selected unit decides the boundary; Analysis layers exist for tracts only.
+    if (b.selected) b.level = b.selected.level;
+    else if (isAnalysisId(b.variable)) b.level = 'tract';
+    if (b.level !== 'tract' && isAnalysisId(b.variable)) b.variable = null;
+    patch.browse = b;
+    patch.browsePanel = !!(b.selected || b.variable);
+  }
   if (q.get('lite') === '1') {
     patch.lite = true;
     patch.layers = { ...(patch.layers ?? defaultLayers(true)), terrain: false };
+  }
+  // One boundary at a time. Links written before that rule may list several; the browsed level wins.
+  if (patch.layers || patch.browse) {
+    const b = patch.browse;
+    const id = LAYER_FOR_LEVEL[b?.level ?? 'tract'];
+    const base = patch.layers ?? defaultLayers(!!patch.lite);
+    const open = !q.has('L') || base[id] || !!b?.variable || !!b?.selected;
+    patch.layers = exclusiveLayers(base, open ? id : null);
   }
   return patch;
 }

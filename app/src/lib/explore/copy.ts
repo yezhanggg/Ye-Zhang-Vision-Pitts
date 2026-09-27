@@ -1,31 +1,43 @@
 // Copy for the Explore data browser, in one place so wording stays consistent.
-import type { BrowseLevel, LayerKey, Unit } from './types';
+import type { LayerKey, Unit } from './types';
 import { ordinalSuffix } from '../format';
 
 export const EXPLORE_UI = {
   search: 'Search an address, neighborhood, tract or ZIP',
   searchPlaceholder: 'Address, neighborhood, tract or ZIP',
   outsideScope: (scope: 'city' | 'county') => (scope === 'county' ? 'That place is outside Allegheny County.' : 'That place is outside the City of Pittsburgh. Online county-wide data is unavailable right now.'),
-  layers: 'Layers',
-  layersSub: 'What the map shows',
+  layers: 'Boundary',
+  layersSub: 'One at a time',
+  cityOnly: { label: 'Pittsburgh only', caption: 'Show only places inside the City of Pittsburgh', muni: 'Municipalities are all outside Pittsburgh' },
+  settings: 'Settings',
+  settingsSub: 'How the map looks',
   data: 'Data',
-  dataSub: 'Color the shapes by a census variable',
-  reduceMotion: { label: 'Reduce motion', caption: 'No camera flights, tweens or 3D terrain' },
-  terrainOffWhenLite: 'Off while Reduce motion is on',
-  levelShort: { tract: 'Tracts', bg: 'Block groups', zcta: 'ZIP codes', muni: 'Municipalities' } as Record<BrowseLevel, string>,
+  dataSub: (many: string) => `Color the ${many} by one variable`,
+  dataClosed: 'Open a boundary to see its data.',
+  cityTractsOnly: 'Pittsburgh tracts only',
+  terrainOffWhenLite: 'Off while your system asks for reduced motion',
+  hint: 'Click any boundary on the map to see a summary of that place.',
+  hintClose: 'Close this tip',
+  summaryTab: 'Summary',
+  chat: {
+    ask: 'Ask about the map',
+    askAbout: (name: string) => `Ask about ${name}`,
+    about: (name: string) => `About ${name} and the places around it`,
+    aboutNone: 'Click a place first for answers about it',
+    prompts: 'Suggested questions',
+    answers: 'Answers',
+    clear: 'Clear the answers',
+    thinking: 'Writing the answer',
+  },
   unitBadge: { count: 'count', usd: '$', share: '%', years: 'year', age: 'yrs', pct: '0–100', score: '/100', class: 'class', flag: 'yes/no', rate: 'rate', ratio: '×' } as Record<Unit, string>,
   clear: 'Clear',
-  bundled: 'bundled',
-  online: 'county-wide · online',
-  footer: 'ACS 2020–2024 5-year · estimate ± 90% margin of error',
-  sourcesLink: 'Sources & method →',
-  turnOn: (layer: string) => `Turn on the ${layer} layer to see this on the map`,
-  turnOnButton: 'Turn it on',
+  footer: 'Source: American Community Survey 2020–2024, 5-year estimates',
+  sourcesLink: 'All sources →',
   notBuilt: 'Data browser not built. Run scripts/07_build_acs_levels.py, then the app export, to bundle the census variables.',
-  clickForDetails: 'Click for details',
-  flatHint: 'The map is tilted by default. Hold ⌘ (Command) with the pointer over the map for a flat, top-down view; release to tilt back.',
+  clickForDetails: 'Click for a summary',
+  flatHint: 'Hold ⌘ (Command) with the pointer over the map for a flat, top-down view. Release to tilt back.',
   flatChip: 'Flat view · release ⌘ to tilt back',
-  analysisOnly: 'City tracts only · the same values the Analysis section shows',
+  analysisOnly: 'Pittsburgh tracts only · the same values the Analysis section shows',
   analysisPriorities: (preset: string | null) => (preset ? `Under your current priorities (${preset})` : 'Under your current priorities (custom mix)'),
   analysisSwitch: 'Analysis layers exist for city tracts only. Picking one switches the map to tracts.',
   noData: 'no data',
@@ -33,7 +45,6 @@ export const EXPLORE_UI = {
   intro: {
     kicker: 'Explore',
     title: 'Browse the census, one shape at a time.',
-    steps: ['Turn on the layers you want to see: buildings, terrain, tracts, block groups, ZIP codes.', 'Pick a variable under Data to color the map; hover a shape for its value and margin of error.', 'Click a shape for its full profile next to the city and county.'],
     analysis: 'Analysis →',
     analysisSub: 'Rank the housing types that fit a tract, compare tracts, compare priorities.',
   },
@@ -41,14 +52,13 @@ export const EXPLORE_UI = {
     thisPlace: 'This place',
     city: 'City',
     county: 'County',
-    keyTable: 'Key figures',
     allVars: 'All variables',
-    allVarsSub: 'Every published variable, by group',
+    allVarsSub: 'Every census figure for this place, by topic',
     showOnMap: 'Show on map',
     onMap: 'On the map',
     openMatch: 'Open in Analysis → Match',
     openMatchSub: 'Rank the housing types that fit this tract',
-    close: 'Close place card',
+    close: 'Close this place',
     vsCity: 'vs city',
   },
   summary: {
@@ -77,11 +87,9 @@ export const EXPLORE_UI = {
     incomeRent: 'Income and rent over time',
     analysis: 'What the matchmaker says',
     rents: 'Asking rents',
-    keyFigures: 'Key figures',
     overview: 'At a glance',
     distribution: 'How this compares',
     rank: (rank: number, n: number, many: string) => `${ordinalSuffix(rank)} of ${n} ${many}`,
-    showEverything: 'Show the full summary',
     clickToSelect: 'Click a row to open it',
     topFive: 'Highest',
     bottomFive: 'Lowest',
@@ -89,20 +97,22 @@ export const EXPLORE_UI = {
   legend: {
     noData: 'No data',
     hovered: 'Hovered',
-    boundaries: 'Boundaries',
   },
 };
 
-export const LAYER_ROWS: { id: LayerKey; label: string; caption: string }[] = [
+type Row = { id: LayerKey; label: string; caption: string };
+/** The boundaries, one open at a time. */
+export const BOUNDARY_ROWS: Row[] = [
+  { id: 'tracts', label: 'Census tracts', caption: 'Neighborhood-sized areas' },
+  { id: 'bg', label: 'Block groups', caption: 'Smaller pieces of a tract' },
+  { id: 'zcta', label: 'ZIP codes', caption: 'Postal ZIP code areas' },
+  { id: 'muni', label: 'Municipalities', caption: 'Boroughs and townships around Pittsburgh' },
+];
+/** How the map looks. */
+export const SETTING_ROWS: Row[] = [
   { id: 'buildings', label: 'Buildings', caption: '3D footprints from OpenStreetMap and Overture' },
   { id: 'terrain', label: 'Terrain', caption: '3D relief and contour lines (USGS 3DEP)' },
   { id: 'hillshade', label: 'Hill shading', caption: 'Shaded relief over the basemap' },
-  { id: 'tracts', label: 'Census tracts', caption: '128 city tracts' },
-  { id: 'bg', label: 'Block groups', caption: '314 city block groups' },
-  { id: 'zcta', label: 'ZIP codes', caption: '32 ZCTAs that touch the city' },
-  { id: 'muni', label: 'Municipalities', caption: '129 boroughs, townships and cities outside Pittsburgh' },
-  { id: 'county', label: 'County', caption: 'Allegheny County outline' },
-  { id: 'city', label: 'City', caption: 'Pittsburgh city limits' },
 ];
 
 /** Boundary styles shared by the map overlays and the legend swatches. `widths` = [zoom0, width0, zoom1, width1]. */
@@ -125,12 +135,4 @@ export const BOUNDARY_STYLE: Record<'tracts' | 'bg' | 'zcta' | 'muni' | 'county'
   muni: { color: '#b45309', widths: [9, 1.8, 14, 3], legendWidth: 2.5, casing: true, labels: 10, label: 'Municipalities' },
   county: { color: '#0f172a', widths: [8, 2, 14, 3], legendWidth: 2.5, label: 'County' },
   city: { color: '#7c3aed', widths: [9, 2.2, 14, 3.2], legendWidth: 3, casing: true, label: 'City limits' },
-};
-
-/** "128 city tracts · bundled", "394 tracts · county-wide · online", or "129 municipalities · county-wide · bundled". */
-export const scopeText = (n: number, many: string, online: boolean, countyWide = false) => {
-  const count = n.toLocaleString('en-US');
-  if (online) return `${count} ${many} · ${EXPLORE_UI.online}`;
-  if (countyWide) return `${count} ${many} · county-wide · ${EXPLORE_UI.bundled}`;
-  return `${count} city ${many} · ${EXPLORE_UI.bundled}`;
 };

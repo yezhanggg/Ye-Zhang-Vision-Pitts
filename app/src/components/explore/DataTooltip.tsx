@@ -1,35 +1,24 @@
-import { LEVEL_LABEL, RELIABILITY, unitSubtitle, unitTitle } from '../../lib/explore/catalog';
-import { fmtMoe, fmtValue, reliability } from '../../lib/explore/bins';
+import { unitSubtitle, unitTitle } from '../../lib/explore/catalog';
+import { fmtValue } from '../../lib/explore/bins';
 import { EXPLORE_UI } from '../../lib/explore/copy';
-import { analysisConf, fmtAnalysis, isAnalysis } from '../../lib/explore/analysisVars';
-import type { Estimate, GeoLevel, UnitProps, VariableDef } from '../../lib/explore/types';
-import { ConfChip } from '../primitives';
+import { fmtAnalysis, isAnalysis } from '../../lib/explore/analysisVars';
+import type { Estimate, UnitProps, VariableDef } from '../../lib/explore/types';
 
-/** Map tooltip for one unit: name, level line, then the painted variable's estimate ± MOE with its reliability chip. */
-export default function DataTooltip({ level, props, geoid, variable, estimate }: { level: GeoLevel; props: UnitProps | null; geoid: string; variable: VariableDef | null; estimate: Estimate | null | undefined }) {
-  const share = props?.pgh_share;
+/** Map tooltip for one unit: its name and, when a variable is painted, the latest value. Nothing else. */
+export default function DataTooltip({ props, geoid, variable, estimate }: { props: UnitProps | null; geoid: string; variable: VariableDef | null; estimate: Estimate | null | undefined }) {
   const sub = unitSubtitle(props);
-  const line = [LEVEL_LABEL[level].one, sub, level !== 'muni' && typeof share === 'number' && share < 0.995 ? EXPLORE_UI.insideCity(Math.max(1, Math.round(share * 100))) : null].filter(Boolean).join(' · ');
+  const has = !!estimate && typeof estimate.est === 'number' && Number.isFinite(estimate.est);
   return (
     <div className="max-w-64">
       <div className="font-semibold">{props ? unitTitle(props) : geoid}</div>
-      <div className="text-caption text-white/75">{line}</div>
+      {sub && <div className="text-caption text-white/75">{sub}</div>}
       {variable ? (
-        estimate && typeof estimate.est === 'number' ? (
-          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-            <span className="tnum">
-              <b>{isAnalysis(variable) ? fmtAnalysis(variable, estimate.est) : fmtValue(estimate.est, variable.unit)}</b>
-              {typeof estimate.moe === 'number' && <span className="text-white/80"> ± {fmtMoe(estimate.moe, variable.unit)}</span>}
-            </span>
-            {isAnalysis(variable) ? analysisConf(variable, geoid) && <ConfChip conf={analysisConf(variable, geoid)} /> : <ConfChip conf={reliability(estimate.cv, RELIABILITY)} />}
-          </div>
-        ) : (
-          <div className="mt-1 text-white/80">
-            {variable.label}: {EXPLORE_UI.noData}
-          </div>
-        )
+        <div className="mt-1">
+          <div className="text-caption text-white/75">{variable.label}</div>
+          <div className="text-lead font-bold tnum">{has ? (isAnalysis(variable) ? fmtAnalysis(variable, estimate?.est) : fmtValue(estimate?.est, variable.unit)) : EXPLORE_UI.noData}</div>
+        </div>
       ) : (
-        <div className="mt-1 text-white/80">{EXPLORE_UI.clickForDetails}</div>
+        <div className="mt-1 text-caption text-white/80">{EXPLORE_UI.clickForDetails}</div>
       )}
     </div>
   );

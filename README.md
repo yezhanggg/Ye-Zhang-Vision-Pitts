@@ -12,7 +12,7 @@ A census data browser and an anti-displacement housing matchmaker for the **City
 
 The app opens on a landing page with a live 3D map. **Open VisionPitts** flies from a globe down to Pittsburgh and lands in Explore.
 
-**Explore** is a data browser on a 3D map, with floating panels you can collapse, hide or reopen (the layout persists per browser). Search an address, turn layers on and off (buildings, terrain, hill shading, tracts, block groups, ZIP codes, the **129 municipalities** of Allegheny County outside Pittsburgh, county, city), and pick a variable under Data: one of **37 ACS 2020–2024 variables** for any geography, or one of the **Analysis layers** for city tracts (the six factor percentiles, match scores under the current priorities, market pressure and the watch list, asking rents, the raw factor inputs). The map opens tilted; hold ⌘ (Command) with the pointer over the map for a flat, top-down view, and release to tilt back. Hill shading is off by default, so the basemap stays evenly toned. Hover for the value and its margin; click a tract, ZIP code or municipality and the right panel becomes a summary: headline figures, tenure, housing stock, race, cost burden and commuting against the city and county, median income and rent **2014–2024**, and, for city tracts, what the matchmaker says. With a variable painted, the same click shows that variable's value, rank, distribution and trend. These values are **descriptive, never scored**.
+**Explore** is a data browser on a 3D map, kept deliberately plain: no name or logo over the map, floating panels that fold into a small tab, and only what you ask for on screen. Search an address, open one **boundary** at a time (census tracts, block groups, ZIP codes, or the **129 municipalities** of Allegheny County outside Pittsburgh), and keep the map to the city with **Pittsburgh only** or switch it off for the whole county. **Data** lists the variables of whichever boundary is open: **37 ACS 2020–2024 variables** for any of them, plus the **Analysis layers** for city tracts (the six factor percentiles, match scores under the current priorities, market pressure and the watch list, asking rents, the raw factor inputs). Buildings, terrain and hill shading sit under **Settings**; the map opens tilted, and holding ⌘ (Command) with the pointer over it gives a flat, top-down view. Hover shows the name and the value, nothing else. Click a place and the right panel becomes its summary: headline figures, tenure, housing stock, race, cost burden and commuting against the city and county, median income and rent **2014–2024**, and, for city tracts, what the matchmaker says. With a variable painted, the same click shows that variable only: value, rank, distribution and trend. A **question box** sits above the summary; once a place is selected it offers prompts such as "Describe the neighborhoods around Hazelwood" or "Compare Hazelwood with places within 3 miles", and answers from the tool's own figures (see AI use). These values are **descriptive, never scored**.
 
 **Analysis** is the Track 3 matchmaker. For any city tract it answers one question: *which housing type (ADU, duplex/triplex, townhome, small apartment, senior housing) best serves households at or below 50% of area median income without accelerating displacement?*
 
@@ -39,7 +39,7 @@ open export/index.html                 # one 6.4 MB file; basemap and search nee
 
 # Run the app
 cd app && npm install && npm run dev   # http://localhost:5173
-npm test && npm run build              # 46 tests; static site in app/dist
+npm test && npm run build              # 68 tests; static site in app/dist
 npm run export                         # rebuild export/index.html
 
 # Rebuild the data (Python 3.12 + uv; CENSUS_API_KEY in .env)
@@ -56,7 +56,7 @@ uv run python scripts/09_build_acs_history.py   # Explore: the same variables fo
 uv run pytest                                   # 51 tests
 ```
 
-**Deploy (Vercel):** Root Directory `app`; env vars `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (public), and optionally `DEEPSEEK_API_KEY` or `ANTHROPIC_API_KEY` for the AI explanation.
+**Deploy (Vercel):** Root Directory `app`; env vars `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (public), and optionally `DEEPSEEK_API_KEY` or `ANTHROPIC_API_KEY` for the AI explanation and the Explore question box.
 
 ## How the data flows
 
@@ -141,6 +141,7 @@ No individual-level data is used anywhere.
 
 - **Claude Code** pair-programmed the pipeline, app, tests and docs during the sprint, with every change reviewed and run by the author; commits carry co-author attribution.
 - **DeepSeek** (`deepseek-flash`, thinking off) writes the optional "why this ranking" sentence in Analysis when `DEEPSEEK_API_KEY` is configured on the deployment; **Claude** (`claude-sonnet-5`) does when only `ANTHROPIC_API_KEY` is set. The model receives computed numbers only; any figure it cannot trace is rejected and a template sentence built from the same numbers is shown instead. Without a key or a balance (and in the offline file) the template sentence is always shown, and the interface names whichever model wrote the text.
+- The same service answers the **question box in Explore** (`app/api/chat.ts`). The browser builds a facts text from figures the tool already shows: the selected place, the places whose centre lies within 3 miles, the city and the county, the matchmaker's read on a city tract, and area aggregates of asking rents. The model is told to quote those figures as written and not to calculate. Every number in its answer is checked against the facts; a failed check triggers one retry, and an answer that still carries an untraceable figure is shown with a warning. Questions and facts go to the model provider; nothing is stored by the tool. The offline file has no question service and says so. The input box is adapted from a component published on 21st.dev, supplied by the author (its model picker, image attachments and simulated voice demo were removed).
 - No model computes, imputes or ranks anything. Scores come from `src/visionpitts/scoring.py` and its TypeScript mirror, checked against a shared 40-case fixture.
 
 ## Team and license

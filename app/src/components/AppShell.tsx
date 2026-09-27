@@ -1,11 +1,9 @@
 import { useState, type ReactNode } from 'react';
 import { motion } from 'motion/react';
-import { BookOpen, Check, Link2, PanelRightOpen, RotateCcw, Settings2, ZapOff } from 'lucide-react';
+import { Check, Home, Link2, RotateCcw, Settings2 } from 'lucide-react';
 import { SECTIONS_FOR_MODE, SECTION_LABELS, defaultUi, sectionOf, useApp, type AnalysisMode, type Mode } from '../lib/store';
 import { cx } from '../lib/format';
 import { UI } from '../lib/copy';
-import Logo from './Logo';
-import { AboutModal, LimitsModal } from './LandingModals';
 
 type Section = ReturnType<typeof sectionOf>;
 const SUBTABS: { id: AnalysisMode; label: string }[] = [
@@ -45,8 +43,12 @@ function Pill<T extends string>({ items, value, onPick, ariaLabel, layoutId, siz
 /** Show / hide the panels and the sections of the left panel for the current mode. */
 function PanelsMenu({ mode }: { mode: Mode }) {
   const ui = useApp((s) => s.ui);
-  const { setSection, setUi } = useApp.getState();
+  const browsePanel = useApp((s) => s.browsePanel);
+  const { setSection, setUi, set } = useApp.getState();
   const [open, setOpen] = useState(false);
+  // Explore's summary opens and folds away by itself during a visit; Match keeps the stored preference.
+  const summaryOn = mode === 'explore' ? browsePanel : ui.right;
+  const setSummary = (on: boolean) => (mode === 'explore' ? set({ browsePanel: on }) : setUi({ right: on }));
   const ids = SECTIONS_FOR_MODE[mode];
   const Row = ({ checked, onChange, label }: { checked: boolean; onChange: (on: boolean) => void; label: string }) => (
     <label className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-small text-slate-800 hover:bg-stone-50">
@@ -63,7 +65,7 @@ function PanelsMenu({ mode }: { mode: Mode }) {
           <div className="absolute left-0 top-full z-40 mt-1.5 w-60 rounded-xl bg-white p-2 shadow-xl ring-1 ring-black/5" role="group" aria-label={UI.panels}>
             <div className="px-2 pb-1 text-caption font-semibold uppercase tracking-wide text-slate-500">{UI.panelsSub}</div>
             <Row checked={ui.left} onChange={(on) => setUi({ left: on })} label={UI.leftPanel} />
-            {HAS_SUMMARY.includes(mode) && <Row checked={ui.right} onChange={(on) => setUi({ right: on })} label={UI.summaryPanel} />}
+            {HAS_SUMMARY.includes(mode) && <Row checked={summaryOn} onChange={setSummary} label={UI.summaryPanel} />}
             <div className="my-1.5 border-t border-stone-200" />
             {ids.map((id) => (
               <Row key={id} checked={ui.sections[id] !== 'hidden'} onChange={(on) => setSection(id, on ? 'open' : 'hidden')} label={SECTION_LABELS[id]} />
@@ -87,19 +89,15 @@ function PanelsMenu({ mode }: { mode: Mode }) {
 }
 
 /**
- * No fixed bars: the map fills the window and every control floats on it. Top-left: About and the Panels menu.
- * Top-center: Explore | Analysis, then the Analysis views. Top-right: Copy link, Sources, Reduce motion, and the
- * button that brings the summary panel back.
+ * No fixed bars, no name, no logo: the map fills the window and every control floats on it. Top-left: Home (back
+ * to the start page, where Sources, Limitations and About live), the Panels menu and Copy link. Top-center:
+ * Explore | Analysis, then the Analysis views. The top-right corner belongs to the views (Explore: the question box).
  */
 export default function AppShell({ children }: { children: ReactNode }) {
   const mode = useApp((s) => s.mode);
   const lastAnalysis = useApp((s) => s.lastAnalysis);
-  const ui = useApp((s) => s.ui);
-  const lite = useApp((s) => s.lite);
-  const layers = useApp((s) => s.layers);
-  const { setMode, setUi, set } = useApp.getState();
+  const { setMode, set } = useApp.getState();
   const section = sectionOf(mode);
-  const [panel, setPanel] = useState<'about' | 'limits' | null>(null);
   const [copied, setCopied] = useState(false);
   const copyLink = async () => {
     try {
@@ -110,7 +108,6 @@ export default function AppShell({ children }: { children: ReactNode }) {
     setCopied(true);
     setTimeout(() => setCopied(false), 1600);
   };
-  const toggleLite = () => (lite ? set({ lite: false }) : set({ lite: true, layers: { ...layers, terrain: false } }));
   const sections: { id: Section; label: string }[] = [
     { id: 'explore', label: UI.explore },
     { id: 'analysis', label: UI.analysis },
@@ -120,24 +117,14 @@ export default function AppShell({ children }: { children: ReactNode }) {
     <div className="relative h-full">
       <div className="absolute inset-0">{children}</div>
       <div className="absolute left-3 top-3 z-30 flex items-center gap-1.5">
-        <button onClick={() => setPanel('about')} title={UI.aboutTitle} className="flex items-center gap-2 rounded-xl bg-white/95 py-1.5 pl-1.5 pr-3 shadow-lg ring-1 ring-black/5 backdrop-blur hover:bg-white">
-          <Logo size={26} />
-          <span className="font-display text-body font-bold tracking-tight text-slate-900">VisionPitts</span>
-        </button>
+        <Chip onClick={() => set({ view: 'landing' })} icon={<Home />} label={UI.home} title={UI.homeTitle} />
         <PanelsMenu mode={mode} />
+        <Chip onClick={copyLink} icon={copied ? <Check /> : <Link2 />} label={copied ? UI.linkCopied : UI.copyLink} />
       </div>
       <div className="pointer-events-none absolute left-1/2 top-3 z-30 flex -translate-x-1/2 flex-col items-center gap-1.5">
         <Pill items={sections} value={section} onPick={(id) => setMode(id === 'explore' ? 'explore' : lastAnalysis)} ariaLabel="Sections" layoutId="tab-pill" />
         {section === 'analysis' && <Pill items={SUBTABS} value={mode as AnalysisMode} onPick={(id) => setMode(id)} ariaLabel="Analysis views" layoutId="subtab-pill" size="sm" />}
       </div>
-      <div className="absolute right-3 top-3 z-30 flex items-center gap-1.5">
-        <Chip onClick={copyLink} icon={copied ? <Check /> : <Link2 />} label={copied ? UI.linkCopied : UI.copyLink} />
-        <Chip onClick={() => set({ sourcesOpen: true })} icon={<BookOpen />} label={UI.sourcesShort} />
-        <Chip onClick={toggleLite} icon={<ZapOff />} label={UI.reduceMotion} pressed={lite} />
-        {!ui.right && HAS_SUMMARY.includes(mode) && <Chip onClick={() => setUi({ right: true })} icon={<PanelRightOpen />} label={UI.showSummary} />}
-      </div>
-      <AboutModal open={panel === 'about'} onClose={() => setPanel(null)} onLimits={() => setPanel('limits')} />
-      <LimitsModal open={panel === 'limits'} onClose={() => setPanel(null)} />
     </div>
   );
 }

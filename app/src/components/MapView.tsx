@@ -989,7 +989,7 @@ export default function MapView(props: Props) {
           {tooltipFor(hover.id)}
         </div>
       )}
-      {flat && <div className="pointer-events-none absolute left-1/2 top-16 z-20 -translate-x-1/2 rounded-full bg-slate-900/90 px-3 py-1 text-small font-medium text-white shadow-md">Flat view · release ⌘ to tilt back</div>}
+      {flat && <div className="pointer-events-none absolute left-1/2 top-28 z-20 -translate-x-1/2 rounded-full bg-slate-900/90 px-3 py-1 text-small font-medium text-white shadow-md">Flat view · release ⌘ to tilt back</div>}
       {props.elevationReadout && elev != null && (
         <div className="pointer-events-none absolute bottom-3 left-1/2 z-20 -translate-x-1/2 rounded-full bg-white/95 px-3 py-1 text-small font-medium text-slate-800 shadow-md ring-1 ring-black/5 tnum">
           Ground ≈ <b>{fmtFt(elev)}</b>
