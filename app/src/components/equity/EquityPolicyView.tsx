@@ -24,7 +24,8 @@ import { bundledGeo, CITY_GEOID } from '../../lib/explore/catalog';
 import { isNum } from '../../lib/place/format';
 import PolicyPopover from './PolicySimulator';
 import { explainPolicies, policiesOnLine } from '../../lib/equity/explain';
-import { useEquityReading } from '../../lib/equity/reading';
+import { READING_QUESTION, READING_QUESTION_NO_POLICY, hasReading, useEquityReading } from '../../lib/equity/reading';
+import { cityTakeaway, explainLocal } from '../../lib/equity/local';
 import { usePolicy } from './usePolicy';
 import { nameOf } from './names';
 import { useEffect } from 'react';
@@ -231,8 +232,28 @@ export default function EquityPolicyView({ active = true }: { active?: boolean }
       }),
     [def, values, levers, results],
   );
-  const readingFacts = useMemo(() => (policyTexts.length ? `${facts}\nWHAT THE POLICIES THAT ARE ON CHANGE:\n${policyTexts.map((p) => `${p.name}: ${p.text}`).join('\n')}` : facts), [facts, policyTexts]);
-  const reading = useEquityReading(readingFacts, active);
+  // VisionPitts Insight runs only while a policy is switched on; its facts add the neighborhood comparison and the
+  // takeaways the page already prints, so the reading can speak to the place and its surroundings.
+  const anyPolicyOn = levers.some((l) => l.on);
+  const localText = useMemo(
+    () =>
+      zipMode
+        ? explainLocal({ def, ami: level, values: zipValues, level: 'zip', selectedId: selZip, nameOf: (z) => zipName(z), many: 'ZIP codes' })
+        : explainLocal({ def, ami: level, values, level: 'tract', selectedId, nameOf, many: 'tracts' }),
+    [def, level, values, selectedId, zipMode, zipValues, selZip],
+  );
+  const readingFacts = useMemo(
+    () =>
+      `${facts}\nTHE SELECTED PLACE AND ITS SURROUNDINGS (computed): ${localText}\nCITYWIDE TAKEAWAY: ${cityTakeaway(def.id, level)}${policyTexts.length ? `\nWHAT THE POLICIES THAT ARE ON CHANGE:\n${policyTexts.map((p) => `${p.name}: ${p.text}`).join('\n')}` : ''}`,
+    [facts, localText, def, level, policyTexts],
+  );
+  // Without a policy on, the Insight is written only on request ("Get VisionPitts Insight"), for the facts on screen
+  // when the button was pressed; a new measure, place or level shows the button again (unless already written).
+  const [askedFor, setAskedFor] = useState<string | null>(null);
+  const question = anyPolicyOn && !zipMode ? READING_QUESTION : READING_QUESTION_NO_POLICY;
+  const wantInsight = (anyPolicyOn && !zipMode) || askedFor === readingFacts || hasReading(readingFacts, question);
+  const reading = useEquityReading(readingFacts, active && wantInsight, question);
+  const askInsight = useCallback(() => setAskedFor(readingFacts), [readingFacts]);
   const prompts = useMemo(() => {
     const ps = equityPrompts(def, level, levers, zipMode ? (selZip ? zipName(selZip) : null) : selectedId ? nameOf(selectedId) : null);
     return zipMode ? ps.map((q) => q.replace('Which neighborhoods', 'Which ZIP codes')) : ps;
@@ -435,6 +456,7 @@ export default function EquityPolicyView({ active = true }: { active?: boolean }
             chatOpen={chatOpen}
             policyTexts={zipMode ? [] : policyTexts}
             reading={reading}
+            onAskInsight={typeof location !== 'undefined' && location.protocol === 'file:' ? undefined : askInsight}
             onPick={zipMode ? setSelZip : select}
           />
           </div>

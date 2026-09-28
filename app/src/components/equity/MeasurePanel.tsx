@@ -11,6 +11,7 @@ import { hud, placeById } from '../../lib/place/data';
 import { histogram } from '../../lib/explore/summary';
 import { MEASURES, measureValue, type AmiPct, type Legend, type MeasureDef, type MeasureId } from '../../lib/equity/measures';
 import { classCounts, explainMeasure, needPercentile, type TractValue } from '../../lib/equity/explain';
+import { cityTakeaway, explainLocal } from '../../lib/equity/local';
 import { DRAW, SERIES, SPIN } from '../charts';
 import { InfoTip, SPRING_PANEL } from '../primitives';
 import type { ReadingState } from '../../lib/equity/reading';
@@ -277,6 +278,7 @@ export default function MeasurePanel({
   policiesLine,
   policyTexts = [],
   reading,
+  onAskInsight,
   onPick,
   wide = false,
   chat,
@@ -299,6 +301,8 @@ export default function MeasurePanel({
   policyTexts?: { id: string; name: string; text: string }[];
   /** VisionPitts-Chat's reading of the tab, shown only when it passed the number check. */
   reading?: ReadingState;
+  /** Writes an Insight on request (shown as a button when none is showing). */
+  onAskInsight?: () => void;
   onPick: (id: string | null) => void;
   /** The chat is hidden: two columns, larger charts, the ranking at full height. */
   wide?: boolean;
@@ -330,7 +334,12 @@ export default function MeasurePanel({
       if (top < list.scrollTop || top + el.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = Math.max(0, top - list.clientHeight / 2);
     }
   }, [selectedId, def.id]);
-  const sentences = useMemo(() => explainMeasure({ def, ami, values, nameOf: area.level === 'tract' ? nameOf : area.label }).map(area.words), [def, ami, values, area]);
+  // At ZIP level a ZIP is named with its main neighborhood ("ZIP 15222 (Central Business District)").
+  const zipWithPlace = (id: string) => {
+    const place = area.listSub(id).split(/,| \+/)[0]?.trim();
+    return place ? `${area.label(id)} (${place})` : area.label(id);
+  };
+  const sentences = useMemo(() => explainMeasure({ def, ami, values, nameOf: area.level === 'tract' ? nameOf : zipWithPlace }).map(area.words), [def, ami, values, area]);
   const [spreadRef, spread] = useSize<HTMLDivElement>();
   const selValue = selectedId ? (values.find((v) => v.id === selectedId)?.value ?? null) : null;
   // Charts replay whenever the measure or the income level changes.
@@ -367,8 +376,8 @@ export default function MeasurePanel({
   ) : policiesLine ? (
     <p className="shrink-0 rounded-md bg-violet-50 px-2 py-0.5 text-caption text-violet-900 ring-1 ring-violet-200/70">{policiesLine}</p>
   ) : null;
-  const readingBlock =
-    reading && reading.status !== 'idle' && reading.status !== 'off' ? (
+  const insightShown = reading && reading.status !== 'idle' && reading.status !== 'off';
+  const readingBlock = insightShown ? (
       <div className="shrink-0 border-t border-stone-100 pt-2.5" data-testid="equity-reading">
         <h3 className="mb-1 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
           <Sparkles className="h-3 w-3 text-violet-500" /> VisionPitts Insight
@@ -382,11 +391,36 @@ export default function MeasurePanel({
           <p className="text-small leading-relaxed text-slate-700">{reading.status === 'ok' ? reading.text : ''}</p>
         )}
       </div>
+    ) : onAskInsight && reading?.status !== 'off' ? (
+      <div className="shrink-0 border-t border-stone-100 pt-2.5" data-testid="equity-reading-ask">
+        <button
+          type="button"
+          onClick={onAskInsight}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-caption font-semibold text-white shadow-sm transition-[background-color,transform] hover:bg-violet-700 active:scale-[0.97]"
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          Get VisionPitts Insight
+        </button>
+        <span className="ml-2 align-middle">
+          <InfoTip label="About VisionPitts Insight" width={250}>
+            A short reading of this measure and place written by VisionPitts-Chat (DeepSeek) from the numbers on this page. It is shown only when every number in it matches the tool's data. It writes itself when a policy is on.
+          </InfoTip>
+        </span>
+      </div>
     ) : null;
+  // Two short paragraphs: the citywide pattern with a takeaway, then the selected area against its surroundings (or
+  // where need clusters when nothing is selected), with a takeaway.
+  const local = useMemo(
+    () => explainLocal({ def, ami, values, level: area.level, selectedId, nameOf: area.level === 'tract' ? nameOf : zipWithPlace, many: area.level === 'tract' ? 'tracts' : 'ZIP codes' }),
+    [def, ami, values, area, selectedId],
+  );
   const explain = (
-    <motion.p key={`x-${replay}`} initial={lite ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={move} className={cx('shrink-0 text-slate-800', wide ? 'text-body leading-relaxed' : 'text-small leading-[1.4]')} data-testid="equity-explain">
-      {sentences.join(' ')}
-    </motion.p>
+    <motion.div key={`x-${replay}`} initial={lite ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={move} className={cx('shrink-0 space-y-2 text-slate-800', wide ? 'text-body leading-relaxed' : 'text-small leading-[1.4]')}>
+      <p data-testid="equity-explain">
+        {sentences.join(' ')} <span className="text-slate-600">{area.words(cityTakeaway(def.id, ami))}</span>
+      </p>
+      <p data-testid="equity-local">{local}</p>
+    </motion.div>
   );
   const areaInfo = area.info ? (
     <p className="shrink-0 rounded-md bg-sky-50 px-2 py-1 text-caption leading-snug text-sky-900 ring-1 ring-sky-200/70" data-testid="equity-zip-note">

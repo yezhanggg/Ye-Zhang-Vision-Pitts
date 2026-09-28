@@ -185,7 +185,7 @@ export function explainPolicies({ def, values, levers, subsidy, rent60, transitL
   const measure = def.title.charAt(0).toLowerCase() + def.title.slice(1);
   const reach = (ids: string[]) => {
     const hit = ids.filter((id) => needSet.has(id));
-    const names = joinNames([...new Set(hit.map(nameOf))].slice(0, 3));
+    const names = joinNames([...new Set(hit.map((x) => nameOf(x)))].slice(0, 3));
     if (!needy.length) return '';
     return hit.length
       ? ` ${int(hit.length)} of the ${int(needy.length)} tracts with the most need on ${measure} are among them, including ${names}.`
