@@ -273,6 +273,7 @@ export const CHAT_COPY = {
   unchecked: 'Some figures in this answer could not be matched to the data. Check them in the summary.',
   /** The chat's name on screen; the model behind it is recorded in Details, not in the box. */
   name: 'VisionPitts-Chat',
+  ai: 'AI-written',
   checked: 'checked against the tool’s numbers',
   interrupted: 'The page was reloaded before this answer arrived. Ask again to get it.',
   you: 'You',

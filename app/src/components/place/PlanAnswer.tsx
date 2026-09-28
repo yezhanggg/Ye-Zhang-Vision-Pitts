@@ -8,6 +8,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { ChevronRight } from "lucide-react";
 import { typologyById } from "../../lib/data";
 import { DECIDE } from "../../lib/place/copy";
+import { NOT_ADVICE } from "../../lib/about";
 import { limitFor } from "../../lib/place/afford";
 import { bedroomsWord } from "../../lib/place/bands";
 import { fmtDollars, fmtHouseholds, fmtPct100d1, isNum, roundHalfEven } from "../../lib/place/format";
@@ -319,6 +320,7 @@ export default function PlanAnswer({
           ))}
         </ul>
       </details>
+      <p className="border-t border-stone-200/70 bg-white px-3 py-1.5 text-caption text-slate-500">{NOT_ADVICE}</p>
     </div>
   );
 }

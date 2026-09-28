@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react';
-import { LIMITS, NEXT, PROJECT } from '../lib/about';
+import { LIMITS, NEXT, NOT_ADVICE, PROJECT } from '../lib/about';
 import { FMR_2BR, activeFactorIds, askingRents, hasAskingRents, meta, scoring, sources } from '../lib/data';
 import { FACTOR_COPY, GLOSSARY, PRESSURE_HOW, RENT_HOW, RENT_WHY_INFO, SCORE_HOW, factorName } from '../lib/copy';
 import { useApp, type DetailsTab } from '../lib/store';
@@ -131,6 +131,7 @@ export default function DetailsModal() {
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-stone-100 bg-white/95 px-6 py-4 backdrop-blur">
               <div className="min-w-0">
                 <h2 className="font-display text-lg font-bold text-slate-900">Project Details &amp; Sources</h2>
+                <p className="text-caption text-slate-500">{NOT_ADVICE}</p>
                 <DetailsTabs tab={tab} onPick={(id) => set({ detailsTab: id })} />
               </div>
               <button onClick={() => set({ sourcesOpen: false })} className="self-start rounded-lg p-2 text-slate-500 hover:bg-stone-100 hover:text-slate-900" aria-label="Close">

@@ -84,6 +84,7 @@ function AnswerBubble({ q, a, fresh, lite }: { q: ChatMessage; a: ChatMessage | 
   const tail = thinking ? 'text-white' : withheld ? 'text-amber-50' : a.failed ? 'text-stone-100' : 'text-white';
   const caption: string[] = [];
   if (a && !thinking && !a.failed) {
+    caption.push(CHAT_COPY.ai);
     if (a.checked) caption.push(CHAT_COPY.checked);
   }
   return (

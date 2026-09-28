@@ -1,6 +1,9 @@
 // Text for the Details window (the project: what it holds, its limits, what comes next) and the About window
 // (the author). Edit freely; nothing here feeds the scores.
 
+/** The framing line shown in the Details header and under the Place answer. */
+export const NOT_ADVICE = 'Decision support only — not legal, financial or zoning advice.';
+
 /** The project in a couple of lines, and what it holds. Shown under Details (and, in two lines, at the foot of About). */
 export const PROJECT = {
   name: 'VisionPitts',
