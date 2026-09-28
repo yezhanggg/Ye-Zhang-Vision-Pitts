@@ -30,7 +30,7 @@ export default function GapBars({ r, ra }: { r: TractResult; ra: Rationale }) {
             const pos = g.delta >= 0;
             const w = (Math.abs(g.delta) / max) * 50;
             const sign = Math.abs(g.delta) < 0.05 ? '' : pos ? '+' : '−';
-            // The points stay in the tooltip; the bar itself is the reading (ranks and words since update 3).
+            // The points stay in the tooltip; the bar itself is the reading (ranks and words, no score).
             const tip = `${factorLabel(g.factor)}: ${sign}${pts1(g.delta)} ${unit(pts1(g.delta))} for ${pos ? A : B}`;
             return (
               <li key={g.factor} className="flex items-center gap-2 text-small" title={tip}>

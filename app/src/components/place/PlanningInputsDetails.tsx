@@ -1,5 +1,5 @@
-// Details > Data & method: "Planning inputs: how each choice is used". The explanations that used to sit under each
-// control in "Who you're planning for" (Place tab), gathered in one place. Text comes from lib/place/plan and copy.
+// Project Details & Sources > Data & method: "Planning inputs: how each choice is used". The explanation of each
+// control in "Who you're planning for" (Place tab), in one place. Text comes from lib/place/plan and copy.
 import type { ReactNode } from 'react';
 import { hud } from '../../lib/place/data';
 import {

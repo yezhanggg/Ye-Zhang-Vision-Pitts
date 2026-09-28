@@ -1,6 +1,6 @@
 # Assumptions and value judgments
 
-Everything in VisionPitts that is a **choice** rather than an observation, in one place, with a one-line rationale and who should revisit it. Observed-data methods are in `docs/data/factor_methods.md`. Config: `config/scoring.json` v0.4.0 (adopted 2026-09-27 in answer to judge review 01; v0.3.0 is restored by two switches, `factor_options.subsidy.mode: "flag"` and `transit.basis: "acre"`, plus the old cells listed in `fit.changes`).
+Everything in VisionPitts that is a **choice** rather than an observation, in one place, with a one-line rationale and who should revisit it. Observed-data methods are in `docs/data/factor_methods.md`. Config: `config/scoring.json` v0.4.0 (v0.3.0 is restored by two switches, `factor_options.subsidy.mode: "flag"` and `transit.basis: "acre"`, plus the old cells listed in `fit.changes`).
 
 Counts below are for the current build: 128 city tracts, 114 ranked; `tests/test_docs_numbers.py` fails when a number here drifts from `app/src/data/meta.json` or the config.
 
@@ -29,7 +29,7 @@ Reading: townhomes are a market product (want a strong market, avoid high-displa
 
 ### Changes in v0.4.0
 
-Every cell that changed is logged in `config/scoring.json` `fit.changes` with `source: "PROPOSED by judge review 01"` and `adopted: "2026-09-27"`. The reasons are the practitioner's, in one line each.
+Every cell that changed from v0.3.0 is logged in `config/scoring.json` `fit.changes` with its old and new value. The reasons are the practitioner's, in one line each.
 
 | Cell | From | To | Reason |
 |---|---|---|---|
@@ -166,50 +166,48 @@ Hazelwood (hero, watch list) · Garfield · Middle Hill · Homewood North · Low
 | Sentinels and rounding | Negative estimates → null; MOE −555555555 → 0; other negative MOEs → null; counts, dollars and years as integers, shares to 4 decimals, CV to 3 | Nothing is imputed; topcoded medians stay as published. | |
 | Simplification | EPSG:2272, 5 m for tracts and block groups, 10 m for ZCTAs, county and city; coordinates to 5 decimals | Keeps the bundle small enough for one file; fine for choropleths, not for parcel work. | |
 
-### 10a. Additions of Sat 2026-09-26 (evening): municipalities, history, Analysis layers
+### 10a. Municipalities, history and Analysis layers
 
-| Choice | Value | Rationale | Revisit by |
+| Choice | Value | Rationale | Owner |
 |---|---|---|---|
 | Municipality unit | Census county subdivisions 2023, the 129 units other than Pittsburgh, bundled in full | In Pennsylvania every municipality is a county subdivision; the Census places file lacks the 42 townships. Pittsburgh stays the `city` level. | |
-| History span | ACS 5-year end years 2014–2024, every year | Ye's choice; overlapping windows are stated on every chart, dollars stay nominal. | Ye |
-| Carrying 2010 tracts | Housing-unit block crosswalk; counts apportioned, medians HU-weighted; tracts with a dominant 2010 share below 0.9 flagged (19 city tracts) | Same crosswalk the factors use; nothing imputed. | Data teammate |
-| Bundled history | 14 variables, margins for 6, 483 KB; the full 37 stay in `data/processed/acs_history_*.csv` | Keeps the offline file small. | |
-| Offline file size | Target under 6 MB for `export/index.html`; 3D buildings are stored delta-coded (`app/src/lib/buildingsCodec.ts`), about 0.47 MB instead of 2.5 MB | The submission checklist's line; a double-clickable file has to travel by email. | Ye |
-| Analysis layers in Explore | Factor percentiles, scores under the current priorities, pressure, watch list, asking rents, raw inputs, painted for city tracts only with the Analysis palettes | Same values, same colours as the Analysis section, so the two screens never disagree. The list is built from the config, so the two v0.4.0 factors appear there too. | |
-| Asking-rent areas | Yearly 2BR medians and distinct units per tract, ZIP and municipality, same suppression as tracts (10 per cell, 20 pooled) | Licensed aggregates only. | Ye |
-| Layout | Floating, collapsible panels with per-browser persistence; no numbered steps | Ye's request; defaults keep every panel open so a first visit and the smoke tests see the full interface. | Ye |
+| History span | ACS 5-year end years 2014–2024, every year | Overlapping windows are stated on every chart; dollars stay nominal. | Author |
+| Carrying 2010 tracts | Housing-unit block crosswalk; counts apportioned, medians HU-weighted; tracts with a dominant 2010 share below 0.9 flagged (19 city tracts) | Same crosswalk the factors use; nothing imputed. | Data lead |
+| Bundled history | 14 variables, margins for 6; the full 37 stay in `data/processed/acs_history_*.csv` | Keeps the offline file small. | |
+| Offline file size | Under 6 MB for `export/index.html`; 3D buildings are stored delta-coded (`app/src/lib/buildingsCodec.ts`), about 0.47 MB instead of 2.5 MB | A double-clickable file has to travel by email. | Author |
+| Analysis layers in Explore | Factor percentiles, scores under the current priorities, pressure, watch list, asking rents, raw inputs, painted for city tracts only with the Analysis palettes | Same values, same colours as the Analysis section, so the two screens never disagree. The list is built from the config. | |
+| Asking-rent areas | Yearly 2BR medians and distinct units per tract, ZIP and municipality, same suppression as tracts (10 per cell, 20 pooled) | Licensed aggregates only. | Author |
+| Layout | Floating, collapsible panels with per-browser persistence; Explore opens with Boundary and Data expanded | A first visit sees what it can choose; the rest stays folded. | Author |
 
-### 10b. Additions of Sat 2026-09-26 (late): a plainer Explore and the question box
+### 10b. Explore map and the question box
 
-| Choice | Value | Rationale | Revisit by |
+| Choice | Value | Rationale | Owner |
 |---|---|---|---|
-| Boundaries | One open at a time (tracts, block groups, ZIP codes, municipalities); Data lists the variables of the open one; Analysis layers appear with tracts only | Ye's request: people see what they ask for. An older link that lists several boundaries opens the one being browsed. | Ye |
-| Pittsburgh only | On by default; shows the bundled city subset and the city limits, asks nothing of Supabase. Off = the whole county. Off and locked while municipalities are open | All 129 municipalities lie outside the city. ZIP codes that touch the city count as "in". | Ye |
+| Boundaries | One open at a time (tracts, block groups, ZIP codes, municipalities); Data lists the variables of the open one; Analysis layers appear with tracts only | People see what they ask for. A link that lists several boundaries opens the one being browsed. | Author |
+| Area | A two-way choice, Pittsburgh or Allegheny County; locked to the county while municipalities are open | All 129 municipalities lie outside the city. ZIP codes that touch the city count as "in". | Author |
 | Settings | Buildings, terrain, hill shading and the ⌘ flat-view hint, collapsed by default | They change how the map looks, not what it shows. | |
-| Hover | Name and the latest value only | Margins and reliability stay in the summary panel. | Ye |
-| Summary panel | Folded into a tab until a place or a variable is chosen; a variable plus a click shows that variable only; the Key figures table is gone; census table numbers show only in the Sources window | Ye's request. | Ye |
-| Click tip | "Click any boundary…" shows when nothing is painted or selected, can be closed, returns on every fresh opening of the tool (which also clears the selection and the painted variable) | Ye's request. | Ye |
-| Shell | No name or logo on the start page header or over the map; Home returns to the start page, where Sources, Limitations and About live; no Reduce motion switch (the system setting and `lite=1` still apply) | Ye's request. | Ye |
-| Question box | `app/api/chat.ts`, same provider as the explanation (DeepSeek or Claude). Facts: the selected place, places whose bounding-box centre lies within 3 miles (nearest 12, places under 50 residents left out; the 5 nearest when none is that close), city, county, the matchmaker's read, asking-rent aggregates. Numbers in the answer are checked against the facts; one retry. In Explore an answer that still fails is shown with a visible warning; in Analysis it is withheld and replaced by a plain refusal (`app/src/lib/analysis/strictChat.ts`) | The model rephrases, code computes. Analysis is where the numbers are the product, so nothing unverified is shown there. Distance between bounding-box centres is an approximation and is stated as such in the facts. | Ye |
+| Hover | Name and the latest value only | Details stay in the summary panel. | Author |
+| Summary panel | Folded into a tab until a place or a variable is chosen; a variable plus a click shows that variable only; census table numbers are listed in the Project Details & Sources window | One thing at a time. | Author |
+| Click tip | "Click any boundary…" shows when nothing is painted or selected and can be closed | Tells a first visitor where to start. | Author |
+| Question box (VisionPitts-Chat) | `app/api/chat.ts`, DeepSeek (Claude when no DeepSeek key is set). Facts: the selected place, places whose bounding-box centre lies within 3 miles (nearest 12, places under 50 residents left out; the 5 nearest when none is that close), city, county, the matchmaker's read, asking-rent aggregates. Numbers in the answer are checked against the facts; one retry. In Explore an answer that still fails is shown with a visible warning; in Analysis it is withheld and replaced by a plain refusal (`app/src/lib/analysis/strictChat.ts`) | The model rephrases, code computes. Analysis is where the numbers are the product, so nothing unverified is shown there. Distance between bounding-box centres is an approximation and is stated as such in the facts. | Author |
 
-### 10c. Additions of Sun 2026-09-27 (early): one box, values only, Details and About
+### 10c. Shell, search and the answer format
 
-| Choice | Value | Rationale | Revisit by |
+| Choice | Value | Rationale | Owner |
 |---|---|---|---|
-| Heading | The same in Explore and Analysis: Home at the top left, Explore / Analysis in the middle, the search-and-question box at the top right. Panels and Copy link are gone (the address bar still carries the link) | Ye's request. | Ye |
-| Area | A two-way choice, Pittsburgh or Allegheny County, replaces the "Pittsburgh only" switch; locked to the county while municipalities are open | Ye's request. | Ye |
-| Search and questions in one box | Sorted in the browser (`app/src/lib/explore/intent.ts`): a house number and a street is an address; text that ends with "?", starts like a question or a request, or runs to six words is a question; anything else is a place. "go to…", "find…", "where is…" are searches. Every list offers "Ask the assistant" as an explicit row | Searching is free and only questions cost tokens; the visitor can always overrule the sorting. | Ye |
-| Token budget | Facts first (cached by the provider on a second question about the same place), last exchange only as history, 8 nearby places, answers capped at 380 tokens, repeats served from memory in the browser and on the warm function | Ye asked to save tokens and money. Measured on 2026-09-27: 1,955 input tokens for a first question, 1,920 of 2,088 billed as cached for the second. | Ye |
-| Thinking time | An answer is shown after at least 5 seconds, with the `thinking-orbs` mark and three phrases; a refusal (offline file, service down) after 0.9 seconds | Ye's request: the pause reads as thinking. | Ye |
-| Values only in Explore | No margins of error, reliability chips, reliability mix or margin bands anywhere in Explore; the Analysis section keeps its confidence tags; the Details window documents margins and the reliability rule | Ye's request. Small-area ACS estimates can be noisy (some tract medians carry margins above half their value), so the figures should be read as estimates. | Ye |
-| Default summary | Empty until a place or a variable is chosen: one line on where to click. The city-at-a-glance panel was removed | Ye's request. | Ye |
-| Flat when far | The map lies flat once the view is zoomed out far enough to fit the city limits plus 5 miles (`app/src/lib/farView.ts`), checked when a move ends, with 0.25 zoom levels of slack before the tilt returns | Ye's request. | Ye |
-| Start page | Three doors: Open, Details (Overview, Data & method, Limitations, What comes next), About (the author: background, education, experience, UPenn email, LinkedIn) | Ye's request. About is written from Ye's LinkedIn profile as read on 2026-09-27. | Ye |
+| Heading | The same in Explore and Analysis: Home at the top left, Explore / Analysis in the middle, the search-and-question box at the top right; the address bar carries the link (`/explore`, `/place`, `/compare`, `/equity`) | One layout everywhere. | Author |
+| Search and questions in one box | Sorted in the browser (`app/src/lib/explore/intent.ts`): a house number and a street is an address; text that ends with "?", starts like a question or a request, or runs to six words is a question; anything else is a place. "go to…", "find…", "where is…" are searches. Every list offers "Ask the assistant" as an explicit row | Searching is free and only questions cost tokens; the visitor can always overrule the sorting. | Author |
+| Token budget | Facts first (cached by the provider on a second question about the same place), last exchange only as history, 8 nearby places, answers capped at 380 tokens, repeats served from memory in the browser and on the warm function | Keeps the cost per question low. Measured: 1,955 input tokens for a first question, 1,920 of 2,088 billed as cached for the second. | Author |
+| Thinking time | An answer is shown after at least 5 seconds, with the `thinking-orbs` mark and three phrases; a refusal (offline file, service down) after 0.9 seconds | The pause reads as thinking. | Author |
+| Values only in Explore | No margins of error, reliability chips, reliability mix or margin bands anywhere in Explore; the Analysis section keeps its confidence tags; the Project Details & Sources window documents margins and the reliability rule | Small-area ACS estimates can be noisy (some tract medians carry margins above half their value), so the figures should be read as estimates. | Author |
+| Default summary | Empty until a place or a variable is chosen: one line on where to click | A clean first view. | Author |
+| Flat when far | The map lies flat once the view is zoomed out far enough to fit the city limits plus 5 miles (`app/src/lib/farView.ts`), checked when a move ends, with 0.25 zoom levels of slack before the tilt returns | A tilted map reads poorly at county scale. | Author |
+| Start page | Three doors: Open VisionPitts, Project Details & Sources (Overview, Data & method, Calculations, Limitations, What comes next), About Author | Everything about the project in one window; the author on a separate card. | Author |
 
-### 10d. Land use and zoning mix (Sun 2026-09-27, afternoon)
+### 10d. Land use and zoning mix
 
-| Choice | Value | Rationale | Revisit by |
+| Choice | Value | Rationale | Owner |
 |---|---|---|---|
-| Land-use measure | Share of parcel lot area by assessed class, county-wide at every level; vacant lots and parcels as counts | Same classifier the Place card uses, so the two never disagree; area reads better than parcel counts for land. | Ye |
-| Zoning mix | Seven family groups, city tracts and block groups only | Zoning data exists only for the city. | Ye |
-| Use | Information only: Explore variables, place summary, Place card fold, Compare places rows, question-box facts | Nothing enters a score. | Ye |
+| Land-use measure | Share of parcel lot area by assessed class, county-wide at every level; vacant lots and parcels as counts | Same classifier the Place card uses, so the two never disagree; area reads better than parcel counts for land. | Author |
+| Zoning mix | Seven family groups, city tracts and block groups only | Zoning data exists only for the city. | Author |
+| Use | Information only: Explore variables, place summary, Place card fold, Compare places rows, question-box facts | Nothing enters a score. | Author |

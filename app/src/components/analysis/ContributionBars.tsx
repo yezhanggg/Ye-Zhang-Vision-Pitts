@@ -1,7 +1,7 @@
 // "How the 5 types compare": one bar per housing type, its length the fit and its segments each factor's share.
 // Segments are the `contrib` parts of lib/scoring (always ≥ 0: a negative-fit factor adds when the value is low).
-// Divs only, no chart library. No number is printed: the points live in the hover tooltips (ranks and words on
-// the Analysis tab since update 3).
+// Divs only, no chart library. No number is printed: the points live in the hover tooltips (the Analysis tab reads
+// in ranks and words).
 import { useState } from 'react';
 import { factorLabel, type Rationale } from '../../lib/analysis/rationale';
 import { pts1, scorePair, unit } from '../../lib/analysis/copy';

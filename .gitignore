@@ -39,8 +39,6 @@ Thumbs.db
 .idea/
 .vscode/
 
-# Inter-terminal handoff notes (never published)
-handoff/
 
 # Supabase CLI and MCP local state (never published)
 supabase/.temp/

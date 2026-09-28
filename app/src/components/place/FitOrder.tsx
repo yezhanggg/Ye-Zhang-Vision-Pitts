@@ -1,7 +1,7 @@
 // "Fit order under this stance": the weighted order of the five housing types (lib/scoring.scoreTract under the
 // current weights) as ranks and words. The AnswerCard is its head: the type that fits best, the three checks and
 // the reasoning of record. The bars (each factor's share, the gaps between the top two) sit under a disclosure.
-// No score is printed; the points live in the hover tooltips. No AI reading since update 3.
+// No score is printed; the points live in the hover tooltips. No AI-written reading.
 import { useMemo } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { fitText, joinAnd } from '../../lib/analysis/copy';
@@ -65,7 +65,7 @@ export function AnswerCard({ t, r, ra, weights }: { t: TractProps; r: TractResul
 }
 
 /**
- * The fit order. `expanded` (the page without place measures, the layout of update 2): the bars and the ranking as
+ * The fit order. `expanded` (the page without place measures): the bars and the ranking as
  * open sections. Otherwise (block G): the ranking as ranks and words, the bars folded under a disclosure.
  */
 export default function FitOrder({ t, r, ra, weights, expanded }: { t: TractProps; r: TractResult; ra: Rationale; weights: Weights; expanded?: boolean }) {

@@ -6,7 +6,7 @@ import { TYPOLOGY_COLORS, type MapPaint } from '../lib/paint';
 import { matchPreset, useApp } from '../lib/store';
 import { fmtInt, fmtMoney, fmtPct, fmtSignedPct } from '../lib/format';
 import { PRESSURE_HOW, RENT_CAVEAT, RENT_HOW, UI, directionWord, percentilePhrase } from '../lib/copy';
-// No AI reading here since update 3: the place page is evidence blocks and a rules-based recommendation.
+// No AI-written reading on this page: the place page is evidence blocks and a rules-based recommendation.
 import { closeMargin, rationale } from '../lib/analysis/rationale';
 import { APP_STANCES } from '../lib/analysis/copy';
 import { cityView, type View } from '../lib/analysis/framing';
@@ -318,8 +318,8 @@ function PlaceExport({ t, place, hud, rec }: { t: TractProps; place: PlaceMeasur
 
 /**
  * One place. With place measures: the answer card (the suggestion under the focusing issue and the planning inputs,
- * with its arithmetic), then the evidence folds A–F, how the suggestion was made and the fit order, then data limits.
- * Without them (the pipeline has not run): the weighted fit order and the factor table, as in update 2.
+ * with its arithmetic), then the evidence folds, how the suggestion was made and the fit order.
+ * Without them (the place-measures pipeline has not run): the weighted fit order and the factor table.
  */
 export function TractDetail({ t, r, weights, rec, fitOrder, onClose }: { t: TractProps; r: TractResult; weights: Weights; rec?: Recommendation | null; fitOrder?: Typology[]; onClose?: () => void }) {
   const ra = useMemo(() => rationale(t, r, weights), [t, r, weights]);

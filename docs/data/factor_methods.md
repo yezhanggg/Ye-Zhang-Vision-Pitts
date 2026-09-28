@@ -37,7 +37,7 @@ Sources span 2016 to 2026. The tool does not pretend they are simultaneous: ever
 1. **Base level from data age** (2026 − data year): ≤2 years high · 3–5 medium · >5 low.
 2. **Downgrade one level** (never below low) for any of: coverage < 90% · dominant crosswalk share < 0.8 · CV > 30% · an imputed or apportioned input, with the factor-specific rules in the table.
 
-Judge review 01 found three of the six v0.3.0 tags constant across all 114 ranked tracts (displacement low, transit high, flood high). The v0.4.0 rules below make every tag vary; the last column is the count in the current build.
+Under v0.3.0, three of the six tags were constant across all 114 ranked tracts (displacement low, transit high, flood high). The v0.4.0 rules below make every tag vary; the last column is the count in the current build.
 
 | Factor | Base | Downgrade when | Ranked tracts today |
 |---|---|---|---|

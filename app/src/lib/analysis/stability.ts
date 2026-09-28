@@ -15,7 +15,7 @@ export const BOUNDARY_SLACK = 0.03;
 
 export const bandOf = (share: number): Band => (share >= SOLID ? 'solid' : share >= LIKELY ? 'likely' : 'close');
 
-/** Tenths of the share, as one digit or a range near a rounding boundary. Not rendered since update 3; kept for tests and tools. */
+/** Tenths of the share, as one digit or a range near a rounding boundary. Not rendered in the app; used by tests and tools. */
 export function digitsFor(share: number): [number] | [number, number] {
   const x = Math.max(0, Math.min(1, share)) * 10;
   const lo = Math.floor(x);

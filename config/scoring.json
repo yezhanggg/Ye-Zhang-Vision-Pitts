@@ -228,119 +228,119 @@
         "cell": "townhome.need",
         "from": 0.2,
         "to": 0.0,
-        "source": "PROPOSED by judge review 01",
+        "source": "v0.4.0 method review",
         "adopted": "2026-09-27"
       },
       {
         "cell": "townhome.displacement_risk",
         "from": -0.6,
         "to": -0.4,
-        "source": "PROPOSED by judge review 01",
+        "source": "v0.4.0 method review",
         "adopted": "2026-09-27"
       },
       {
         "cell": "small_apartment.subsidy_eligible",
         "from": 1.0,
         "to": 0.6,
-        "source": "PROPOSED by judge review 01",
+        "source": "v0.4.0 method review",
         "adopted": "2026-09-27"
       },
       {
         "cell": "senior.need",
         "from": 0.6,
         "to": 0.3,
-        "source": "PROPOSED by judge review 01",
+        "source": "v0.4.0 method review",
         "adopted": "2026-09-27"
       },
       {
         "cell": "senior.market_strength",
         "from": 0.0,
         "to": 0.15,
-        "source": "PROPOSED by judge review 01",
+        "source": "v0.4.0 method review",
         "adopted": "2026-09-27"
       },
       {
         "cell": "senior.subsidy_eligible",
         "from": 0.8,
         "to": 0.6,
-        "source": "PROPOSED by judge review 01",
+        "source": "v0.4.0 method review",
         "adopted": "2026-09-27"
       },
       {
         "cell": "senior.transit_access",
         "from": 0.6,
         "to": 0.8,
-        "source": "PROPOSED by judge review 01",
+        "source": "v0.4.0 method review",
         "adopted": "2026-09-27"
       },
       {
         "cell": "adu.senior_demand",
         "from": null,
         "to": 0.0,
-        "source": "PROPOSED by judge review 01",
+        "source": "v0.4.0 method review",
         "adopted": "2026-09-27"
       },
       {
         "cell": "duplex_triplex.senior_demand",
         "from": null,
         "to": 0.0,
-        "source": "PROPOSED by judge review 01",
+        "source": "v0.4.0 method review",
         "adopted": "2026-09-27"
       },
       {
         "cell": "townhome.senior_demand",
         "from": null,
         "to": 0.0,
-        "source": "PROPOSED by judge review 01",
+        "source": "v0.4.0 method review",
         "adopted": "2026-09-27"
       },
       {
         "cell": "small_apartment.senior_demand",
         "from": null,
         "to": 0.0,
-        "source": "PROPOSED by judge review 01",
+        "source": "v0.4.0 method review",
         "adopted": "2026-09-27"
       },
       {
         "cell": "senior.senior_demand",
         "from": null,
         "to": 0.8,
-        "source": "PROPOSED by judge review 01",
+        "source": "v0.4.0 method review",
         "adopted": "2026-09-27"
       },
       {
         "cell": "adu.small_multifamily_stock",
         "from": null,
         "to": 0.3,
-        "source": "PROPOSED by judge review 01",
+        "source": "v0.4.0 method review",
         "adopted": "2026-09-27"
       },
       {
         "cell": "duplex_triplex.small_multifamily_stock",
         "from": null,
         "to": 0.8,
-        "source": "PROPOSED by judge review 01",
+        "source": "v0.4.0 method review",
         "adopted": "2026-09-27"
       },
       {
         "cell": "townhome.small_multifamily_stock",
         "from": null,
         "to": 0.0,
-        "source": "PROPOSED by judge review 01",
+        "source": "v0.4.0 method review",
         "adopted": "2026-09-27"
       },
       {
         "cell": "small_apartment.small_multifamily_stock",
         "from": null,
         "to": 0.0,
-        "source": "PROPOSED by judge review 01",
+        "source": "v0.4.0 method review",
         "adopted": "2026-09-27"
       },
       {
         "cell": "senior.small_multifamily_stock",
         "from": null,
         "to": 0.0,
-        "source": "PROPOSED by judge review 01",
+        "source": "v0.4.0 method review",
         "adopted": "2026-09-27"
       }
     ]
