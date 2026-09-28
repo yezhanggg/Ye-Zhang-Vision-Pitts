@@ -2,13 +2,28 @@
 
 *Great decisions need vision. We give you one.*
 
-VisionPitts is a free, map-based tool about housing in Pittsburgh and Allegheny County. It shows who lives in each neighborhood, what they pay for housing, and which kinds of new homes could help renters with low incomes without pushing them out.
+**VisionPitts is a free, live map-based decision-support tool that matches Pittsburgh neighborhoods with the kinds of new housing that fit them: ADUs, duplexes and triplexes, townhomes, small apartment buildings, or senior housing.** It answers the question behind [Track 3, Housing Typology, Equity & Climate Matchmaker](https://ai-horizons-2026-ai-for-housing-hackathon.brandon831577.chatgpt.site/challenges/typology-equity-climate): not just "we need missing middle," but which type, where, for whom, at what rent, and with what trade-offs.
 
-Solo entry by **Ye Zhang** (University of Pennsylvania) for the **AI for Housing Hackathon, part of AI Horizons 2026**, Track 3 (Housing Typology, Equity & Climate Matchmaker).
+**Who it is for**, the four users named in the challenge:
+- **Municipal planners** checking where a housing type fits and what zoning or policy changes would reach.
+- **Community development corporations** choosing projects that serve the renters who live there now.
+- **Developers** seeing which product types a neighborhood's renters and market can support.
+- **Residents and public officials** looking at the same facts when they weigh growth options.
+
+**How it meets the challenge:**
+- **Real data for a real place:** the 128 City of Pittsburgh neighborhoods (census tracts) and all of Allegheny County, from public sources (census, HUD, CDC, FEMA, transit, zoning, property records).
+- **Matches neighborhoods to housing types** using renter need and income, displacement risk, market strength, transit access, flood exposure, land use and zoning, and shows the rent a household can afford.
+- **Compares scenarios, not one answer:** switch between four stances (anti-displacement, market-led, transit-first, climate-resilient), compare two places side by side, and test four policy ideas across the city.
+- **Explains every ranking** with the numbers behind it, and lets you **adjust the weights** under Advanced settings.
+- **Keeps facts and value judgments apart:** measured data is labeled as fact; the housing-fit rules and weights are labeled as opinion and published for review.
+
+**Everything is live.** Every feature in this README works today on [ye-zhang-vision-pitts.vercel.app](https://ye-zhang-vision-pitts.vercel.app): the maps, place summaries, housing matches, comparisons, policy tests, exports and the AI question box. Nothing is mocked. No sign-in or install is needed.
+
+Solo entry by **Ye Zhang** (University of Pennsylvania) for the **AI for Housing Hackathon, part of AI Horizons 2026**.
 
 - **Live tool:** [ye-zhang-vision-pitts.vercel.app](https://ye-zhang-vision-pitts.vercel.app)
 - **Demo video:** [Google Drive](https://drive.google.com/drive/folders/1sGpKEhHjHAfOVwkX1uGUhARW7VnUAS8f?usp=sharing)
-- **Offline copy:** open `export/index.html` (one file, no install)
+- **Offline copy:** open `export/index.html` (one file, no install; everything except the AI question box)
 - **Technical notes:** [docs/TECHNICAL.md](docs/TECHNICAL.md) (data rebuild, every source, the method)
 
 > **Decision support only — not legal, financial or zoning advice.** The tool shows evidence and its arithmetic; people make the decision.
@@ -37,8 +52,6 @@ Solo entry by **Ye Zhang** (University of Pennsylvania) for the **AI for Housing
 - **Place:** pick a priority (for example, keeping current renters housed) and who you are planning for. The tool suggests which of five housing types fits and shows the numbers behind it.
 - **Compare places:** two neighborhoods side by side.
 - **Equity & policy:** where renters need help most, and what four policy ideas (such as allowing backyard homes) would change.
-
-**Who it is for:** city planners, community development groups, housing nonprofits and residents. For example, a community group in Hazelwood can see how many renters earn half the area's median income or less, what rent they can afford, and which small housing types fit, before meeting a developer.
 
 | Explore | Place | Compare places | Equity & policy |
 |---|---|---|---|
@@ -76,7 +89,7 @@ Every source, with dates and links, is in the app under **Project Details & Sour
 ## Limitations
 
 - Zoning is a screening reading, not checked lot by lot; it does not say what can legally be built on a site.
-- No infrastructure (roads, sewers) or building costs.
+- No infrastructure capacity (roads, sewers) or building costs, and no carbon estimate for each housing type (no Pittsburgh data to base one on).
 - Census figures for small areas are estimates with margins of error.
 - Flood risk is a screening model, not an engineering study.
 - Asking rents come from online listings, which lean toward newer, market-rate homes.
