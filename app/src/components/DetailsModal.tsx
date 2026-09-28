@@ -365,7 +365,7 @@ export default function DetailsModal() {
               </section>
               <section className="text-small text-slate-700">
                 <h3 className="mb-1 text-body font-semibold text-slate-900">How AI is used</h3>
-                AI never calculates a score or looks up data; plain code does all the math. When you see an explanation written by AI (DeepSeek, or Claude as a backup), it was written from numbers the tool had already calculated, and every number in it was checked before it was shown. If the check fails, you see a simple sentence built from the same numbers instead.
+                AI never calculates a score or looks up data; plain code does all the math. When you see text written by AI (DeepSeek), it is labeled AI-written, it was written from numbers the tool had already calculated, and every number in it was checked before it was shown. The Equity & policy Insight paragraph is left out when its check fails.
                 <p className="mt-1.5">
                   <span className="font-semibold text-slate-900">VisionPitts-Chat</span>, the question box in Explore and Analysis, is powered by DeepSeek (the deepseek-flash model). It answers only about Pittsburgh housing, using the facts this tool sends with each question. In Analysis, an answer with a number that cannot be matched to those facts is not shown.
                 </p>

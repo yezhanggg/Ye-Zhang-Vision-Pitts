@@ -15,8 +15,6 @@
 //     place repeats the same opening and the provider can bill it as cached input. Only the last exchange is sent as
 //     history, answers are capped, and a question already answered while this function is warm is served from memory.
 //
-// The provider code repeats api/explain.ts on purpose: every file in api/ deploys as its own function, so this one
-// does not depend on a neighbor being bundled with it.
 // Provider: DeepSeek when DEEPSEEK_API_KEY is set, otherwise Claude when ANTHROPIC_API_KEY is set.
 // EXPLAIN_PROVIDER=deepseek|anthropic forces one; CHAT_MODEL (then EXPLAIN_MODEL) overrides the model id.
 

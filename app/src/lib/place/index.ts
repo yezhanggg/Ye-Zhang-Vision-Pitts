@@ -9,6 +9,5 @@ export * from './bands';
 export * from './feasibility';
 export * from './copy';
 export * from './recommend';
-export * from './needs';
 export * from './plan';
 export * from './suggest';

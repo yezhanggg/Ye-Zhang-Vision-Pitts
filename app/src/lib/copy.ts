@@ -166,7 +166,6 @@ export const UI = {
   dataBehind: 'The data behind it',
   dataLimits: 'Data limits',
   whyAuto: 'Why this ranking · written automatically from the scores',
-  whyAI: (who: string) => `Why this ranking · written by ${who} from the scores, every number checked`,
   whatMatters: 'What matters most?',
   fineTune: 'Fine-tune',
   colorBy: 'Color the map by',

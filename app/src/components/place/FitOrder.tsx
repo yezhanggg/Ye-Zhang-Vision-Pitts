@@ -1,7 +1,7 @@
 // "Fit order under this stance": the weighted order of the five housing types (lib/scoring.scoreTract under the
 // current weights) as ranks and words. The AnswerCard is its head: the type that fits best, the three checks and
 // the reasoning of record. The bars (each factor's share, the gaps between the top two) sit under a disclosure.
-// No score is printed; the points live in the hover tooltips. No AI reading since update 3 (lib/explainRemote.ts).
+// No score is printed; the points live in the hover tooltips. No AI reading since update 3.
 import { useMemo } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { fitText, joinAnd } from '../../lib/analysis/copy';

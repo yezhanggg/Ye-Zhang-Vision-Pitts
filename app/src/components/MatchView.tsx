@@ -6,8 +6,7 @@ import { TYPOLOGY_COLORS, type MapPaint } from '../lib/paint';
 import { matchPreset, useApp } from '../lib/store';
 import { fmtInt, fmtMoney, fmtPct, fmtSignedPct } from '../lib/format';
 import { PRESSURE_HOW, RENT_CAVEAT, RENT_HOW, UI, directionWord, percentilePhrase } from '../lib/copy';
-// lib/explainRemote (the AI reading) is not imported here since update 3: the place page is evidence blocks and a
-// rules-based recommendation; see the note at the top of that file.
+// No AI reading here since update 3: the place page is evidence blocks and a rules-based recommendation.
 import { closeMargin, rationale } from '../lib/analysis/rationale';
 import { APP_STANCES } from '../lib/analysis/copy';
 import { cityView, type View } from '../lib/analysis/framing';

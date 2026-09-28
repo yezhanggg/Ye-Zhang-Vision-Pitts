@@ -4,13 +4,10 @@
 import { describe, expect, it } from 'vitest';
 import type { TractResult } from '../../lib/derived';
 import { FIXTURE_HUD, HAZELWOOD, HOMEWOOD_NORTH, NULL_PLACE, SQUIRREL_HILL_NORTH } from '../../lib/place/fixture';
-import type { TractProps } from '../../lib/types';
 import { cumulative } from './Affordability';
-import { fitUnderStances } from './PlaceBlocks';
 import { NOT_CLAIMED, YOU_DECIDE, computeRules } from './Rules';
 import { districtText } from './ZoningPrograms';
 
-const T = { GEOID: '42003562300', name: 'Tract 5623', neighborhood: 'Hazelwood', focus: 'Hazelwood', residential: true, pgh_share: 1, households: 1383, need_count: 590, displacement_risk: 0.717, need: 0.9, market_strength: 0.2, subsidy_eligible: 1, transit_access: 0.8, flood_exposure: 0.7, senior_demand: 0.6, small_multifamily_stock: 0.2 } as unknown as TractProps;
 const R: TractResult = { scores: [], ranking: ['small_apartment', 'senior', 'adu', 'duplex_triplex', 'townhome'], top: 'small_apartment', topScore: 0.7 };
 const ORDERS = { anti_displacement: ['senior', 'small_apartment', 'adu', 'duplex_triplex', 'townhome'], market_led: ['townhome', 'small_apartment', 'duplex_triplex', 'adu', 'senior'], transit_first: ['small_apartment', 'senior', 'townhome', 'duplex_triplex', 'adu'] };
 const text = (o: ReturnType<typeof computeRules>) => o.lines.map((l) => `${l.label}: ${l.text}`).join('\n');
@@ -88,13 +85,5 @@ describe('the rules adapter on Hazelwood', () => {
     expect(none.rec).toBeNull();
     expect(text(none)).toContain('HUD income limits not available');
     expect(text(none)).toContain(YOU_DECIDE);
-  });
-});
-
-describe('fit order under each stance', () => {
-  it('re-scores the tract under the four published weight sets', () => {
-    const f = fitUnderStances(T);
-    expect(Object.keys(f)).toEqual(['anti_displacement', 'market_led', 'transit_first', 'climate_resilient']);
-    for (const k of Object.keys(f)) expect(f[k].result.ranking.length).toBeGreaterThan(0);
   });
 });
