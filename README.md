@@ -22,7 +22,7 @@
 Solo entry by **Ye Zhang** (University of Pennsylvania) for the **AI for Housing Hackathon, part of AI Horizons 2026**.
 
 - **Live tool:** [ye-zhang-vision-pitts.vercel.app](https://ye-zhang-vision-pitts.vercel.app)
-- **Demo video:** [Google Drive](https://drive.google.com/drive/folders/1sGpKEhHjHAfOVwkX1uGUhARW7VnUAS8f?usp=sharing)
+- **Demo video (4:52):** a compressed copy is in this repo at [docs/demo/VisionPitts-Demo.mp4](docs/demo/VisionPitts-Demo.mp4) (1280×800, 37 MB); the full-quality version is on [Google Drive](https://drive.google.com/drive/folders/1sGpKEhHjHAfOVwkX1uGUhARW7VnUAS8f?usp=sharing)
 - **Offline copy:** open `export/index.html` (one file, no install; everything except the AI question box)
 - **Technical notes:** [docs/TECHNICAL.md](docs/TECHNICAL.md) (data rebuild, every source, the method)
 
