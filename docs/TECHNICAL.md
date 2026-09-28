@@ -6,7 +6,7 @@ The full technical README: how to rebuild the data, the database, every source, 
 
 A census data browser and an anti-displacement housing matchmaker for the **City of Pittsburgh**. Solo entry for the **AI Horizons 2026 · AI for Housing Hackathon**, Track 3, built Sep 26–27, 2026. Every line of code was written after the Saturday 9:00 a.m. ET kickoff.
 
-**Live app:** [ye-zhang-vision-pitts.vercel.app](https://ye-zhang-vision-pitts.vercel.app) · **Offline:** double-click `export/index.html` · **Docs:** [plan](PLAN.md) · [methods](data/factor_methods.md) · [value judgments](assumptions.md) · [sources](../data/processed/sources.md)
+**Live app:** [ye-zhang-vision-pitts.vercel.app](https://ye-zhang-vision-pitts.vercel.app) · **Offline:** double-click `export/index.html` · **Docs:** [methods](data/factor_methods.md) · [value judgments](assumptions.md) · [sources](../data/processed/sources.md)
 
 ![Landing page: a live 3D map of Downtown and the four doors](screenshots/00-landing.png)
 
