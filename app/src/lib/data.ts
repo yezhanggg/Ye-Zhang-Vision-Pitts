@@ -29,7 +29,17 @@ export const scoring = load<ScoringConfig>('scoring', {
 export const tractsFC = load<FC<TractFeature>>('tracts', { type: 'FeatureCollection', features: [] });
 export const neighborhoodsFC = load<FC<NeighborhoodFeature>>('neighborhoods', { type: 'FeatureCollection', features: [] });
 export const buildingsFC = decodeBuildings(load<unknown>('buildings', null));
-export const sources = load<SourceDef[]>('sources', []);
+/** Sources of the features the offline single file leaves out (data/online): tree canopy and the tax credit score sheet. */
+function onlineSources(): SourceDef[] {
+  if (import.meta.env.MODE === 'export') return [];
+  const text = (import.meta.glob('../data/online/sources.json', { eager: true, query: '?raw', import: 'default' }) as Record<string, string>)['../data/online/sources.json'];
+  try {
+    return text ? (JSON.parse(text) as SourceDef[]) : [];
+  } catch {
+    return [];
+  }
+}
+export const sources = [...load<SourceDef[]>('sources', []), ...onlineSources()];
 export const focusDefs = load<FocusDef[]>('focus', []);
 export const meta = load<Meta>('meta', {});
 /** County / city asking-rent trend; empty when step 6 has not run (the layer then hides itself). */

@@ -25,7 +25,7 @@ export default function PanelFrame({ children, show = true, open: controlled, on
             <motion.button onClick={() => toggle(false)} whileHover={{ scale: 1.12 }} whileTap={{ scale: 0.88 }} transition={SPRING_TAB} className="absolute -left-3.5 top-3 z-20 grid h-7 w-7 place-items-center rounded-full bg-white text-slate-500 shadow-md ring-1 ring-black/10 hover:text-slate-900" aria-label={UI.hideSummary} title={UI.hideSummary}>
               <PanelRightClose className="h-3.5 w-3.5" />
             </motion.button>
-            <div className="scroll-quiet min-h-0 flex-1 overflow-y-auto rounded-2xl">{children}</div>
+            <div className="scroll-quiet relative min-h-0 flex-1 overflow-y-auto rounded-2xl">{children}</div>
           </motion.div>
         ) : (
           <motion.div key="panel-tab" style={{ transformOrigin: 'top right' }} initial={{ opacity: 0, scale: 0.6, x: 8 }} animate={{ opacity: 1, scale: 1, x: 0 }} exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.12 } }} transition={SPRING_TAB} className={inline ? 'pointer-events-auto' : 'absolute right-3 top-16 z-20'}>

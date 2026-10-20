@@ -1,5 +1,5 @@
 // Smoke test + screenshots against the dev server (or a URL in argv[2]). Writes docs/screenshots/*.png.
-// Shots: landing (00), then the app's two sections: Explore (01-02, 10-12), Analysis (03-06, 08) and the Sources window (07).
+// Shots: landing (00), then the app's two sections: Explore (01-02, 10-12, 14), Analysis (03-06, 08) and the Sources window (07).
 // The single-file export shot (09-single-file-export.png) comes from scripts/check_export.mjs.
 import { chromium } from 'playwright';
 const base = process.argv[2] || 'http://localhost:5173';
@@ -66,5 +66,18 @@ await page.waitForTimeout(3500);
 await page.getByRole('button', { name: 'Got it' }).click();
 await shot('13-tour', 4500);
 await page.keyboard.press('Escape');
+// Explore: sun and shadow over Downtown on the winter day at 2 PM. The switch (under Data) is not part of the link, so it is clicked.
+await open('#m=explore', 'text=Boundary');
+if (!(await page.locator('#layer-sun').count())) await page.locator('button', { hasText: 'Data' }).first().click();
+await page.locator('#layer-sun').click();
+await page.waitForSelector('[data-sun-ready]', { timeout: 25000 });
+await page.getByRole('button', { name: 'Pause' }).click();
+await page.getByRole('radio', { name: 'Winter' }).click();
+await page.locator('input[aria-label="Time of day"]').evaluate((el) => {
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, '12');
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+});
+await page.evaluate(() => window.__map.jumpTo({ center: [-79.9975, 40.4412], zoom: 15.3, pitch: 55, bearing: -20 }));
+await shot('14-sun-shadow', 6000);
 console.log('console errors:', errors.filter((e) => !/openfreemap|favicon|404|api\/explain|mapterhorn|Failed to fetch|AJAXError/.test(e)));
 await browser.close();

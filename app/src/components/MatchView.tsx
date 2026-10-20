@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { FMR_2BR, activeFactorIds, focusTracts, hasAskingRents, rankedTracts, scoring, tractById, tractLabel, tractSubLabel, typologyById } from '../lib/data';
 import { tLabel, useAllResults, type TractResult } from '../lib/derived';
@@ -17,6 +17,7 @@ import { AGE_LABEL, LEVEL_LABEL, sizeWord } from '../lib/place/plan';
 import { usePlan } from '../lib/place/planStore';
 import type { Recommendation } from '../lib/place/recommend';
 import { suggestAll } from '../lib/place/suggest';
+import { useDemandScores } from '../lib/place/useDemandScores';
 import { STANCE_LABEL } from '../lib/place/thresholds';
 import type { HudTable, PlaceMeasures, Stance, Typology } from '../lib/place/types';
 import type { TractProps, Weights } from '../lib/types';
@@ -42,6 +43,12 @@ import SuggestionLegend, { FLOOD_FILL } from './place/SuggestionLegend';
 import ZipPanel, { AreaSwitch, useZipOverlays } from './place/ZipPanel';
 import { useZipView } from '../lib/place/zipView';
 import { ConfChip, Dot, Explainer, InfoTip, ObservedBadge, SectionTitle } from './primitives';
+
+// The project cards (mix, zoning, tax credit sheet, pencil) come with their own data, so they load on demand and stay out of the offline single file.
+const ProjectPanel = import.meta.env.MODE === 'export' ? null : lazy(() => import('./place/project/ProjectPanel'));
+const FinderCard = import.meta.env.MODE === 'export' ? null : lazy(() => import('./place/finder/FinderCard'));
+// Online the left panel is wider and its inputs wait for Confirm (place/PlaceRail); the offline file keeps the panel below.
+const PlaceRail = import.meta.env.MODE === 'export' ? null : lazy(() => import('./place/PlaceRail'));
 
 /** Map hover card. `weights` (the Match view passes them) lets it tell "every factor is zero" from "no data". */
 export function MapTooltip({ id, results, weights }: { id: string; results: Map<string, TractResult>; weights?: Weights }) {
@@ -144,7 +151,7 @@ function AskingRentLine({ t }: { t: TractProps }) {
   );
 }
 
-function AboutPlace({ t }: { t: TractProps }) {
+export function AboutPlace({ t }: { t: TractProps }) {
   return (
     <section>
       <SectionTitle>{UI.aboutPlace}</SectionTitle>
@@ -160,7 +167,7 @@ function AboutPlace({ t }: { t: TractProps }) {
 }
 
 /** The anti-displacement lens for one tract: neighbors' market vs its own, and the watch-list test. */
-function PressureCard({ t }: { t: TractProps }) {
+export function PressureCard({ t }: { t: TractProps }) {
   const set = useApp((s) => s.set);
   if (t.market_pressure == null && !t.market_direction) return null;
   const p = t.market_pressure;
@@ -202,7 +209,7 @@ function PressureCard({ t }: { t: TractProps }) {
 }
 
 /** No tract yet: one line and the demo neighborhoods. Nothing else. */
-function StartCard() {
+export function StartCard({ suggestions }: { suggestions: Map<string, Recommendation> }) {
   const select = useApp((s) => s.select);
   return (
     <div className="space-y-3 p-5">
@@ -215,12 +222,17 @@ function StartCard() {
           </button>
         ))}
       </div>
+      {FinderCard && (
+        <Suspense fallback={null}>
+          <FinderCard suggestions={suggestions} />
+        </Suspense>
+      )}
     </div>
   );
 }
 
 /** Map hover card on Match: the suggested type under the focusing issue and the planning inputs. */
-function SuggestTooltip({ id, rec }: { id: string; rec: Recommendation | null | undefined }) {
+export function SuggestTooltip({ id, rec }: { id: string; rec: Recommendation | null | undefined }) {
   const t = tractById.get(id);
   if (!t) return null;
   const lead = rec?.types[0]?.typology ?? null;
@@ -254,7 +266,7 @@ function devFixtureOn(): boolean {
   }
 }
 /** The place measures and HUD table for a tract: the built files, or (dev server with ?fixture=1) the synthetic fixture. */
-function placeDataFor(geoid: string): { place: PlaceMeasures | null; hud: HudTable | null } {
+export function placeDataFor(geoid: string): { place: PlaceMeasures | null; hud: HudTable | null } {
   if (hasPlaceData) return { place: placeFor(geoid), hud: hudTable };
   if (devFixtureOn()) {
     const key = FIXTURE_GEOIDS[geoid];
@@ -263,7 +275,7 @@ function placeDataFor(geoid: string): { place: PlaceMeasures | null; hud: HudTab
   return { place: null, hud: null };
 }
 
-function DetailHeader({ t, onClose, actions }: { t: TractProps; onClose?: () => void; actions?: React.ReactNode }) {
+export function DetailHeader({ t, onClose, actions }: { t: TractProps; onClose?: () => void; actions?: React.ReactNode }) {
   return (
     <div className="sticky top-0 z-10 border-b border-stone-100 bg-white/95 px-5 pb-3 pt-4 backdrop-blur">
       <div className="flex items-start justify-between gap-2">
@@ -290,7 +302,7 @@ function DetailHeader({ t, onClose, actions }: { t: TractProps; onClose?: () => 
 }
 
 /** Export for one place: the place report (PDF via print) and one CSV row per measure. */
-function PlaceExport({ t, place, hud, rec }: { t: TractProps; place: PlaceMeasures; hud: HudTable; rec: Recommendation }) {
+export function PlaceExport({ t, place, hud, rec }: { t: TractProps; place: PlaceMeasures; hud: HudTable; rec: Recommendation }) {
   const plan = usePlan();
   const input = () => ({ t, place, hud, rec, plan: { focus: rec.stance, level: plan.level, size: plan.size, age: plan.age, homes: plan.homes, flood: plan.flood, transitMi: plan.transitMi }, typeLabel: (k: Typology) => typologyById.get(k)?.label ?? k });
   const name = tractLabel(t);
@@ -331,6 +343,11 @@ export function TractDetail({ t, r, weights, rec, fitOrder, onClose }: { t: Trac
         <DetailHeader t={t} onClose={onClose} actions={<PlaceExport t={t} place={place} hud={hud} rec={rec} />} />
         <div className="space-y-3 p-5">
           <PlanAnswer rec={rec} hud={hud} level={plan.level} size={plan.size} age={plan.age} homes={plan.homes} />
+          {ProjectPanel && (
+            <Suspense fallback={null}>
+              <ProjectPanel t={t} place={place} hud={hud} rec={rec} fitOrder={fitOrder ?? (r.ranking as Typology[])} />
+            </Suspense>
+          )}
           <PlaceFolds t={t} place={place} hud={hud} rec={rec} level={plan.level} fitOrder={fitOrder ?? (r.ranking as Typology[])} />
         </div>
       </div>
@@ -388,10 +405,11 @@ export default function MatchView() {
   // The suggested type for every place under the focus and the planning inputs; the fit order (current weights) only
   // orders types inside each suggested set.
   const fitOrders = useMemo(() => new Map([...results].map(([id, r]) => [id, r.ranking as Typology[]])), [results]);
+  const demand = useDemandScores();
   const suggestions = useMemo(() => {
     if (!hasPlaceData || !hudTable) return new Map<string, Recommendation>();
-    return suggestAll(placeById, hudTable, focus, { level: plan.level, size: plan.size, age: plan.age, flood: plan.flood, transitMi: plan.transitMi }, fitOrders);
-  }, [focus, plan.level, plan.size, plan.age, plan.flood, plan.transitMi, fitOrders]);
+    return suggestAll(placeById, hudTable, focus, { level: plan.level, size: plan.size, age: plan.age, flood: plan.flood, transitMi: plan.transitMi }, fitOrders, demand);
+  }, [focus, plan.level, plan.size, plan.age, plan.flood, plan.transitMi, fitOrders, demand]);
   const { paint, counts } = useMemo(() => {
     const values = new Map<string, number | null>();
     const counts: Record<string, number> = { none: 0, flood: 0 };
@@ -462,6 +480,11 @@ export default function MatchView() {
           onMapReady={registerMap('place')}
         />
       )}
+      {PlaceRail ? (
+        <Suspense fallback={null}>
+          <PlaceRail t={t ?? null} rec={rec} zipMode={zipMode} title={UI.matchTab} legend={<SuggestionLegend focus={focusLabel} level={[plan.size === 'auto' ? '' : sizeWord(plan.size), plan.age === 'any' ? '' : AGE_LABEL[plan.age], LEVEL_LABEL[plan.level]].filter(Boolean).join(' · ')} counts={counts} noneLabel={noneLabel} />} />
+        </Suspense>
+      ) : (
       <Rail float title={UI.matchTab} maxHeightClass="max-h-[calc(100%-4.75rem-12.5rem)]">
         <AreaSwitch />
         <RailSection id="priorities" title="Focusing issue">
@@ -478,11 +501,12 @@ export default function MatchView() {
         </RailSection>
         <AdvancedSettings focus={focus} weights={weights} onChange={setWeights} custom={!isStance(preset)} onReset={() => applyPreset(focus)} />
       </Rail>
+      )}
       <RightColumn>
         <AnalysisChat />
-        <PanelFrame inline>{zipMode ? <ZipPanel suggestions={suggestions} hud={hudTable} level={plan.level} /> : t && r ? <TractDetail t={t} r={r} weights={weights} rec={rec} fitOrder={fitOrders.get(t.GEOID)} onClose={() => select(null)} /> : <StartCard />}</PanelFrame>
+        <PanelFrame inline>{zipMode ? <ZipPanel suggestions={suggestions} hud={hudTable} level={plan.level} /> : t && r ? <TractDetail t={t} r={r} weights={weights} rec={rec} fitOrder={fitOrders.get(t.GEOID)} onClose={() => select(null)} /> : <StartCard suggestions={suggestions} />}</PanelFrame>
       </RightColumn>
-      {(
+      {!PlaceRail && (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="absolute bottom-3 left-3 z-20 w-[340px] xl:w-[360px] max-sm:hidden">
           <SuggestionLegend focus={focusLabel} level={[plan.size === 'auto' ? '' : sizeWord(plan.size), plan.age === 'any' ? '' : AGE_LABEL[plan.age], LEVEL_LABEL[plan.level]].filter(Boolean).join(' · ')} counts={counts} noneLabel={noneLabel} />
         </motion.div>

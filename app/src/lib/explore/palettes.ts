@@ -76,7 +76,7 @@ const BY_ID: Record<string, ThemeId> = {
 /** Fallback by catalogue group, for variables added later. */
 const BY_GROUP: Record<string, ThemeId> = {
   population: 'people', race: 'people', income: 'money', work_edu: 'edu', stock: 'stock', tenure: 'stock', cost: 'rent',
-  commute: 'transit', an_ami: 'ami', an_rents: 'rent', an_inputs: 'stock', land: 'landVacant', zoning: 'landRes',
+  commute: 'transit', an_ami: 'ami', an_rents: 'rent', an_inputs: 'stock', land: 'landVacant', zoning: 'landRes', canopy: 'green',
 };
 
 export function themeOf(variable: Pick<VariableDef, 'id' | 'group'> | null | undefined): ThemeId {

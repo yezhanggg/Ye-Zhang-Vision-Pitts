@@ -11,6 +11,9 @@ export const PGH_CENTER: [number, number] = [-79.985, 40.44];
 export const PGH_VIEW = { center: PGH_CENTER, zoom: 11.6, pitch: 50, bearing: -15 };
 export const HERO_VIEW = { center: [-79.992, 40.4418] as [number, number], zoom: 14.6, pitch: 62, bearing: -30 };
 
+/** Hidden marker layer under contours and buildings: overlay fills sit below it, the sun-and-shadow layer right above it. */
+export const OVERLAY_TOP = 'overlay-top';
+
 export const VIOLET = 'rgb(124,58,237)';
 export const NO_DATA = '#e7e5e4';
 

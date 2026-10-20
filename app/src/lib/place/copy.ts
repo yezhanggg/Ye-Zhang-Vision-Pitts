@@ -42,7 +42,7 @@ export const REFUSES: string[] = [
   'whether a project pencils',
   'a site',
   'verified zoning',
-  'PHFA scoring',
+  'the score PHFA would give an application',
   'absorption',
   '2026 incomes',
   'who has already been displaced',
@@ -68,7 +68,7 @@ export const SOURCE_LINES = {
   D: `PRT GTFS June 2026 · 2020 census blocks · frequent = at least ${THRESHOLDS.frequent_stop_departures} weekday departures at the stop`,
   E: 'FEMA NFHL flood zones · HAND on USGS 3DEP (terrain screen) · shares of land',
   F: 'WPRDC zoning districts (land share) · HUD QCT/DDA 2026 · Treasury Opportunity Zones · City CDBG areas',
-  G: 'the rules in docs/assumptions.md §11 · value judgments with printed thresholds · fit order = scoreTract under the stance preset',
+  G: 'the rules in docs/assumptions.md §14 · value judgments with printed thresholds · fit order = scoreTract under the stance preset',
 } as const;
 
 // ------------------------------------------------------------------ block A: affordability by AMI band

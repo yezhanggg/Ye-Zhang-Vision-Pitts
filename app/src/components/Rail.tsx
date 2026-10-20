@@ -6,7 +6,7 @@ import { UI } from '../lib/copy';
 import { cx } from '../lib/format';
 import { Explainer, FoldButton, SPRING_PANEL, SPRING_TAB } from './primitives';
 
-const BODY = 'scroll-quiet min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3 pb-3 pt-1';
+const BODY = 'scroll-quiet relative min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3 pb-3 pt-1';
 
 function RailHeader({ title, onHide }: { title: string; onHide: () => void }) {
   return (

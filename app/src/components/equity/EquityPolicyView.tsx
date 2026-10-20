@@ -2,7 +2,7 @@
 // levers with the policy simulator pop-up beside them, export) over three columns: the map (colored by the measure,
 // lever-changed tracts outlined), the measure section (definition, plain sentences, charts, the selected tract against
 // the city, every tract ranked by need) and the question box filling the right column.
-import { useCallback, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useMemo, useState } from 'react';
 import { rankedTracts, tractById, tractLabel } from '../../lib/data';
 import { useApp } from '../../lib/store';
 import type { MapPaint } from '../../lib/paint';
@@ -35,6 +35,8 @@ import { InfoTip } from '../primitives';
 
 /** v2: the chat is a floating panel behind a button, closed until asked for (remembered per browser). */
 const CHAT_KEY = 'visionpitts.equityChat.v2';
+/** Online the chat opens from the VisionPitts Chat pill in the top right, as on every view; offline it docks here. */
+const ChatPill = import.meta.env.MODE === 'export' ? null : lazy(() => import('../ChatPill'));
 
 const infoOf = (id: string): TractInfo => {
   const t = tractById.get(id);
@@ -354,7 +356,15 @@ export default function EquityPolicyView({ active = true }: { active?: boolean }
   }
 
   return (
-    <div className="flex h-full flex-col bg-[#fbfaf8] pt-[96px]" data-active={active ? 'true' : 'false'}>
+    // Online the top bar is one row (TopNav), so the page starts higher; the offline file keeps two rows of tabs.
+    <div className={import.meta.env.MODE === 'export' ? 'flex h-full flex-col bg-[#fbfaf8] pt-[96px]' : 'flex h-full flex-col bg-[#fbfaf8] pt-14'} data-active={active ? 'true' : 'false'}>
+      {ChatPill && active && (
+        <div className="absolute right-3 top-3 z-30">
+          <Suspense fallback={null}>
+            <ChatPill extraFacts={facts} prompts={prompts} />
+          </Suspense>
+        </div>
+      )}
       <div className="flex min-h-0 flex-1 flex-col gap-2.5 px-4 pb-4 pt-1.5 sm:px-5 max-lg:overflow-y-auto">
         <header className="flex shrink-0 flex-wrap items-baseline gap-x-3">
           <h1 className="font-display text-title font-bold text-slate-900">Equity &amp; policy</h1>
@@ -384,7 +394,7 @@ export default function EquityPolicyView({ active = true }: { active?: boolean }
           policySlot={<PolicyPopover levers={levers} results={results} selectedId={selectedId} onToggle={toggle} />}
           exportSlot={<ExportMenu items={exportItems} size="md" iconOnlyNarrow className="[&>button]:h-8 [&>button]:px-2.5 [&>button]:text-caption min-[2100px]:[&>button]:px-3 min-[2100px]:[&>button]:text-small" />}
           chatSlot={
-            <button
+            ChatPill ? null : <button
               type="button"
               onClick={toggleChat}
               aria-pressed={chatOpen}
@@ -452,8 +462,8 @@ export default function EquityPolicyView({ active = true }: { active?: boolean }
             allValues={zipMode ? zipAll : allValues}
             selectedId={zipMode ? selZip : selectedId}
             policiesLine={zipMode ? (levers.some((l) => l.on) ? LEVERS_TRACT_ONLY : null) : policiesOnLine(levers)}
-            chat={chatPanel}
-            chatOpen={chatOpen}
+            chat={ChatPill ? null : chatPanel}
+            chatOpen={!ChatPill && chatOpen}
             policyTexts={zipMode ? [] : policyTexts}
             reading={reading}
             onAskInsight={typeof location !== 'undefined' && location.protocol === 'file:' ? undefined : askInsight}

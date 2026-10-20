@@ -321,6 +321,9 @@ export function evidenceBlocks(t: PlaceTract, p: PlaceMeasures, hud: HudTable): 
   return out;
 }
 
+/** What the project card adds to a place's PDF and CSV while it is open (online only: lib/project/report). */
+export const placeExtra: { at?: (geoid: string) => { blocks: ReportBlock[]; rows: MeasureRow[] } | undefined } = {};
+
 export function buildPlaceReport(i: PlaceReportInput): Report {
   const { t, place, hud, rec, plan } = i;
   const name = placeName(t);
@@ -337,7 +340,7 @@ export function buildPlaceReport(i: PlaceReportInput): Report {
   ];
   if (i.map) blocks.push({ kind: 'image', src: i.map, caption: `${name}: map colored by the suggested housing type under ${STANCE_LABEL[plan.focus]} at ${LEVEL_LABEL[plan.level]}.` });
   blocks.push({ kind: 'heading', text: 'Evidence' }, ...evidenceBlocks(t, place, hud));
-  blocks.push({ kind: 'heading', text: 'You decide' }, { kind: 'callout', text: DECIDE });
+  blocks.push(...(placeExtra.at?.(t.GEOID)?.blocks ?? []), { kind: 'heading', text: 'You decide' }, { kind: 'callout', text: DECIDE });
   return {
     title: `Place report: ${name}`,
     subtitle: `${t.name} · Pittsburgh · census tract ${t.GEOID}`,
@@ -454,6 +457,7 @@ export function placeMeasureRows(t: PlaceTract, p: PlaceMeasures, hud: HudTable 
     add('Land use', 'Vacant lots', lu.vacant_lots, 'parcels', LAND_SOURCE);
     add('Land use', 'Parcels', lu.parcels, 'parcels', LAND_SOURCE);
   }
+  out.push(...(placeExtra.at?.(t.GEOID)?.rows ?? []));
   return out;
 }
 

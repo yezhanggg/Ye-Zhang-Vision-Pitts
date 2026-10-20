@@ -45,6 +45,8 @@ export default defineConfig(({ mode }) => {
   const single = mode === 'export';
   return {
     base: './',
+    // Files in public/ (the sun-and-shadow pages) are fetched at runtime; the offline file has no folder to fetch from.
+    publicDir: single ? false : 'public',
     plugins: [react(), tailwindcss(), devApi(), ...(single ? [viteSingleFile({ removeViteModuleLoader: true })] : [])],
     // The offline file never talks to Supabase (file:// turns it off), so it carries no Supabase URL or key at all.
     define: single ? { 'import.meta.env.VITE_SUPABASE_URL': '""', 'import.meta.env.VITE_SUPABASE_ANON_KEY': '""' } : undefined,

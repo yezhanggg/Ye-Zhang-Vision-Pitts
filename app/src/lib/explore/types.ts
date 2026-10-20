@@ -24,7 +24,7 @@ export interface VariableDef {
   description: string;
   sort: number;
   /** Absent or 'acs' for census variables; 'analysis' for the tract-only layers from the Analysis section. */
-  source?: 'acs' | 'analysis' | 'parcels' | 'zoning';
+  source?: 'acs' | 'analysis' | 'parcels' | 'zoning' | 'canopy';
 }
 
 export interface GroupDef {

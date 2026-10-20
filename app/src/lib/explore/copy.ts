@@ -53,7 +53,7 @@ export const EXPLORE_UI = {
   clear: 'Clear',
   footer: 'Source: American Community Survey 2020–2024, 5-year estimates',
   sourceOf: (source?: string) =>
-    source === 'parcels' ? 'Source: Allegheny County property assessments (2026), share of parcel land' : source === 'zoning' ? 'Source: City of Pittsburgh zoning districts (WPRDC); unverified by-right reading' : 'Source: American Community Survey 2020–2024, 5-year estimates',
+    import.meta.env.MODE !== 'export' && source === 'canopy' ? 'Source: tree canopy mapped from 2020 lidar (Tree Pittsburgh and the University of Vermont, PASDA), share of land' : source === 'parcels' ? 'Source: Allegheny County property assessments (2026), share of parcel land' : source === 'zoning' ? 'Source: City of Pittsburgh zoning districts (WPRDC); unverified by-right reading' : 'Source: American Community Survey 2020–2024, 5-year estimates',
   zoningCityOnly: 'City of Pittsburgh only',
   sourcesLink: 'All sources →',
   notBuilt: 'Data browser not built. Run scripts/07_build_acs_levels.py, then the app export, to bundle the census variables.',

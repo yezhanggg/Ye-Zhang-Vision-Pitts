@@ -43,3 +43,14 @@ Thumbs.db
 # Supabase CLI and MCP local state (never published)
 supabase/.temp/
 .mcp.json
+
+# Local process files (shadow run inputs and outputs); never published
+nopush/
+
+# Sun and shadow, close-zoom pages (6 ft cells, about 162 MB). The app uses them when they are there and works
+# without them. Delete the next line to publish them with the site.
+app/public/data/shadow/fine/
+
+# Sun and shadow, By parcel view (lot shapes and their figures, about 55 MB; scripts/15_build_parcel_shadow.py). The
+# app shows the view only where these files are. Delete the next line to publish them with the site.
+app/public/data/parcel-shadow/

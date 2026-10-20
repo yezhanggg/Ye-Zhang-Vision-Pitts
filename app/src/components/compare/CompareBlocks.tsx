@@ -275,14 +275,14 @@ export const GLANCE_GRID =
   "grid grid-cols-[minmax(200px,520px)_minmax(104px,168px)_minmax(104px,168px)] gap-x-3";
 
 /** Row groups for display only; `glanceRows()` keeps its order for the export. Index 3 (rent gap) follows the fits row. */
-const GROUPS: { label: string; idx: (number | "fits")[] }[] = [
+export const GROUPS: { label: string; idx: (number | "fits")[] }[] = [
   { label: "Affordability", idx: [0, 1, 2, "fits", 3] },
   { label: "Access", idx: [4, 6, 7] },
   { label: "Risk", idx: [5] },
   { label: "Land and zoning", idx: [8, 9, 10] },
 ];
 
-function Value({
+export function Value({
   text,
   muted,
   shade,
@@ -309,7 +309,7 @@ function Value({
   );
 }
 
-function Measure({
+export function Measure({
   label,
   note,
   title,
@@ -415,7 +415,7 @@ export function AtAGlance({
 
 // ---------------------------------------------------------------------------------------------------------------- 2
 
-type GetsCells = {
+export type GetsCells = {
   type: ReactNode;
   size: ReactNode;
   rent: ReactNode;
@@ -427,7 +427,7 @@ const note = (t: ReactNode) => (
   <span className="block text-[11px] leading-snug text-slate-500">{t}</span>
 );
 
-function getsCells(s: SideInfo, level: PlanLevel): GetsCells {
+export function getsCells(s: SideInfo, level: PlanLevel): GetsCells {
   const rec = s.rec;
   if (!s.t)
     return {

@@ -1,0 +1,1 @@
+{"version":1,"built":"2026-10-12","source":"PASDA Allegheny County Tree Canopy Change 2015-2020 (Tree Pittsburgh and the University of Vermont, lidar from fall 2019 and spring 2020), read as the 2020 tree canopy extent","year":2020,"tileSize":512,"minzoom":11,"maxzoom":15,"bounds":[-80.112305,40.346544,-79.848633,40.513799],"tiles":646,"bytes":12302210,"path":"{z}/{x}/{y}.png"}

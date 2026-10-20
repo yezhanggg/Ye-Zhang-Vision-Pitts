@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { Suspense, lazy, type ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { Compass, Home } from 'lucide-react';
 import { TOUR_COPY, useTour } from '../lib/tour';
@@ -9,6 +9,8 @@ import { UI } from '../lib/copy';
 import { SPRING_TAB, SlideBg, useSlide } from './primitives';
 
 type Section = ReturnType<typeof sectionOf>;
+// Online: Explore | Analysis with a menu of the Analysis views on hover (TopNav). The offline file keeps the two rows below.
+const TopNav = import.meta.env.MODE === 'export' ? null : lazy(() => import('./TopNav'));
 const SUBTABS: { id: AnalysisMode; label: string }[] = [
   { id: 'match', label: UI.matchTab },
   { id: 'tracts', label: UI.compareTractsTab },
@@ -60,10 +62,16 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <span className="max-sm:hidden">{TOUR_COPY.button}</span>
         </motion.button>
       </div>
+      {TopNav ? (
+        <Suspense fallback={null}>
+          <TopNav />
+        </Suspense>
+      ) : (
       <div className="pointer-events-none absolute left-1/2 top-3 z-30 flex -translate-x-1/2 flex-col items-center gap-1.5">
         <Pill items={sections} value={section} onPick={(id) => setMode(id === 'explore' ? 'explore' : lastAnalysis)} ariaLabel="Sections" layoutId="tab-pill" tour="sections" />
         {section === 'analysis' && <Pill items={SUBTABS} value={mode as AnalysisMode} onPick={(id) => setMode(id)} ariaLabel="Analysis views" layoutId="subtab-pill" size="sm" tour="subtabs" />}
       </div>
+      )}
       <TourLayer />
     </div>
   );

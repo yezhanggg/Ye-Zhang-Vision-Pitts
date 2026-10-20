@@ -1,6 +1,6 @@
 // The evidence under the answer card on Analysis > Match: blocks A–F, how the suggestion was made, and the fit order,
 // each folded with its title and one headline value. Opening a fold shows the block's table and its source line.
-import type { ReactNode } from 'react';
+import { Suspense, lazy, type ReactNode } from 'react';
 import { typologyById } from '../../lib/data';
 import { isNum } from '../../lib/format';
 import { sumBands, typeBandFor } from '../../lib/place/bands';
@@ -21,6 +21,9 @@ import Transit from './Transit';
 import ZoningPrograms from './ZoningPrograms';
 import { landByGroup, landForType } from '../../lib/place/zoningAnalysis';
 import LandUse, { landHeadline } from './LandUse';
+
+// Sun, shade and trees reads data the offline single file has no room for, so the fold loads on demand.
+const SiteConditions = import.meta.env.MODE === 'export' ? null : lazy(() => import('./SiteConditions'));
 
 export function Fold({ title, headline, children }: { title: string; headline: ReactNode; children: ReactNode }) {
   return (
@@ -82,6 +85,11 @@ export default function PlaceFolds({ t, place, hud, rec, level, fitOrder }: { t:
       <Fold title="Flood" headline={isNum(f.fema_sfha_pct) ? `${f.fema_sfha_pct.toFixed(1)}% of land in flood zone` : 'not available'}>
         <Flood place={place} t={t} />
       </Fold>
+      {SiteConditions && (
+        <Suspense fallback={null}>
+          <SiteConditions geoid={t.GEOID} />
+        </Suspense>
+      )}
       <Fold title="Land use" headline={landHeadline(t.GEOID)}>
         <LandUse geoid={t.GEOID} />
       </Fold>
@@ -97,7 +105,7 @@ export default function PlaceFolds({ t, place, hud, rec, level, fitOrder }: { t:
             </div>
           ))}
         </dl>
-        <SourceLine className="mt-1.5">Rules · lib/place/recommend with the thresholds in lib/place/thresholds, printed in each line · docs/assumptions.md §11.</SourceLine>
+        <SourceLine className="mt-1.5">Rules · lib/place/recommend with the thresholds in lib/place/thresholds, printed in each line · docs/assumptions.md §14.</SourceLine>
       </Fold>
       <Fold title="Fit order" headline={fitOrder[0] ? `${typologyById.get(fitOrder[0])?.label ?? cap(TYPOLOGY_LABEL[fitOrder[0]])} first` : 'not available'}>
         <ol className="space-y-1">

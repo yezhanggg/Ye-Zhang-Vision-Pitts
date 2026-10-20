@@ -182,6 +182,8 @@ def write_all(tracts: gpd.GeoDataFrame, df: pd.DataFrame, cfg: dict, focus: list
     df.drop(columns=[c for c in ("geometry",) if c in df]).to_csv(PROCESSED / "tracts.csv", index_label="GEOID")
     dump(cfg, APP_DATA / "scoring.json")
     dump(sources.for_app(), APP_DATA / "sources.json")
+    (APP_DATA / "online").mkdir(exist_ok=True)
+    dump(sources.for_app_online(), APP_DATA / "online" / "sources.json")
     dump(focus, APP_DATA / "focus.json")
     dump(flips.to_dict(orient="records"), APP_DATA / "flips.json")
     dump(neighborhoods_geojson(nbhd, tracts), APP_DATA / "neighborhoods.json")

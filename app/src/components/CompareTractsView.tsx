@@ -1,7 +1,7 @@
 // Analysis > Compare places: two places side by side under one focusing issue and income level. A header with the two
 // pickers and the focus, two independent maps colored by the suggested type, then three blocks: the real measures,
 // what each place would get, and (folded) the scoring detail behind "Why they differ".
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from "react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import {
   rankedTracts,
@@ -40,6 +40,7 @@ import { LEVEL_LABEL, PLAN_LEVELS, type PlanLevel } from "../lib/place/plan";
 import { usePlan } from "../lib/place/planStore";
 import type { Recommendation } from "../lib/place/recommend";
 import { suggestAll } from "../lib/place/suggest";
+import { useDemandScores } from "../lib/place/useDemandScores";
 import { whyTheyDiffer } from "../lib/place/whyDiffer";
 import type { Stance, Typology } from "../lib/place/types";
 import type { Stability } from "../lib/scoring";
@@ -73,6 +74,9 @@ import { mapSnapshot, printReport } from "../lib/export/report";
 import { fLabel } from "../lib/derived";
 import { pctShort } from "../lib/copy";
 import { Chevron, Dot, Segmented } from "./primitives";
+
+// The Place tab's project in both places (online only; the offline file has no room).
+const CompareProject = import.meta.env.MODE === "export" ? null : lazy(() => import("./compare/CompareProject"));
 
 export const COLOR_A = "#7c3aed";
 export const COLOR_B = "#0f766e";
@@ -158,7 +162,7 @@ function StabilityLine({ s, ra }: { s: Stability | null; ra: Rationale }) {
 }
 
 /** One side's column under the maps: its ranking, the guard chips and the stability line; or why it has no ranking. */
-function Side({
+export function Side({
   tag,
   color,
   t,
@@ -209,11 +213,11 @@ const STANCE_IDS: readonly string[] = (
 ).includes("climate_resilient")
   ? APP_STANCES
   : [...APP_STANCES, "climate_resilient"];
-const isStance = (s: string | null): s is Stance =>
+export const isStance = (s: string | null): s is Stance =>
   !!s && STANCE_IDS.includes(s);
 const TYPOLOGY_INDEX = new Map(scoring.typologies.map((t, i) => [t.id, i]));
 
-function SuggestTip({
+export function SuggestTip({
   id,
   rec,
 }: {
@@ -254,7 +258,7 @@ function SuggestTip({
   );
 }
 
-const SwapIcon = () => (
+export const SwapIcon = () => (
   <svg
     viewBox="0 0 20 20"
     className="h-4 w-4"
@@ -271,7 +275,7 @@ const SwapIcon = () => (
 
 /** The weighted scoring ranks every type; the written rules above decide which types are suggested, so the two can
  *  differ (the scoring only orders types inside the suggested set). */
-const SCORING_CAVEAT =
+export const SCORING_CAVEAT =
   "On the weighted scoring ranks, which only order types and can differ from the rules above:";
 
 export default function CompareTractsView({
@@ -308,10 +312,11 @@ export default function CompareTractsView({
     () => new Map([...results].map(([id, r]) => [id, r.ranking as Typology[]])),
     [results],
   );
+  const demand = useDemandScores();
   const suggestions = useMemo(() => {
     if (!hasPlaceData || !hudTable) return new Map<string, Recommendation>();
     try {
-      return suggestAll(placeById, hudTable, focus, plan, fitOrders);
+      return suggestAll(placeById, hudTable, focus, plan, fitOrders, demand);
     } catch (e) {
       console.warn("[compare] suggestions failed for", focus, e);
       return new Map<string, Recommendation>();
@@ -325,6 +330,7 @@ export default function CompareTractsView({
     plan.flood,
     plan.transitMi,
     fitOrders,
+    demand,
   ]);
   const { paint, counts } = useMemo(() => {
     const values = new Map<string, number | null>();
@@ -531,7 +537,7 @@ export default function CompareTractsView({
   return (
     <MotionConfig reducedMotion={!active || lite ? "always" : "user"}>
       <div className="flex h-full flex-col bg-[#fbfaf8] pt-[96px]">
-        <div className="scroll-quiet min-h-0 flex-1 overflow-y-auto">
+        <div className="scroll-quiet relative min-h-0 flex-1 overflow-y-auto">
           <div className="w-full px-4 pb-12 pt-3 sm:px-5">
             <header className="mb-3">
               <div className="flex flex-wrap items-baseline gap-x-3">
@@ -825,6 +831,12 @@ export default function CompareTractsView({
                 </section>
               </div>
             </div>
+
+            {CompareProject && (ta || tb) && (
+              <Suspense fallback={null}>
+                <CompareProject A={A} B={B} />
+              </Suspense>
+            )}
 
             <AnimatePresence initial={false}>
               {detail && (

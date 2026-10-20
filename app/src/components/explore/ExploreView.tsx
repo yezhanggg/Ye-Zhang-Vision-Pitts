@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { MapPinned, MousePointerClick, X } from 'lucide-react';
 import type { ExpressionSpecification } from 'maplibre-gl';
@@ -32,6 +32,12 @@ import { BoundaryPanel, SettingsPanel } from './LayersPanel';
 import PlaceCard from './PlaceCard';
 import VariableSummary from './VariableSummary';
 import { registerMap } from '../../lib/export/mapRegistry';
+import { useParcelShadow } from '../../lib/explore/parcelShadowStore';
+import { useSunShadow } from '../../lib/explore/sunShadowStore';
+
+// The sun-and-shadow control and its map layer load when the switch is first turned on; the offline single file leaves them out.
+const SunDock = import.meta.env.MODE === 'export' ? null : lazy(() => import('./SunDock'));
+const ChatPill = import.meta.env.MODE === 'export' ? null : lazy(() => import('../ChatPill'));
 
 /** The built-in tract layers are hidden in Explore; this keeps their paint effect inert. */
 const EMPTY_PAINT: MapPaint = { kind: 'cat', palette: ['#e7e5e4'], values: new Map() };
@@ -95,6 +101,10 @@ export default function ExploreView() {
   const set = useApp((s) => s.set);
   const zoningOn = useZoningLayer((s) => s.on);
   const landOn = useLandUseLayer((s) => s.on);
+  const sunOn = useSunShadow((s) => s.on);
+  // Sun and shadow, By parcel: lots come ready-made from the lazy half; while they are on screen they take the hover and the clicks.
+  const lotLayers = useParcelShadow((s) => s.overlays);
+  const lotsOn = useParcelShadow((s) => s.active);
   // The legend is pinned to the bottom-left corner; the Explore panel keeps clear of it (and folds away on its own).
   const [legendH, setLegendH] = useState(0);
   const legendRo = useRef<ResizeObserver | null>(null);
@@ -159,8 +169,8 @@ export default function ExploreView() {
         idField: 'GEOID',
         line: lineFor(layerId, true),
         selectedId: selected?.geoid ?? null,
-        fill: fillPaint ? { paint: fillPaint } : NEUTRAL_FILL,
-        interactive: true,
+        fill: fillPaint && !lotsOn ? { paint: fillPaint } : NEUTRAL_FILL,
+        interactive: !lotsOn,
         zoomTo: true,
         tooltip: (gid) => <DataTooltip geoid={gid} props={browseIndex.get(gid) ?? null} variable={variable} estimate={values?.get(gid)} />,
         // A second click on the selected place clears it.
@@ -173,11 +183,12 @@ export default function ExploreView() {
     }
     // The zoning map sits over the boundary fill (its own hover tooltip); clicks still reach the boundary below.
     if (zoningOn) {
-      out.push({ id: 'zoning', data: zoningFC as OverlayLayer['data'], idField: 'code', line: ZONING_LINE, fill: { paint: zoningPaint, opacity: ZONING_OPACITY }, interactive: true, tooltip: (code) => <ZoningTooltip code={code} /> });
+      out.push({ id: 'zoning', data: zoningFC as OverlayLayer['data'], idField: 'code', line: ZONING_LINE, fill: { paint: zoningPaint, opacity: ZONING_OPACITY }, interactive: !lotsOn, tooltip: (code) => <ZoningTooltip code={code} /> });
     }
     if (cityOnly) out.push({ id: 'city', data: cityGeo.data, idField: 'GEOID', line: lineFor('city', false), selectedId: null });
+    out.push(...lotLayers);
     return out;
-  }, [open, layerId, level, cityOnly, browseGeo.data, cityGeo.data, selected, fillPaint, browseIndex, variable, values, setBrowse, zoningOn, landOn, landPaint]);
+  }, [open, layerId, level, cityOnly, browseGeo.data, cityGeo.data, selected, fillPaint, browseIndex, variable, values, setBrowse, zoningOn, landOn, landPaint, lotLayers, lotsOn]);
 
   const chat = useMemo<ChatScope>(() => ({ level, cityOnly, fc: browseGeo.data, selected: selected?.geoid ?? null, variable, values, weights }), [level, cityOnly, browseGeo.data, selected, variable, values, weights]);
   const panelKey = selected ? `place:${selected.level}:${selected.geoid}:${variable?.id ?? ''}` : variable ? `var:${variable.id}` : 'overview';
@@ -185,7 +196,7 @@ export default function ExploreView() {
   const noticeClosed = useTour((s) => s.noticeClosed);
   const tourCue = useTour((s) => s.cue);
   const showNotice = phase === 'done' && !noticeClosed && !tourActive;
-  const showHint = phase === 'done' && open && !variable && !selected && !hintClosed && !tourActive;
+  const showHint = phase === 'done' && open && !variable && !selected && !hintClosed && !tourActive && !lotsOn;
 
   return (
     <div className="relative h-full">
@@ -197,6 +208,7 @@ export default function ExploreView() {
         terrain={layers.terrain}
         terrainAlways={layers.terrain}
         buildings={layers.buildings}
+        buildingsFaded={lotsOn}
         hillshade={layers.hillshade}
         pin={pin}
         elevationReadout
@@ -206,6 +218,7 @@ export default function ExploreView() {
             setZoningHover(id);
             return;
           }
+          if (overlayId?.startsWith('parcels-')) return;
           if (useApp.getState().hoverId !== id) set({ hoverId: id });
         }}
         padding={padding}
@@ -243,7 +256,16 @@ export default function ExploreView() {
       {/* Right column: the search-and-question box on top, the summary (or its small tab) underneath. */}
       {phase === 'done' && (
         <RightColumn>
-          <ChatBox scope={chat} resolve={resolve} onGo={(geoid) => setBrowse({ selected: { level, geoid } })} />
+          {/* Online the box opens from the VisionPitts Chat pill, as on every view. */}
+          {ChatPill ? (
+            <Suspense fallback={null}>
+              <ChatPill>
+                <ChatBox scope={chat} resolve={resolve} onGo={(geoid) => setBrowse({ selected: { level, geoid } })} />
+              </ChatPill>
+            </Suspense>
+          ) : (
+            <ChatBox scope={chat} resolve={resolve} onGo={(geoid) => setBrowse({ selected: { level, geoid } })} />
+          )}
           <PanelFrame inline tourId="summary" open={panelOpen} onToggle={(o) => set({ browsePanel: o })} title={EXPLORE_UI.summaryTab}>
             <AnimatePresence mode="wait" initial={false}>
               <motion.div key={panelKey} className={selected || variable ? undefined : 'h-full'} initial={lite ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={lite ? undefined : { opacity: 0, y: -6 }} transition={{ duration: 0.16 }}>
@@ -268,11 +290,18 @@ export default function ExploreView() {
         )}
       </AnimatePresence>
       <AnimatePresence>
-        {phase === 'done' && ((variable && values) || zoningOn || (landOn && open)) && (
-          <motion.div key="legend" ref={legendRef} initial={lite ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className={cx('absolute bottom-3 left-3 z-20 flex items-end gap-2 max-sm:bottom-[8.5rem] max-sm:right-3 max-sm:overflow-x-auto', panelOpen && 'max-sm:hidden')}>
-            {variable && values && <DataLegend variable={variable} level={level} values={values} breaks={breaks} ext={ext} hoverId={hoverId} />}
-            {landOn && open && <LandUseLegend classes={landClasses} hoverId={hoverId} />}
-            {zoningOn && <ZoningLegend hoverCode={zoningHover} />}
+        {phase === 'done' && (sunOn || (variable && values) || zoningOn || (landOn && open)) && (
+          <motion.div key="legend" ref={legendRef} initial={lite ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className={cx('absolute bottom-3 left-3 z-20 flex flex-col items-start gap-2 max-sm:bottom-[8.5rem] max-sm:right-3', panelOpen && 'max-sm:hidden')}>
+            {sunOn && SunDock && (
+              <Suspense fallback={null}>
+                <SunDock lite={lite} />
+              </Suspense>
+            )}
+            <div className="flex max-w-full items-end gap-2 max-sm:overflow-x-auto">
+              {variable && values && !lotsOn && <DataLegend variable={variable} level={level} values={values} breaks={breaks} ext={ext} hoverId={hoverId} />}
+              {landOn && open && <LandUseLegend classes={landClasses} hoverId={hoverId} />}
+              {zoningOn && <ZoningLegend hoverCode={zoningHover} />}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

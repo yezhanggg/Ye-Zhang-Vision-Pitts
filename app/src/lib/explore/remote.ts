@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { tractById } from '../data';
 import { restGet, supabase } from '../supabase';
-import { bundledGeo, bundledValues, historyFor, isCountyWide, levelMeta, reference, unitValues, valuesFor } from './catalog';
+import { CANOPY_VAR, ONLINE_DATA, bundledGeo, bundledValues, canopyValues, historyFor, isCountyWide, levelMeta, reference, unitValues, valuesFor } from './catalog';
 import type { Series } from './summary';
 import type { DataSource, Estimate, GeoLevel, Loaded, Scope, UnitFC, UnitFeature, ValueMap } from './types';
 
@@ -83,6 +83,11 @@ export function loadValues(level: GeoLevel, varId: string): Promise<ValueMap | n
       if (!remoteEnabled()) return null;
       const meta = levelMeta(level);
       if (meta.total <= meta.bundled) return null;
+      // Tree canopy for the whole county rides in the build, not in the database.
+      if (ONLINE_DATA && varId === CANOPY_VAR) {
+        const c = canopyValues(level);
+        return c ? new Map(Object.entries(c).map(([geoid, est]) => [geoid, { est, moe: null, cv: null }])) : null;
+      }
       try {
         const rows = await restGet<ValueRow>('acs_values', { level: `eq.${level}`, var: `eq.${varId}`, select: 'geoid,est,moe,cv', order: 'geoid' });
         if (!rows.length) throw new Error(`acs_values has no ${key} rows`);
@@ -114,6 +119,8 @@ export function loadUnit(level: GeoLevel, geoid: string): Promise<Record<string,
         if (!rows.length) return null;
         const out: Record<string, Estimate> = {};
         for (const r of rows) out[r.var] = { est: r.est, moe: r.moe, cv: r.cv };
+        const trees = ONLINE_DATA ? canopyValues(level)?.[geoid] : null;
+        if (trees != null) out[CANOPY_VAR] = { est: trees, moe: null, cv: null };
         unitResults.set(key, out);
         return out;
       } catch {

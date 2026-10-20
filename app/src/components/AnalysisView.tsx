@@ -1,10 +1,17 @@
-import { useState } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useStrictChat } from '../lib/analysis/strictChat';
 import { useApp, type AnalysisMode } from '../lib/store';
 import MatchView from './MatchView';
 import CompareTractsView from './CompareTractsView';
 import EquityPolicyView from './equity/EquityPolicyView';
+
+// Compare places online: inputs on the left, both maps, results on the right. The offline single file has no room for
+// it and keeps CompareTractsView.
+const CompareStudio = import.meta.env.MODE === 'export' ? null : lazy(() => import('./compare/CompareStudio'));
+// Place online: the screens and policies in place of a focusing issue, every input flat behind Confirm. The offline
+// file keeps MatchView.
+const PlaceStudio = import.meta.env.MODE === 'export' ? null : lazy(() => import('./place/PlaceStudio'));
 
 /**
  * Keep the sub-views mounted: a view mounts the first time its mode is visited and Match plus the most recently
@@ -24,8 +31,22 @@ function useKeptViews(mode: AnalysisMode): AnalysisMode[] {
 }
 
 function View({ mode, active }: { mode: AnalysisMode; active: boolean }) {
-  if (mode === 'match') return <MatchView />;
-  if (mode === 'tracts') return <CompareTractsView active={active} />;
+  if (mode === 'match')
+    return PlaceStudio ? (
+      <Suspense fallback={null}>
+        <PlaceStudio />
+      </Suspense>
+    ) : (
+      <MatchView />
+    );
+  if (mode === 'tracts')
+    return CompareStudio ? (
+      <Suspense fallback={null}>
+        <CompareStudio active={active} />
+      </Suspense>
+    ) : (
+      <CompareTractsView active={active} />
+    );
   return <EquityPolicyView active={active} />;
 }
 

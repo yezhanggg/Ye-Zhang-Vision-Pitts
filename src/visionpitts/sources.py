@@ -108,6 +108,82 @@ SOURCES: list[dict] = [
          method="Footprints inside the demo tracts; height from Overture `height`, else county assessment stories x 3.3 m + 1.5 m, "
                 "else Overture floors x 3.3 m, else 6 m default (drawn faded). 3D display only.",
          caveats="Guessed heights are labeled. Not a scoring input."),
+    dict(id="pasda_lidar2015", name="Allegheny County / Pittsburgh LiDAR 2015, terrain products (PASDA)",
+         url="https://www.pasda.psu.edu/uci/DataSummary.aspx?dataset=1705", vintage="2015", geography="6 ft raster, city plus buffer",
+         method="Sun and shadow layer in Explore. The DSM6ft raster (first-return surface: ground, buildings and trees) is read "
+                "out of the geodatabase, one spike over the river is removed, and a CUDA kernel on a Colab T4 GPU marches every "
+                "cell toward the sun (NOAA solar position; grid north corrected by 1.46 degrees) for each half hour of June 21, "
+                "September 22 and December 21. A cell is in shadow when a cell on the way stands above the sun ray. Results are "
+                "packed one bit per half hour into map pages (scripts/13_build_shadow_notebook.py, scripts/14_publish_shadows.py; "
+                "method in docs/data/shadow.md).",
+         caveats="The surface is from 2015: later buildings and demolitions are missing. Trees count as solid, so tree cover reads "
+                 "as shadow. Clear sky only. Shadows cast from outside the raster (about 1,500 ft beyond the city line) are "
+                 "missing. Display only, never scored."),
+    dict(id="canopy2020", online=True, name="Allegheny County tree canopy 2020 (Tree Pittsburgh and the University of Vermont, on PASDA)",
+         url="https://www.pasda.psu.edu/uci/DataSummary.aspx?dataset=1235", vintage="2020 (lidar flown fall 2019 and spring 2020)",
+         geography="polygons, whole county",
+         method="Tree canopy variable and canopy map in Explore; Sun, shade and trees on the Place page. Canopy area inside each "
+                "area divided by its land area (scripts/16_build_canopy.py; docs/data/canopy.md).",
+         caveats="Published as a 2015-2020 change file without its change classes; its extent matches the 2020 canopy Tree "
+                 "Pittsburgh reports. Power lines and building edges can read as canopy. Display only, never scored."),
+    dict(id="phfa_qap", online=True, name="PHFA Qualified Allocation Plan, selection criteria: 2025/2026 and the 2027/2028 draft",
+         url="https://www.phfa.org/forms/multifamily_application_guidelines/guidelines/2025/2025-mpg-03.pdf",
+         vintage="2025/2026 adopted (PDF 2024-12-19); 2027/2028 draft (2026-07-13)", geography="statewide rules; Pittsburgh is in the urban pool",
+         method="Tax credit score sheet on the Place page. Points, tiers and caps transcribed by hand into "
+                "app/src/data/lazy/lihtc_pa.json and added up as entered (docs/data/lihtc.md).",
+         caveats="A self-score: PHFA scores every application itself, and the draft can change. Which lines the place decides "
+                 "is this project's reading."),
+    dict(id="acs_demand", online=True, name="ACS 5-year 2020-2024: renter households by size, age and income, the homes they rent and their rents (Census API)",
+         url="https://api.census.gov/data/2024/acs/acs5", vintage="2020-2024 (growth from 2010-2014 on 2020 tracts)",
+         geography="city tracts, the city's ZCTAs, the city",
+         method="Who needs it on the Place page. B25009 (tenure by household size), B25042 (tenure by bedrooms), B25068 (bedrooms by "
+                "gross rent), B25118 (tenure by income), B25119 (median income by tenure), B25032 (tenure by units in structure), "
+                "B25007 (tenure by age of householder), B25064; labels checked against the API's variable list before use. Shares "
+                "carry the ACS proportion margin of error; signals count only past a printed mark and the margin of error "
+                "(scripts/17_build_demand.py; docs/data/demand.md).",
+         caveats="Tract margins are wide, so a signal falls back to the tract's ZIP code (the whole ZCTA, part of which may lie "
+                 "outside the city). Household size and home size describe the same occupied homes: a gap says how renters are "
+                 "housed, not that homes are missing. Display and ordering only, never scored."),
+    dict(id="hud_lihtc_db", online=True, name="HUD Low-Income Housing Tax Credit property database (public ArcGIS layer)",
+         url="https://www.huduser.gov/portal/datasets/lihtc.html",
+         vintage="as published by HUD (placed in service through the file's latest year)", geography="property point",
+         method="Tax credit homes in each tract, within a mile of it and in each ZIP code, by year placed in service; the nearest "
+                "properties to each tract's center. Property fields only: never the contact, company or telephone fields "
+                "(scripts/17_build_demand.py).",
+         caveats="HUD's file lags new awards by a year or more. The 30-year mark (15-year compliance plus 15 years of extended "
+                 "use) is an assumption: properties placed before 1990 had less, and some carry longer terms."),
+    dict(id="pgh_zoning_code", online=True, name="City of Pittsburgh Zoning Code, Title Nine (eCode360)",
+         url="https://ecode360.com/PI6865", vintage="current through 2026-09-16 (read 2026-10-15)", geography="zoning district",
+         method="What can be built on the Place page. Development subdistrict standards (§903.03), mixed-use district standards "
+                "(§904.01-§904.04), the Use Table (§911.02), the ADU overlay rule (§912.08), parking minimums (§914.02) and the "
+                "inclusionary overlay (§907.04.A), transcribed by hand into config/zoning_standards.json with each row's section; "
+                "applied to every city lot and summed to tracts (scripts/18_build_zoning_capacity.py; docs/data/zoning_capacity.md).",
+         caveats="A reading of the code, not a zoning determination. Contextual setbacks and heights (§925.06, §925.07), "
+                 "compatibility standards (Chapter 916), slopes, parking and variances are not modeled; envelope districts use "
+                 "assumed home sizes. Districts set by height maps, downtown, riverfront and planned districts are not computed. "
+                 "The older by-right table in config/zoning_rules.json stays marked unverified."),
+    dict(id="pgh_izo", online=True, name="City of Pittsburgh Inclusionary Housing Overlay District (ArcGIS feature layer)",
+         url="https://services1.arcgis.com/YZCmUqbcsUpOKfj7/arcgis/rest/services/InclusionaryHousingOverlayDistrict/FeatureServer/0",
+         vintage="as published by the City (read 2026-10-15)", geography="overlay polygon",
+         method="Share of each tract inside the IZ-O (2,457 acres: Bloomfield, the three Lawrencevilles, Polish Hill and parts "
+                "of Oakland); the 10% set-aside of §907.04.A is applied to projects of 20 or more homes where most of the "
+                "tract is inside.",
+         caveats="The overlay is tested by tract share, not by site: a site near its edge needs the City's map."),
+    dict(id="hud_mtsp", online=True, name="HUD FY2026 Multifamily Tax Subsidy Project (MTSP) income limits, Pittsburgh HMFA (HUD User API)",
+         url="https://www.huduser.gov/portal/datasets/mtsp.html", vintage="FY2026", geography="HUD Metro FMR Area (Pittsburgh, PA)",
+         method="Tax credit rents in the pencil on the Place page: 30% of the limit at 1.5 persons a bedroom (a studio counts one "
+                "person, a half person takes the mean of the neighboring limits) ÷ 12, rounded down, less the utility allowance "
+                "(scripts/19_build_pencil_defaults.py; docs/data/pencil.md).",
+         caveats="MTSP limits, not the Section 8 limits the rest of the Place page uses; the two agree at 50% here and differ by "
+                 "a few dollars at 30% and 80%. No HERA special limits apply to the Pittsburgh area."),
+    dict(id="hacp_ua", online=True, name="Housing Authority of the City of Pittsburgh, 2026 Housing Choice Voucher utility allowance schedule",
+         url="https://hacp.org/app/uploads/2025/10/2026-HCV-Utility-Allowance-Schedule.pdf", vintage="effective 2026-01-01",
+         geography="City of Pittsburgh",
+         method="Default utility allowance in the pencil: low-rise apartment (4 stories or fewer), standard, tenant paying electric "
+                "heat pump heating, electric cooking, other electric, air conditioning and electric water heating; owner paying "
+                "water, sewer and trash ($111, $133, $171, $210 for studio to 3 bedrooms).",
+         caveats="One of several allowance methods a tax credit project may use; the right one depends on the building's "
+                 "utilities and PHFA's rules. Editable on the card."),
     dict(id="wprdc_parcels", name="Allegheny County parcel boundaries (WPRDC)",
          url="https://data.wprdc.org/dataset/allegheny-county-parcel-boundaries", vintage="2026-09", geography="parcel",
          method="Each demo-tract building is matched to a parcel by its representative point to look up the assessment record.",
@@ -333,6 +409,11 @@ RAW_FILES = {
     "nces_schools": ["benchmark/access/ccd_directory_pa_2024.json"],
     "osm_services": ["benchmark/access/osm_services_overpass.json"],
     "parcel_sales": ["parcels/assessments.csv", "parcels/alleghenycounty_parcels202609.geojson"],
+    "acs_demand": ["acs/acs5_2024_tract_demand.csv", "acs/acs5_2024_zcta_demand.csv", "acs/acs5_2024_city_demand.csv"],
+    "hud_lihtc_db": ["benchmark/lihtc/lihtc_allegheny.csv"],
+    "pgh_izo": ["benchmark/zoning/izo_overlay.geojson"],
+    "hud_mtsp": ["benchmark/hud_api/mtspil_4200399999_2026.json"],
+    "hacp_ua": ["benchmark/hacp/2026-HCV-Utility-Allowance-Schedule.pdf"],
 }
 
 
@@ -373,5 +454,14 @@ def write_md() -> None:
     (PROCESSED / "sources.md").write_text("\n".join(lines) + "\n")
 
 
+APP_KEYS = ("id", "name", "url", "vintage", "geography", "method", "caveats")
+
+
 def for_app() -> list[dict]:
-    return [{k: s[k] for k in ("id", "name", "url", "vintage", "geography", "method", "caveats")} for s in SOURCES]
+    """The sources every build of the app lists (bundled, so the offline single file carries them)."""
+    return [{k: s[k] for k in APP_KEYS} for s in SOURCES if not s.get("online")]
+
+
+def for_app_online() -> list[dict]:
+    """Sources of the features the offline single file leaves out (`online=True`); only the online build lists them."""
+    return [{k: s[k] for k in APP_KEYS} for s in SOURCES if s.get("online")]

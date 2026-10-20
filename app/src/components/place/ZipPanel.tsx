@@ -2,7 +2,7 @@
 // colors, a veil outside the city) and the right panel (a short ZIP profile, then the city tracts whose main ZIP it
 // is, each with its suggested type; a click opens the tract). Suggestions stay per tract: nothing here is a ZIP
 // suggestion. Data: lib/equity/zip (read-only) and lib/place/zipView.
-import { useMemo, type ReactNode } from 'react';
+import { Suspense, lazy, useMemo, type ReactNode } from 'react';
 import { tractById, tractLabel, tractsFC, typologyById } from '../../lib/data';
 import { useApp } from '../../lib/store';
 import type { MapPaint } from '../../lib/paint';
@@ -19,6 +19,8 @@ import { spotlightRings, type OverlayLayer } from '../MapView';
 import { getMap } from '../../lib/export/mapRegistry';
 import { cityView } from '../../lib/analysis/framing';
 import { Dot, InfoTip, SlideBg, useSlide } from '../primitives';
+
+const ZipDemand = import.meta.env.MODE === 'export' ? null : lazy(() => import('./project/ZipDemand'));
 
 type FC = OverlayLayer['data'];
 type Geom = FC['features'][number]['geometry'];
@@ -220,6 +222,11 @@ export default function ZipPanel({ suggestions, hud, level }: { suggestions: Map
             <B>{Math.round(r.share * 100)}%</B> of its homes{r.edge ? ' · city part only' : ''}
           </Fact>
         </dl>
+        {ZipDemand && (
+          <Suspense fallback={null}>
+            <ZipDemand zip={zip} />
+          </Suspense>
+        )}
         <div>
           <div className="mb-1 flex items-center gap-1 text-small font-semibold text-slate-700">
             Tracts in this ZIP

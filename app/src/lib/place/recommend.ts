@@ -83,6 +83,8 @@ export interface RecommendOptions {
   flood?: FloodRisk;
   /** Transit-first passes when the nearest frequent stop is within this many miles of the average resident (replaces the share/departures rule). */
   transitMiles?: number;
+  /** Renter demand signals per type (lib/demand/order): more signals go first inside the suggested set (docs/assumptions.md §15). */
+  demand?: Partial<Record<Typology, number>>;
 }
 
 const HIGH_BANDS: BandId[] = [...THRESHOLDS.anti_displacement_high_bands];
@@ -229,9 +231,9 @@ function saleClause(c: Ctx): string {
 
 const townhomeLowBandReason = (c: Ctx) => `a for-sale rowhouse serves buyers, not renters ${c.phrase}; at that income it needs a subsidy this tool does not see${c.branch === 'high' ? ', and on an occupied lot it means demolition' : ''}`;
 
-function orderByLead(types: Typology[], c: Ctx, fitOrder: Typology[]): Typology[] {
+function orderByLead(types: Typology[], c: Ctx, fitOrder: Typology[], ds: (t: Typology) => number): Typology[] {
   const lead = c.tenants.types[0]?.type ?? null;
-  return [...types].sort((a, b) => fitToLead(a, lead) - fitToLead(b, lead) || fitOrder.indexOf(a) - fitOrder.indexOf(b));
+  return [...types].sort((a, b) => ds(b) - ds(a) || fitToLead(a, lead) - fitToLead(b, lead) || fitOrder.indexOf(a) - fitOrder.indexOf(b));
 }
 
 /** Bands other than the served ones, with the reason in words (below: only with a voucher; above: over the income limit). */
@@ -391,6 +393,11 @@ export function recommend(p: PlaceMeasures, hud: HudTable, stance: Stance, opts:
   const resolved = opts.size ? resolveHousehold(p, tenantBands, opts.size, opts.age ?? 'any') : null;
   const size = resolved?.size;
   const household = preferOf(resolved, opts.age);
+  // Demand signals order the set where the stance has no order of its own; a household the reader chose still comes
+  // first there, one read off CHAS ('auto') gives way.
+  const ds = (t: Typology) => opts.demand?.[t] ?? 0;
+  const byDemand = TYPOLOGIES.some((t) => ds(t) > 0);
+  const householdD = byDemand && resolved?.auto ? undefined : household;
   const tenants = level || opts.size ? planTenants(p, tenantBands, opts.size ?? 3, opts.age ?? 'any', phrase) : tenantProfile(p, band);
   const mRent = marketRent(p);
   const floodLimit = opts.flood ? floodCheck(p, opts.flood) : null;
@@ -438,8 +445,8 @@ export function recommend(p: PlaceMeasures, hud: HudTable, stance: Stance, opts:
     const passed = tt ? (mt.passed === true && tt.passed === true ? true : mt.passed === false || tt.passed === false ? false : null) : mt.passed;
     stanceTest = { passed, sentence: tt ? `${mt.sentence} ${tt.sentence}` : mt.sentence };
     if (passed) {
-      types = stance === 'transit_first' ? DENSITY_ORDER.filter((t) => t !== 'adu' && t !== 'senior') : stance === 'climate_resilient' ? CLIMATE_ORDER.filter((t) => t !== 'senior') : fitOrder.filter((t) => t !== 'senior');
-      types = preferFor(types, household);
+      types = stance === 'transit_first' ? DENSITY_ORDER.filter((t) => t !== 'adu' && t !== 'senior') : stance === 'climate_resilient' ? CLIMATE_ORDER.filter((t) => t !== 'senior') : fitOrder.filter((t) => t !== 'senior').sort((a, b) => ds(b) - ds(a));
+      types = preferFor(types, stance === 'transit_first' || stance === 'climate_resilient' ? household : householdD);
       not.push({ typology: 'senior', because: 'age-restricted affordable apartments are a subsidized product; at market rate the market test does not speak to them' });
     }
     notServed = notServedByMarket(p, hud, types[0] ?? null);
@@ -459,12 +466,12 @@ export function recommend(p: PlaceMeasures, hud: HudTable, stance: Stance, opts:
       if (isLowBand(band)) not.push({ typology: 'townhome', because: townhomeLowBandReason(c) });
       else types.push('townhome');
     }
-    types = preferFor(orderByLead(types, c, fitOrder), household);
+    types = preferFor(orderByLead(types, c, fitOrder, ds), householdD);
     notServed = notServedIncomeRestricted(served);
   } else if (stance === 'market_led') {
     stanceTest = marketLedTest(p, cityMedian, hud?.city?.sale_median ?? null);
     if (stanceTest.passed) {
-      types = fitOrder.filter((t) => t !== 'senior');
+      types = fitOrder.filter((t) => t !== 'senior').sort((a, b) => ds(b) - ds(a));
       not.push({ typology: 'senior', because: 'age-restricted affordable apartments are a subsidized product; the market test does not speak to them' });
     }
     notServed = notServedByMarket(p, hud, types[0] ?? null);

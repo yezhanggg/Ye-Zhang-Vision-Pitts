@@ -1,3 +1,4 @@
+import { Suspense, lazy, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { LIMITS, NEXT, NOT_ADVICE, PROJECT } from '../lib/about';
 import { FMR_2BR, activeFactorIds, askingRents, hasAskingRents, meta, scoring, sources } from '../lib/data';
@@ -38,6 +39,9 @@ function formula(num: string[], den: string | null): string {
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 
+// The Place page's project cards are online only, and so is their part of this window.
+const CardDetails = import.meta.env.MODE === 'export' ? null : lazy(() => import('./details/ProjectCardsDetails'));
+
 const TABS: { id: DetailsTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'sources', label: 'Data & method' },
@@ -66,7 +70,7 @@ function Bullets({ groups }: { groups: { title: string; items: string[] }[] }) {
   );
 }
 
-function Overview() {
+function Overview({ cards }: { cards: ReactNode }) {
   return (
     <>
       <div>
@@ -88,6 +92,7 @@ function Overview() {
           ))}
         </div>
       </section>
+      {cards}
       <ul className="space-y-1 text-small">
         {PROJECT.links.map((l) => (
           <li key={l.url}>
@@ -123,6 +128,11 @@ export default function DetailsModal() {
   const tab = useApp((s) => s.detailsTab);
   const set = useApp((s) => s.set);
   const factors = scoring.factors.filter((f) => activeFactorIds.includes(f.id));
+  const cards = CardDetails && (
+    <Suspense fallback={null}>
+      <CardDetails tab={tab} />
+    </Suspense>
+  );
   return (
     <AnimatePresence>
       {open && (
@@ -142,27 +152,31 @@ export default function DetailsModal() {
             </div>
             {tab === 'overview' && (
               <div className="space-y-6 px-6 py-5">
-                <Overview />
+                <Overview cards={cards} />
               </div>
             )}
             {tab === 'calc' && (
-              <div className="px-6 py-5">
+              <div className="space-y-6 px-6 py-5">
                 <AnalysisCalculations />
+                {cards}
               </div>
             )}
             {tab === 'limits' && (
               <div className="space-y-6 px-6 py-5">
                 <Bullets groups={LIMITS} />
+                {cards}
               </div>
             )}
             {tab === 'next' && (
               <div className="space-y-6 px-6 py-5">
                 <Bullets groups={NEXT} />
+                {cards}
               </div>
             )}
             <div className={cx('space-y-6 px-6 py-5', tab !== 'sources' && 'hidden')}>
               <p className="text-small text-slate-600">Where every number comes from, and which parts are opinions rather than facts.</p>
               <PlanningInputsDetails />
+              {tab === 'sources' && cards}
               <section>
                 <h3 className="mb-2 text-body font-semibold text-emerald-800">Facts: where the numbers come from</h3>
                 <div className="overflow-hidden rounded-xl ring-1 ring-stone-200">

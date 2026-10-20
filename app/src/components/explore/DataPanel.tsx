@@ -6,7 +6,7 @@ import type { VariableDef } from '../../lib/explore/types';
 import { cx } from '../../lib/format';
 import { RailSection } from '../Rail';
 import { Dot, Explainer } from '../primitives';
-import { LandUseMapSwitch, ZoningMapSwitch } from './LayersPanel';
+import { CanopySwitch, LandUseMapSwitch, SunShadowSwitch, ZoningMapSwitch } from './LayersPanel';
 
 function VarRow({ v, on, onPick }: { v: VariableDef; on: boolean; onPick: () => void }) {
   return (
@@ -34,6 +34,9 @@ export default function DataPanel() {
   if (!hasBrowser) {
     return (
       <RailSection id="data" title={EXPLORE_UI.data}>
+        <div className="mb-2">
+          <SunShadowSwitch />
+        </div>
         <p className="rounded-xl bg-stone-100 px-3 py-2 text-small text-slate-700 ring-1 ring-stone-200">{EXPLORE_UI.notBuilt}</p>
       </RailSection>
     );
@@ -52,6 +55,10 @@ export default function DataPanel() {
         ) : undefined
       }
     >
+      {/* Sun and shadow covers the whole city and needs no boundary, so it comes before the variables. */}
+      <div className="mb-2">
+        <SunShadowSwitch />
+      </div>
       {!open ? (
         <p className="rounded-xl bg-stone-100 px-3 py-2 text-small text-slate-700 ring-1 ring-stone-200">{EXPLORE_UI.dataClosed}</p>
       ) : (
@@ -69,7 +76,7 @@ export default function DataPanel() {
                     <span>
                       <span className="block">{g.label}</span>
                       <span className="block text-caption font-normal text-slate-600">
-                        {vars.length} variables{isAnalysisGroup(g.id) ? ` · ${EXPLORE_UI.cityTractsOnly}` : g.id === 'zoning' ? ` · ${EXPLORE_UI.zoningCityOnly}` : ''}
+                        {vars.length} {vars.length === 1 ? 'variable' : 'variables'}{isAnalysisGroup(g.id) ? ` · ${EXPLORE_UI.cityTractsOnly}` : g.id === 'zoning' ? ` · ${EXPLORE_UI.zoningCityOnly}` : ''}
                       </span>
                     </span>
                   }
@@ -78,6 +85,11 @@ export default function DataPanel() {
                   {g.id === 'zoning' && (
                     <div className="mb-1.5">
                       <ZoningMapSwitch id="data-zoning-map" />
+                    </div>
+                  )}
+                  {import.meta.env.MODE !== 'export' && g.id === 'canopy' && (
+                    <div className="mb-1.5">
+                      <CanopySwitch id="data-canopy-map" />
                     </div>
                   )}
                   {g.id === 'land' && (

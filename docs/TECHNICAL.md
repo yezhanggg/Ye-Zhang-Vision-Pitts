@@ -24,10 +24,16 @@ The app opens on a landing page with a live 3D map. **Open VisionPitts** flies f
 
 **Analysis** is the Track 3 matchmaker. For any city tract it answers one question: *which housing type (ADU, duplex/triplex, townhome, small apartment, senior housing) best serves households at or below 50% of area median income without accelerating displacement?*
 
-- **Match**: best type under your priorities, a 0–100 score, how stable the pick is, and why, factor by factor.
-- **Compare scenarios**: change the weights and see every tract whose answer flips.
-- **Compare tracts**: two places side by side on synced maps.
-- **Copy link** puts the whole state in the URL.
+- **Switching views**: online, the Analysis button names the view in use and opens a menu of Place, Compare places and Equity & policy on hover (`components/TopNav.tsx`); the offline file keeps the two rows of tabs.
+- **Place**: a focusing issue (Anti-displacement, Market-led, Transit-first, Climate-resilient) and who you are planning for. Written rules with printed thresholds suggest a building type, its rent and its tenants (docs/assumptions.md §14), with the evidence folds below.
+- **Test a project here** (on Place, October 2026, online only). Online, Place is its own view (`components/place/PlaceStudio.tsx`). Its left panel is wider, flat (no folds) and waits for **Confirm and update** (`components/place/flat/FlatInputs.tsx`, `lib/project/draft.ts`). In working order it holds: Project (homes, residents, stories, financing), Unit mix and income, Site, Policies that apply here, Open space and sun, Tax credit entries and Pencil inputs. **Policies that apply here** replaces the focusing issue with binding rules, funding and incentives, and your screens, each with its document and status (docs/assumptions.md §14a, `lib/policy/`). The map and the answer show the types that pass your screens. The right panel holds results only: the answer, Policies and screens, and five project questions, the fifth being Open space and sun (docs/data/shadow.md). Code in `components/place/project/`, one model in `useProjectModel.ts`:
+  - **Who needs it:** renter demand by tract and ZIP code orders the suggested types and sets a unit mix (§15, docs/data/demand.md).
+  - **What can be built:** the zoning code's standards give homes by right, and Try a lot reads one lot (§16, docs/data/zoning_capacity.md).
+  - **Tax credit score:** PHFA's sheet is filled from the plan (§12, docs/data/lihtc.md).
+  - **Does it pencil:** sources and uses on your own numbers (§17, docs/data/pencil.md).
+- **Compare places** (online, `components/compare/CompareStudio.tsx`): three strips. Place A on the left and place B on the right, each with its map on top (colored under that side's settings) and its inputs underneath; the comparison in the middle (at a glance, what each place would get, why they differ, the project in each place). B's settings are the same as A's or its own: side A always uses the Place tab's settings, and side B can keep its own screens, residents, income and project. Each strip's inputs are the Place tab's flat sections (`lib/compare/store.ts`, `lib/project/side.ts`). So it compares two places under one set of settings, two places under two, or one place under two (tax credit entries stay shared; each side's financing picks its credit). Changes on Compare apply at once. The offline single file and phones keep the earlier one-page Compare (`CompareTractsView.tsx`).
+- **Equity & policy**: where renters need help most and what four policy ideas would change.
+- **Copy link** puts the whole state in the URL; the project's own entries stay in the browser.
 
 | Explore | Match | Compare tracts | Compare scenarios |
 |---|---|---|---|
@@ -43,11 +49,11 @@ Made for city planners, community development corporations and mission-driven de
 
 ```bash
 # Open it
-open export/index.html                 # one file of about 4.5 MB; basemap and search need internet, data is inside
+open export/index.html                 # one file of about 6 MB; basemap and search need internet, data is inside
 
 # Run the app
 cd app && npm install && npm run dev   # http://localhost:5173
-npm test && npm run build              # 177 tests; static site in app/dist
+npm test && npm run build              # 472 tests; static site in app/dist
 npm run export                         # rebuild export/index.html
 
 # Rebuild the data, in this order (Python 3.12 + uv; CENSUS_API_KEY in .env)
@@ -61,7 +67,11 @@ uv run python scripts/05_build_buildings.py     # 3D buildings, demo tracts (com
 uv run python scripts/06_build_asking_rents.py  # optional, licensed Dewey caches: asking-rent aggregates (tracts, ZIPs, municipalities)
 uv run python scripts/08_publish_supabase.py    # push county-wide rows to Supabase (apply supabase/migrations first)
 uv run python scripts/09_build_acs_history.py   # Explore: the same variables for every end year 2014-2024
-uv run pytest                                   # 150 tests, including the numbers-in-docs check
+uv run python scripts/13_build_shadow_notebook.py  # optional: Colab notebook for the sun-and-shadow GPU run (see docs/data/shadow.md)
+uv run python scripts/14_publish_shadows.py     # optional: check that run and copy its pages to app/public/data/shadow (close-zoom pages go to a git-ignored subfolder)
+uv run python scripts/15_build_parcel_shadow.py # optional: shadow by parcel from that run (analysis files in nopush/, map files git-ignored)
+uv run python scripts/16_build_canopy.py        # optional: tree canopy 2020 by area, canopy map tiles, and the Place page's sun, trees and vacant-lot figures (needs data/raw/canopy; uses 15's tables when they are there)
+uv run pytest                                   # 271 tests, including the numbers-in-docs check
 ```
 
 **Deploy (Vercel):** Root Directory `app`; env vars `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (public), and optionally `DEEPSEEK_API_KEY` or `ANTHROPIC_API_KEY` for the AI explanation and the question box in both tabs.
@@ -127,6 +137,9 @@ All scoring data is public. Full registry with links, retrieval dates and checks
 | Land use (information only) | Allegheny County property assessments, class, use and lot area of every parcel | tract, block group, ZIP, municipality, county-wide, 2026 |
 | Zoning mix (information only) | City of Pittsburgh zoning districts (WPRDC), grouped into seven families | city tracts and block groups |
 | Asking rents (info layer) | RentHub rental listings via Dewey Data, **licensed**; only aggregates leave the pipeline (yearly 2BR medians and unit counts, hidden under 10 units). Data by RentHub, licensed through Dewey Data Inc. | tract, ZCTA, municipality, 2019–2026 |
+| Sun and shadow (information only) | PASDA Allegheny County / Pittsburgh LiDAR 2015, first-return surface; shadows cast with a CUDA kernel on a Colab T4 ([method](data/shadow.md)) | 6 ft cells cast; 12 ft pages published, 6 ft close-zoom pages and by-parcel figures optional; June 21, September 22, December 21 |
+| Tree canopy (information only) | Allegheny County tree canopy 2020 from lidar, Tree Pittsburgh and the University of Vermont, on PASDA ([method](data/canopy.md)) | share of land for tract, block group, ZIP, municipality, city and county; canopy map tiles for the city |
+| Tax credit score sheet (a self-score, information only) | PHFA Qualified Allocation Plan: 2025/2026 adopted and the 2027/2028 draft, transcribed by hand ([method](data/lihtc.md)) | statewide rules, urban pool tiers |
 | Basemap, terrain, search | OpenFreeMap · Mapterhorn · Photon · Census Geocoder | live |
 
 No individual-level data is used anywhere.
@@ -147,6 +160,7 @@ No individual-level data is used anywhere.
 - Explore values are survey estimates: block groups and ZCTAs often have low reliability, and ZCTAs only approximate ZIP codes.
 - The 2014–2024 lines are overlapping five-year windows in each vintage's own dollars; values before 2020 for 19 city tracts were assembled from several 2010 tracts and are flagged as such.
 - Analysis layers and the matchmaker block exist for the 128 city tracts only; municipalities and ZIP codes get census description and, where listed, asking rents.
+- Sun and shadow (added October 2026) is cast from a 2015 surface with trees as solid objects, for a clear sky on three days; it is fetched at runtime, so the offline file does not have it, and it cannot be shown together with 3D terrain. Its By parcel view measures each lot as seen from above (roof, yard and tree tops together) and is offered only where the lot files are published.
 - Not covered: zoning and buildability, infrastructure capacity, carbon, parcel feasibility, in-place rents.
 - The fit matrix is a judgment and is published for review in [docs/assumptions.md](assumptions.md), with every cell changed in v0.4.0 logged with its reason. Under Balanced weights senior housing tops 17 of 114 tracts (40 under v0.3.0, when nothing measured seniors), and duplex/triplex, which could not win before, tops 13 now that the 2–4 unit stock is measured. Many picks are close: the #1–#2 margin is under 5 points in 63 of 114 tracts, and the app says so.
 

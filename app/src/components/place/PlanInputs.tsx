@@ -14,7 +14,7 @@ import {
 import { usePlan } from '../../lib/place/planStore';
 
 /** One short caption: "≤50% AMI: up to $49,700 (3 people) · rent $1,242". Any (largest group) prices at 3 people. */
-function incomeCaption(level: PlanLevel, size: HouseholdSize): string | null {
+export function incomeCaption(level: PlanLevel, size: HouseholdSize): string | null {
   if (level === 'market') return 'Above 80% AMI · rent is what the market asks';
   if (!hud) return null;
   const n = size === 'auto' ? 3 : size;
@@ -30,7 +30,7 @@ export function openPlanningDetails() {
   window.setTimeout(() => document.getElementById('planning-inputs')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 350);
 }
 
-function Segmented<T extends string | number>({ label, options, value, onChange, text, cols, template, info, tip }: { label: string; options: T[]; value: T; onChange: (v: T) => void; text: (v: T) => string; cols?: number; template?: string; info?: ReactNode; tip?: (v: T) => string }) {
+export function Segmented<T extends string | number>({ label, options, value, onChange, text, cols, template, info, tip }: { label: string; options: T[]; value: T; onChange: (v: T) => void; text: (v: T) => string; cols?: number; template?: string; info?: ReactNode; tip?: (v: T) => string }) {
   const [slideRef, box] = useSlide(value);
   return (
     <div>
@@ -53,9 +53,9 @@ function Segmented<T extends string | number>({ label, options, value, onChange,
   );
 }
 
-export default function PlanInputs() {
+export default function PlanInputs({ store = usePlan }: { store?: typeof usePlan }) {
   const id = useId();
-  const { level, size, age, homes, flood, transitMi, setPlan } = usePlan();
+  const { level, size, age, homes, flood, transitMi, setPlan } = store();
   const caption = incomeCaption(level, size);
   return (
     <div className="space-y-3">

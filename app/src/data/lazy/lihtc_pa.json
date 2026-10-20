@@ -1,0 +1,1549 @@
+{
+  "version": "1.0.0",
+  "what": "Pennsylvania's selection criteria for Low Income Housing Tax Credits, transcribed from the Pennsylvania Housing Finance Agency's own documents. The points, tiers and caps are PHFA's. The `basis` of each line (who or what decides it) and the short wording of each rule are this project's reading, written so the sheet can be filled in for a place. PHFA scores every application itself; nothing here is an award or a prediction of one.",
+  "retrieved": "2026-10-11",
+  "pool": {
+    "id": "urban",
+    "label": "Urban pool",
+    "why": "PHFA lists the City of Pittsburgh among the urban areas with more than 25,000 people, so a Pittsburgh application competes in the urban pool and the urban tiers below apply. At least 25% of the urban pool is first set aside for municipalities other than Philadelphia."
+  },
+  "bases": {
+    "place": "Measured here from where the place is",
+    "lookup": "Depends on the address; a score to look up",
+    "site": "Depends on the parcel that is chosen",
+    "design": "Decided in the design and the unit mix",
+    "partners": "Needs a letter, a commitment or an approval from others",
+    "team": "Who is on the development team",
+    "finance": "How the development is paid for"
+  },
+  "dates": {
+    "checked": "2026-10-20",
+    "status": "On 2026-10-20 PHFA's news page listed the 2027/2028 plan only as a board-approved draft (posted 2026-07-13); no final adoption was posted. The dates below are the draft's and may change.",
+    "items": [
+      {
+        "credit": "nine",
+        "label": "9% round, 2027: full application due, 3:00 p.m.",
+        "date": "2027-02-17",
+        "note": "or another deadline PHFA posts on its website; an Intent to Submit comes first",
+        "ref": "2027/2028 draft QAP §9.1",
+        "url": "https://www.phfa.org/forms/multifamily_news/news/2026/2027-2028-draft-qap.pdf"
+      },
+      {
+        "credit": "four",
+        "label": "4% with tax-exempt bonds, 2027: applications accepted on a rolling basis until",
+        "date": "2027-07-01",
+        "note": "or until PHFA's volume cap is used up, whichever is first",
+        "ref": "2027/2028 draft QAP §9.2",
+        "url": "https://www.phfa.org/forms/multifamily_news/news/2026/2027-2028-draft-qap.pdf"
+      },
+      {
+        "credit": "four",
+        "label": "4% Intent to Submit: at least 60 days before the application",
+        "date": null,
+        "note": "rule of the adopted 2025/2026 plan",
+        "ref": "2025/2026 QAP §2.1",
+        "url": "https://www.phfa.org/forms/multifamily_program_notices/qap/2025_and_2026/2025-2026-lihtc-qap.pdf"
+      },
+      {
+        "credit": "nine",
+        "label": "Last 9% awards posted (2025 round)",
+        "date": "2025-10-09",
+        "note": "the 2025/2026 plan ran one 9% round, due 2025-02-11",
+        "ref": "PHFA multifamily news",
+        "url": "https://www.phfa.org/news/"
+      }
+    ]
+  },
+  "sheets": [
+    {
+      "id": "pa-2025-2026",
+      "label": "2025/2026",
+      "status": "adopted",
+      "title": "2025 & 2026 Qualified Allocation Plan, Exhibit SC2025/2026, and the Tab 3 self-scoring sheet",
+      "sources": [
+        {
+          "title": "2025 & 2026 Qualified Allocation Plan (PHFA, PDF dated 2024-12-19)",
+          "url": "https://www.phfa.org/forms/multifamily_application_guidelines/guidelines/2025/2025-mpg-03.pdf"
+        },
+        {
+          "title": "Tab 3, Selection Criteria Self-Scoring (PHFA, PDF dated 2024-12-04)",
+          "url": "https://www.phfa.org/forms/multifamily_application_guidelines/submission/tab_03/tab_03.pdf"
+        }
+      ],
+      "max": 232,
+      "thresholds": [
+        {
+          "id": "nine",
+          "label": "9% credits",
+          "points": {
+            "new": 125,
+            "preservation": 110
+          }
+        },
+        {
+          "id": "four",
+          "label": "4% credits",
+          "points": {
+            "new": 110,
+            "preservation": 110
+          }
+        }
+      ],
+      "remarks": [
+        "PHFA states the 9% minimum two ways: 125 points in the scoring table and on the self-scoring sheet, 120 points in sections 4.3 and 4.5 of the plan. This sheet uses 125.",
+        "Development Cost Savings (section E, 10 points) is suspended for 2025/2026 and is not part of the 232.",
+        "The items for new construction in section A add up to 36; PHFA states the section as 37 because preservation can reach 17 in A.2.",
+        "The self-scoring sheet totals section D as 91 in one place and 93 in another; its items add up to 93.",
+        "Passing the minimum does not win an award. Credits go to the highest scores within each pool and preference, and a tie goes to the application with the larger share of units at or below 50% of area median income."
+      ],
+      "sections": [
+        {
+          "id": "A",
+          "label": "Community and economic impact",
+          "max": 37,
+          "items": [
+            {
+              "id": "A.1.a",
+              "label": "Area of opportunity",
+              "max": 13,
+              "basis": "place",
+              "input": "points",
+              "occupancy": [
+                "general"
+              ],
+              "rule": "Up to 13 points where the market study shows low poverty, few affordable homes (subsidized or not), little affordable housing built in the past 20 years, jobs close by, a strong housing market and a high share of owners.",
+              "ref": "A.1.a",
+              "evidence": [
+                "poverty",
+                "owners",
+                "market",
+                "lihtc"
+              ]
+            },
+            {
+              "id": "A.1.b",
+              "label": "School performance",
+              "max": 2,
+              "basis": "lookup",
+              "input": "score",
+              "occupancy": [
+                "general"
+              ],
+              "unit": "% proficient",
+              "tiers": [
+                {
+                  "over": 80,
+                  "points": 2
+                },
+                {
+                  "from": 70,
+                  "points": 1
+                }
+              ],
+              "rule": "The public senior high school serving the site: combined average proficiency in English, mathematics and science of 70% to 80% earns 1 point, over 80% earns 2.",
+              "ref": "A.1.b",
+              "link": {
+                "label": "PA school performance",
+                "url": "http://www.paschoolperformance.org/"
+              }
+            },
+            {
+              "id": "A.1.c",
+              "label": "Underserved area for seniors",
+              "max": 15,
+              "basis": "place",
+              "input": "points",
+              "occupancy": [
+                "senior"
+              ],
+              "rule": "Up to 15 points where many seniors qualify for affordable housing, affordable homes are few, little has been built in 20 years, and health care, shops, home health agencies and hospitals are close.",
+              "ref": "A.1.c",
+              "evidence": [
+                "seniors",
+                "lihtc"
+              ]
+            },
+            {
+              "id": "A.2.a",
+              "label": "Community revitalization plan",
+              "max": 5,
+              "basis": "partners",
+              "input": "check",
+              "kind": [
+                "new"
+              ],
+              "rule": "A letter from a local government official saying how the development contributes to a named, adopted revitalization plan. A zoning or land use plan does not count.",
+              "ref": "A.2.a"
+            },
+            {
+              "id": "A.2.b",
+              "label": "Funding commitments in the area",
+              "max": 5,
+              "basis": "partners",
+              "input": "check",
+              "kind": [
+                "new"
+              ],
+              "rule": "Evidence of significant funding commitments from other housing, community or economic development programs as part of a major investment in the area. Requests made in this application do not count.",
+              "ref": "A.2.b"
+            },
+            {
+              "id": "A.2.c",
+              "label": "Mixed-income housing",
+              "max": 2,
+              "basis": "design",
+              "input": "check",
+              "kind": [
+                "new"
+              ],
+              "rule": "At least 15% and no more than 50% of the units are market rate, with a shown financial benefit. Not available with income averaging.",
+              "ref": "A.2.c"
+            },
+            {
+              "id": "A.2.d",
+              "label": "Transit-oriented design",
+              "max": 2,
+              "basis": "place",
+              "input": "auto",
+              "auto": "transit",
+              "kind": [
+                "new"
+              ],
+              "rule": "The site is within one-half mile of a completed or planned fixed-route public transit stop, or in an area with a no-cost accessible alternative.",
+              "ref": "A.2.d",
+              "evidence": [
+                "transit"
+              ]
+            },
+            {
+              "id": "A.2.e",
+              "label": "Walkability",
+              "max": 2,
+              "basis": "lookup",
+              "input": "score",
+              "kind": [
+                "new"
+              ],
+              "unit": "Walk Score",
+              "tiers": [
+                {
+                  "from": 80,
+                  "points": 2
+                },
+                {
+                  "from": 70,
+                  "points": 1
+                }
+              ],
+              "rule": "Walk Score of 70 to 79 earns 1 point, 80 or more earns 2 (urban tiers). Scattered sites use an average weighted by units.",
+              "ref": "A.2.e",
+              "link": {
+                "label": "walkscore.com",
+                "url": "https://www.walkscore.com/"
+              }
+            },
+            {
+              "id": "A.2.f",
+              "label": "Funding commitments in the area",
+              "max": 3,
+              "basis": "partners",
+              "input": "check",
+              "kind": [
+                "preservation"
+              ],
+              "rule": "Evidence of significant funding commitments from other housing, community or economic development programs as part of a major investment in the area.",
+              "ref": "A.2.f"
+            },
+            {
+              "id": "A.2.g",
+              "label": "Risk of loss to the market",
+              "max": 4,
+              "basis": "site",
+              "input": "check",
+              "kind": [
+                "preservation"
+              ],
+              "rule": "Section 8 project-based or similar restrictions expire within 12 months of the application, with occupancy above 90% over the last five years.",
+              "ref": "A.2.g"
+            },
+            {
+              "id": "A.2.h",
+              "label": "Risk of loss to physical needs",
+              "max": 4,
+              "basis": "site",
+              "input": "check",
+              "kind": [
+                "preservation"
+              ],
+              "rule": "More than 15 years past loan closing and placed-in-service, with a major building component to replace or an immediate health or safety need.",
+              "ref": "A.2.h"
+            },
+            {
+              "id": "A.2.i",
+              "label": "Mixed-income housing",
+              "max": 2,
+              "basis": "design",
+              "input": "check",
+              "kind": [
+                "preservation"
+              ],
+              "rule": "At least 15% and no more than 50% of the units are market rate, with a shown financial benefit. Not available with income averaging.",
+              "ref": "A.2.i"
+            },
+            {
+              "id": "A.2.j",
+              "label": "Transit-oriented design",
+              "max": 2,
+              "basis": "place",
+              "input": "auto",
+              "auto": "transit",
+              "kind": [
+                "preservation"
+              ],
+              "rule": "The site is within one-half mile of a completed or planned fixed-route public transit stop, or in an area with a no-cost accessible alternative.",
+              "ref": "A.2.j",
+              "evidence": [
+                "transit"
+              ]
+            },
+            {
+              "id": "A.2.k",
+              "label": "Walkability",
+              "max": 2,
+              "basis": "lookup",
+              "input": "score",
+              "kind": [
+                "preservation"
+              ],
+              "unit": "Walk Score",
+              "tiers": [
+                {
+                  "from": 80,
+                  "points": 2
+                },
+                {
+                  "from": 70,
+                  "points": 1
+                }
+              ],
+              "rule": "Walk Score of 70 to 79 earns 1 point, 80 or more earns 2 (urban tiers).",
+              "ref": "A.2.k",
+              "link": {
+                "label": "walkscore.com",
+                "url": "https://www.walkscore.com/"
+              }
+            },
+            {
+              "id": "A.3",
+              "label": "Addresses social inequities",
+              "max": 5,
+              "basis": "design",
+              "input": "check",
+              "rule": "The Social Inequities and Local Disparities Certification plus a narrative of initiatives and outreach beyond a normal rent-up.",
+              "ref": "A.3"
+            }
+          ]
+        },
+        {
+          "id": "B",
+          "label": "Resident population and services",
+          "max": 62,
+          "items": [
+            {
+              "id": "B.1",
+              "label": "Homes at or below 50% of area median income",
+              "max": 20,
+              "basis": "design",
+              "input": "percent",
+              "unit": "% of all units",
+              "tiers": [
+                {
+                  "over": 50,
+                  "points": 20
+                },
+                {
+                  "over": 40,
+                  "points": 16
+                },
+                {
+                  "over": 30,
+                  "points": 12
+                },
+                {
+                  "over": 20,
+                  "points": 8
+                },
+                {
+                  "over": 10,
+                  "points": 4
+                }
+              ],
+              "rule": "Share of all units, market-rate units included, that are affordable to and occupied by households at or below 50% of area median income: over 10% earns 4 points, then 4 more for each further 10 points of share, to 20 points above 50%.",
+              "ref": "B.1",
+              "evidence": [
+                "need"
+              ]
+            },
+            {
+              "id": "B.2",
+              "label": "Supportive services",
+              "max": 12,
+              "basis": "design",
+              "input": "choice",
+              "options": [
+                {
+                  "id": "plan",
+                  "label": "Services plan meeting the four minimum factors",
+                  "points": 7
+                },
+                {
+                  "id": "funded",
+                  "label": "The same, funded for 15 years and with the minimum on-site staffing",
+                  "points": 12
+                }
+              ],
+              "rule": "A services plan for the whole resident population for the compliance period. The four minimum factors earn 7 points; a 15-year funding commitment and one hour of on-site staff a week for every five units can add 5.",
+              "ref": "B.2"
+            },
+            {
+              "id": "B.3",
+              "label": "Accessible units",
+              "max": 10,
+              "basis": "design",
+              "input": "choice",
+              "options": [
+                {
+                  "id": "x2",
+                  "label": "Twice the required number (preservation: 5% more of all units)",
+                  "points": 5
+                },
+                {
+                  "id": "x3",
+                  "label": "Three times the required number (preservation: 10% more of all units)",
+                  "points": 10
+                }
+              ],
+              "rule": "New construction or substantial rehabilitation: two times the fully accessible units otherwise required earns 5 points, three times earns 10 (always rounded up). Preservation: raising them by 5% of all units earns 5, by 10% earns 10.",
+              "ref": "B.3"
+            },
+            {
+              "id": "B.4",
+              "label": "Homes for large families",
+              "max": 10,
+              "basis": "design",
+              "input": "percent",
+              "occupancy": [
+                "general"
+              ],
+              "unit": "% of units with 3+ bedrooms",
+              "tiers": [
+                {
+                  "over": 25,
+                  "points": 10
+                },
+                {
+                  "over": 20,
+                  "points": 8
+                },
+                {
+                  "over": 15,
+                  "points": 6
+                }
+              ],
+              "rule": "Affordable units with three or more bedrooms as a share of all rental units: over 15% earns 6 points, over 20% earns 8, over 25% earns 10 (urban tiers). Not available to buildings of seven or more stories or to senior housing.",
+              "ref": "B.4",
+              "evidence": [
+                "families"
+              ]
+            },
+            {
+              "id": "B.5",
+              "label": "Broadband and internet access",
+              "max": 5,
+              "basis": "design",
+              "input": "check",
+              "rule": "A device sharing program, free WiFi in public areas, and either free internet in every unit or an internet utility allowance.",
+              "ref": "B.5"
+            },
+            {
+              "id": "B.6",
+              "label": "Section 811 units",
+              "max": 5,
+              "basis": "design",
+              "input": "check",
+              "rule": "At least 10% of the units, or five units in an urban area if that is more, set aside as Section 811 one-bedroom units for people with disabilities aged 18 to 61, two of them accessible at the 50% rent. Must be named in the Intent to Submit and accepted by PHFA.",
+              "ref": "B.6"
+            }
+          ]
+        },
+        {
+          "id": "C",
+          "label": "Development characteristics",
+          "max": 35,
+          "items": [
+            {
+              "id": "C.1.a",
+              "label": "Brownfield site",
+              "max": 5,
+              "basis": "site",
+              "input": "check",
+              "rule": "A former industrial or commercial property where reuse is complicated by a hazardous substance, with the cleanup inside the project. Lead paint, asbestos or a storage tank alone does not count.",
+              "ref": "C.1.a"
+            },
+            {
+              "id": "C.1.b",
+              "label": "Blight remediation or residential infill",
+              "max": 7,
+              "basis": "site",
+              "input": "check",
+              "rule": "A vacant, previously developed site (or one with a dilapidated structure to be demolished) in an existing residential or mixed-use neighborhood with infrastructure in place, built at the type and scale of its neighbors. It must be at least 51% of the project's floor area.",
+              "ref": "C.1.b",
+              "evidence": [
+                "vacant"
+              ]
+            },
+            {
+              "id": "C.1.c",
+              "label": "Adaptive reuse of an existing building",
+              "max": 10,
+              "basis": "site",
+              "input": "check",
+              "rule": "A vacant non-residential building turned into housing, making up at least 51% of the residential floor area.",
+              "ref": "C.1.c"
+            },
+            {
+              "id": "C.2",
+              "label": "Green building certification",
+              "max": 10,
+              "basis": "design",
+              "input": "check",
+              "rule": "Certification under Enterprise Green Communities 2020, LEED v4 Silver, or ICC 700-2020 National Green Building Standard Silver (preservation has its own list).",
+              "ref": "C.2",
+              "evidence": [
+                "sun",
+                "canopy"
+              ]
+            },
+            {
+              "id": "C.3",
+              "label": "Energy efficiency goal",
+              "max": 10,
+              "basis": "design",
+              "input": "choice",
+              "options": [
+                {
+                  "id": "zerh_self",
+                  "label": "Zero Energy Ready Home, self-certified",
+                  "points": 3
+                },
+                {
+                  "id": "hers",
+                  "label": "HERS index lower than Energy Star requires",
+                  "points": 5
+                },
+                {
+                  "id": "zerh",
+                  "label": "Zero Energy Ready Home, certified by the U.S. Department of Energy program",
+                  "points": 8
+                },
+                {
+                  "id": "passive",
+                  "label": "Passive House, certified",
+                  "points": 10
+                }
+              ],
+              "rule": "One only: a reduced HERS index earns 5 points, Zero Energy Ready Home 8 when certified or 3 when self-certified, certified Passive House 10.",
+              "ref": "C.3",
+              "evidence": [
+                "sun"
+              ]
+            },
+            {
+              "id": "C.4",
+              "label": "Build America, Buy America",
+              "max": 5,
+              "basis": "finance",
+              "input": "check",
+              "rule": "Only when applying for PHFA loan resources (PennHOMES, Housing Trust Fund or PHARE): agree to follow the federal Build America, Buy America requirements.",
+              "ref": "C.4"
+            }
+          ]
+        },
+        {
+          "id": "D",
+          "label": "Development team and process",
+          "max": 93,
+          "items": [
+            {
+              "id": "D.1.a",
+              "label": "Experience of the applicant",
+              "max": 9,
+              "basis": "team",
+              "input": "choice",
+              "options": [
+                {
+                  "id": "consultant",
+                  "label": "Experienced housing consultant instead",
+                  "points": 3
+                },
+                {
+                  "id": "1-4",
+                  "label": "1 to 4 tax credit developments placed in service",
+                  "points": 3
+                },
+                {
+                  "id": "5-10",
+                  "label": "5 to 10",
+                  "points": 6
+                },
+                {
+                  "id": "11+",
+                  "label": "11 or more",
+                  "points": 9
+                }
+              ],
+              "rule": "Tax credit developments with a placed-in-service package submitted, averaged by ownership share when there are co-applicants: 1 to 4 earns 3 points, 5 to 10 earns 6, 11 or more earns 9. An experienced housing consultant earns 3 instead.",
+              "ref": "D.1.a"
+            },
+            {
+              "id": "D.1.b",
+              "label": "Experience of the management agent",
+              "max": 9,
+              "basis": "team",
+              "input": "choice",
+              "options": [
+                {
+                  "id": "consultant",
+                  "label": "Experienced management consultant instead",
+                  "points": 3
+                },
+                {
+                  "id": "25-150",
+                  "label": "25 to 150 tax credit units managed",
+                  "points": 3
+                },
+                {
+                  "id": "151-300",
+                  "label": "151 to 300",
+                  "points": 6
+                },
+                {
+                  "id": "301+",
+                  "label": "301 or more",
+                  "points": 9
+                }
+              ],
+              "rule": "Tax credit units managed: 25 to 150 earns 3 points, 151 to 300 earns 6, 301 or more earns 9. An experienced housing management consultant earns 3 instead.",
+              "ref": "D.1.b"
+            },
+            {
+              "id": "D.1.c",
+              "label": "Attorney with tax credit experience",
+              "max": 2,
+              "basis": "team",
+              "input": "check",
+              "rule": "2 points.",
+              "ref": "D.1.c"
+            },
+            {
+              "id": "D.1.d",
+              "label": "Experienced general contractor",
+              "max": 2,
+              "basis": "team",
+              "input": "check",
+              "rule": "2 points.",
+              "ref": "D.1.d"
+            },
+            {
+              "id": "D.1.e",
+              "label": "Experienced architect",
+              "max": 2,
+              "basis": "team",
+              "input": "choice",
+              "options": [
+                {
+                  "id": "one",
+                  "label": "Design architect or contract administration architect",
+                  "points": 1
+                },
+                {
+                  "id": "both",
+                  "label": "Both",
+                  "points": 2
+                }
+              ],
+              "rule": "1 point for the design architect and 1 for the construction contract administration architect.",
+              "ref": "D.1.e"
+            },
+            {
+              "id": "D.1.f",
+              "label": "Small diverse, veteran or small business on the team",
+              "max": 17,
+              "basis": "team",
+              "input": "choice",
+              "options": [
+                {
+                  "id": "agent_self",
+                  "label": "Management agent, self-certified small business",
+                  "points": 3
+                },
+                {
+                  "id": "jv30_self",
+                  "label": "Joint venture at 30% or more, self-certified",
+                  "points": 5
+                },
+                {
+                  "id": "agent_dgs",
+                  "label": "Management agent, certified with the state",
+                  "points": 6
+                },
+                {
+                  "id": "jv51_self",
+                  "label": "Joint venture at 51% or more, self-certified",
+                  "points": 8
+                },
+                {
+                  "id": "jv30_dgs",
+                  "label": "Joint venture at 30% or more, certified with the state",
+                  "points": 8
+                },
+                {
+                  "id": "owner_self",
+                  "label": "Owner or developer, self-certified small business",
+                  "points": 10
+                },
+                {
+                  "id": "jv51_dgs",
+                  "label": "Joint venture at 51% or more, certified with the state",
+                  "points": 13
+                },
+                {
+                  "id": "owner_dgs",
+                  "label": "Owner or developer, certified with the state",
+                  "points": 17
+                }
+              ],
+              "rule": "A small diverse or veteran business certified with the Pennsylvania Department of General Services, or a self-certified qualified small business, as owner, joint venture partner (sharing at least 30% or 51% of ownership, work and fee) or management agent. One owner or developer entity is scored; 17 points at most.",
+              "ref": "D.1.f"
+            },
+            {
+              "id": "D.2",
+              "label": "Work for minority, women's and veteran businesses",
+              "max": 15,
+              "basis": "team",
+              "input": "points",
+              "rule": "Up to 15 points for material participation by small diverse, veteran or qualified small businesses. PHFA's table gives 1 point at 1% to 4.99% of total development cost and 2 points at 5% or more, for each of professional services, the general contractor, and sub-contractors or vendors.",
+              "ref": "D.2"
+            },
+            {
+              "id": "D.3",
+              "label": "Zoning approvals",
+              "max": 10,
+              "basis": "partners",
+              "input": "choice",
+              "options": [
+                {
+                  "id": "path",
+                  "label": "Letter from an attorney or zoning official setting out a realistic, timely path",
+                  "points": 5
+                },
+                {
+                  "id": "secured",
+                  "label": "All zoning approvals secured, variances and special exceptions included",
+                  "points": 10
+                }
+              ],
+              "rule": "10 points when all zoning approvals are secured for every site; 5 points with a letter from a qualified attorney or local zoning official that sets out a realistic and timely path to approval.",
+              "ref": "D.3",
+              "evidence": [
+                "zoning"
+              ]
+            },
+            {
+              "id": "D.4.a",
+              "label": "Fully funded",
+              "max": 5,
+              "basis": "finance",
+              "input": "check",
+              "rule": "All funding commitments in place apart from PHFA's own first mortgage, PennHOMES or Housing Trust Fund. A gap under 25% of the developer fee still qualifies.",
+              "ref": "D.4.a"
+            },
+            {
+              "id": "D.4.b",
+              "label": "Private capital and soft debt",
+              "max": 8,
+              "basis": "finance",
+              "input": "percent",
+              "unit": "% of total development cost",
+              "tiers": [
+                {
+                  "over": 30,
+                  "points": 8
+                },
+                {
+                  "over": 20,
+                  "points": 6
+                },
+                {
+                  "over": 10,
+                  "points": 4
+                },
+                {
+                  "from": 5,
+                  "points": 2
+                }
+              ],
+              "rule": "Permanent amortizing debt and soft financing from private, state, local, nonprofit, foundation or federal sources (historic tax credit equity and donated land or buildings included) as a share of total development cost. PHFA's tiers for a participating jurisdiction, which the City of Pittsburgh is as a direct recipient of federal HOME funds: 5% to 10% earns 2 points, over 10% earns 4, over 20% earns 6, over 30% earns 8.",
+              "ref": "D.4.b"
+            },
+            {
+              "id": "D.4.c",
+              "label": "Assumed or related-party debt",
+              "max": 2,
+              "basis": "finance",
+              "input": "percent",
+              "unit": "% of total development cost",
+              "tiers": [
+                {
+                  "over": 30,
+                  "points": 2
+                },
+                {
+                  "from": 10,
+                  "points": 1
+                }
+              ],
+              "rule": "Existing debt carried on a preservation or substantial rehabilitation project: 10% to 30% earns 1 point, over 30% earns 2.",
+              "ref": "D.4.c"
+            },
+            {
+              "id": "D.4.d",
+              "label": "Funding applied for",
+              "max": 2,
+              "basis": "finance",
+              "input": "choice",
+              "options": [
+                {
+                  "id": "low",
+                  "label": "Up to 15% of the developer fee",
+                  "points": 1
+                },
+                {
+                  "id": "high",
+                  "label": "Over 15% and up to 25% of the developer fee",
+                  "points": 2
+                }
+              ],
+              "rule": "Identified funding applied for or to be applied for, matched by a commitment to reinvest the same amount of developer fee, up to 25% of the fee.",
+              "ref": "D.4.d"
+            },
+            {
+              "id": "D.4.e",
+              "label": "PennHOMES request",
+              "max": 2,
+              "basis": "finance",
+              "input": "check",
+              "rule": "The financing plan asks for at least $500,000 of PennHOMES funds and can meet that program's requirements.",
+              "ref": "D.4.e"
+            },
+            {
+              "id": "D.4.f",
+              "label": "PHFA first mortgage",
+              "max": 5,
+              "basis": "finance",
+              "input": "check",
+              "rule": "The financing plan asks for PHFA first mortgage financing and meets PHFA underwriting.",
+              "ref": "D.4.f"
+            },
+            {
+              "id": "D.4.g",
+              "label": "Project-based rent subsidy",
+              "max": 2,
+              "basis": "finance",
+              "input": "check",
+              "rule": "Project-based Section 8 or public housing (ACC) subsidy for at least half of the units.",
+              "ref": "D.4.g"
+            },
+            {
+              "id": "D.4.h",
+              "label": "Real estate tax abatement",
+              "max": 1,
+              "basis": "partners",
+              "input": "check",
+              "rule": "Evidence of a tax abatement from the municipal taxing authority lasting at least five years.",
+              "ref": "D.4.h"
+            },
+            {
+              "id": "D.5",
+              "label": "Noncompliance",
+              "max": 0,
+              "min": -10,
+              "basis": "team",
+              "input": "points",
+              "rule": "PHFA may take away up to 10 points when anyone on the team is delinquent or in default with PHFA, has open IRS Form 8823 issues, missed deadlines, ended a tax credit project early, or did not deliver earlier selection criteria.",
+              "ref": "D.5"
+            }
+          ]
+        },
+        {
+          "id": "F",
+          "label": "Complete application",
+          "max": 5,
+          "items": [
+            {
+              "id": "F",
+              "label": "Complete application package",
+              "max": 5,
+              "basis": "team",
+              "input": "check",
+              "rule": "5 bonus points when the application arrives with every exhibit on PHFA's checklist.",
+              "ref": "F"
+            }
+          ]
+        }
+      ],
+      "groups": [
+        {
+          "ids": [
+            "C.1.a",
+            "C.1.b",
+            "C.1.c"
+          ],
+          "max": 10,
+          "label": "Smart site selection (C.1) counts 10 points at most"
+        },
+        {
+          "ids": [
+            "C.1.a",
+            "C.1.b",
+            "C.1.c",
+            "C.2",
+            "C.3"
+          ],
+          "max": 30,
+          "label": "C.1, C.2 and C.3 together count 30 points at most"
+        },
+        {
+          "ids": [
+            "D.1.a",
+            "D.1.b",
+            "D.1.c",
+            "D.1.d",
+            "D.1.e",
+            "D.1.f"
+          ],
+          "max": 41,
+          "label": "Development team (D.1) counts 41 points at most"
+        },
+        {
+          "ids": [
+            "D.4.a",
+            "D.4.b",
+            "D.4.c",
+            "D.4.d",
+            "D.4.e",
+            "D.4.f",
+            "D.4.g",
+            "D.4.h"
+          ],
+          "max": 27,
+          "label": "Commitment of funds (D.4) counts 27 points at most"
+        }
+      ]
+    },
+    {
+      "id": "pa-2027-2028-draft",
+      "label": "2027/2028 draft",
+      "status": "draft",
+      "title": "2027/2028 draft Qualified Allocation Plan for public comment, section 4",
+      "sources": [
+        {
+          "title": "2027/2028 DRAFT QAP for Public Comment (PHFA, PDF dated 2026-07-13)",
+          "url": "https://www.phfa.org/forms/multifamily_news/news/2026/2027-2028-draft-qap.pdf"
+        },
+        {
+          "title": "Notice of public hearing, 2027/2028 allocation plan (hearing 2026-07-29, comments to 2026-08-14)",
+          "url": "https://www.phfa.org/forms/public_hearing_notice/2027-2028-QAP-PH-Notice.pdf"
+        }
+      ],
+      "max": 205,
+      "thresholds": [
+        {
+          "id": "nine",
+          "label": "9% credits",
+          "points": {
+            "new": 120,
+            "preservation": 120
+          }
+        },
+        {
+          "id": "four",
+          "label": "4% credits",
+          "points": {
+            "new": 120,
+            "preservation": 120
+          }
+        }
+      ],
+      "remarks": [
+        "This is a draft. PHFA took comments until August 14, 2026, and the final plan needs the Governor's approval; it can change. Check PHFA's site before relying on it.",
+        "Every line is pass or fail: Pass-Exceed counts 10 points, Pass-Basic 5, Fail 0. Some lines have no Pass-Exceed.",
+        "Compared with 2025/2026: Passive House, Zero Energy Ready Home and residential infill no longer score, transit and walkability score only together, and cost efficiency and noncompliance become scored lines.",
+        "The draft adds two pools: applications asking only for credits (at least 25% of credits) and applications that also ask for PHFA soft funding (at most 75%). A tie goes to the application most ready to proceed.",
+        "The draft's summary table still carries the old exhibit name, and its text for section 4.4 mentions 35 points where the table gives 20. This sheet follows the table."
+      ],
+      "sections": [
+        {
+          "id": "4.2",
+          "label": "Community and economic impact",
+          "max": 30,
+          "items": [
+            {
+              "id": "4.2.1.g",
+              "label": "Underserved area",
+              "max": 10,
+              "basis": "lookup",
+              "input": "score",
+              "occupancy": [
+                "general"
+              ],
+              "unit": "PHFA map score",
+              "tiers": [
+                {
+                  "from": 10,
+                  "points": 10
+                },
+                {
+                  "from": 6,
+                  "points": 5
+                }
+              ],
+              "rule": "The score PHFA's PolicyMap gives the address on the General Occupancy map: 6 to 9 is Pass-Basic, 10 or more is Pass-Exceed.",
+              "ref": "4.2.1",
+              "evidence": [
+                "poverty",
+                "owners",
+                "market",
+                "lihtc"
+              ],
+              "link": {
+                "label": "PHFA's PolicyMap",
+                "url": "https://www.policymap.com/embed/widget/12104/B5F53XRI1UJAAYRQFG7V9IGRVDMXHFHM"
+              }
+            },
+            {
+              "id": "4.2.1.s",
+              "label": "Underserved area for seniors",
+              "max": 10,
+              "basis": "lookup",
+              "input": "score",
+              "occupancy": [
+                "senior"
+              ],
+              "unit": "PHFA map score",
+              "tiers": [
+                {
+                  "from": 11,
+                  "points": 10
+                },
+                {
+                  "from": 8,
+                  "points": 5
+                }
+              ],
+              "rule": "The score PHFA's PolicyMap gives the address on the Senior Occupancy map: 8 to 10 is Pass-Basic, 11 or more is Pass-Exceed.",
+              "ref": "4.2.1",
+              "evidence": [
+                "seniors",
+                "lihtc"
+              ],
+              "link": {
+                "label": "PHFA's PolicyMap",
+                "url": "https://www.policymap.com/embed/widget/12104/B5F53XRI1UJAAYRQFG7V9IGRVDMXHFHM"
+              }
+            },
+            {
+              "id": "4.2.2.n",
+              "label": "Community revitalization plan",
+              "max": 10,
+              "basis": "partners",
+              "input": "choice",
+              "kind": [
+                "new"
+              ],
+              "options": [
+                {
+                  "id": "plan",
+                  "label": "A revitalization plan adopted in 2021 or later that names this location",
+                  "points": 5
+                },
+                {
+                  "id": "all",
+                  "label": "The plan, a letter from a local official, and another publicly funded improvement within two miles in the last five years",
+                  "points": 10
+                }
+              ],
+              "rule": "A community revitalization plan adopted in 2021 or later that includes the location is Pass-Basic. Adding a letter from a local government official and evidence of another publicly funded improvement within two miles in the last five years is Pass-Exceed. A zoning or land use plan does not count.",
+              "ref": "4.2.2"
+            },
+            {
+              "id": "4.2.2.p",
+              "label": "Revitalization plan and risk of loss",
+              "max": 10,
+              "basis": "partners",
+              "input": "choice",
+              "kind": [
+                "preservation"
+              ],
+              "options": [
+                {
+                  "id": "risk",
+                  "label": "Risk of loss to the market or to critical physical needs",
+                  "points": 5
+                },
+                {
+                  "id": "all",
+                  "label": "A revitalization plan, a letter from a local official, and a risk of loss",
+                  "points": 10
+                }
+              ],
+              "rule": "Showing a risk of loss (restrictions expiring within 12 months with 90% occupancy for five years, or critical physical needs more than 15 years after placed-in-service) is Pass-Basic. Adding a revitalization plan and a letter is Pass-Exceed.",
+              "ref": "4.2.2"
+            },
+            {
+              "id": "4.2.3",
+              "label": "Transit and walkability together",
+              "max": 5,
+              "basis": "lookup",
+              "input": "score",
+              "requires": "transit",
+              "unit": "Walk Score",
+              "tiers": [
+                {
+                  "over": 75,
+                  "points": 5
+                }
+              ],
+              "rule": "Both are needed: the site is within one-half mile of a completed or planned fixed-route transit stop, and its Walk Score is above 75.",
+              "ref": "4.2.3",
+              "evidence": [
+                "transit"
+              ],
+              "link": {
+                "label": "walkscore.com",
+                "url": "https://www.walkscore.com/"
+              }
+            },
+            {
+              "id": "4.2.4",
+              "label": "Addresses social inequities",
+              "max": 5,
+              "basis": "design",
+              "input": "check",
+              "rule": "Four or more boxes checked on the Social Inequities and Local Disparities Certification.",
+              "ref": "4.2.4"
+            }
+          ]
+        },
+        {
+          "id": "4.3",
+          "label": "Resident population and services",
+          "max": 45,
+          "items": [
+            {
+              "id": "4.3.1",
+              "label": "Homes at or below 50% of area median income",
+              "max": 10,
+              "basis": "design",
+              "input": "percent",
+              "unit": "% of units",
+              "tiers": [
+                {
+                  "over": 50,
+                  "points": 10
+                },
+                {
+                  "over": 30,
+                  "points": 5
+                }
+              ],
+              "rule": "Share of units at or below 50% of area median income: over 30% is Pass-Basic, over 50% is Pass-Exceed.",
+              "ref": "4.3.1",
+              "evidence": [
+                "need"
+              ]
+            },
+            {
+              "id": "4.3.2",
+              "label": "Supportive services",
+              "max": 10,
+              "basis": "design",
+              "input": "choice",
+              "options": [
+                {
+                  "id": "plan",
+                  "label": "Services plan meeting the four factors",
+                  "points": 5
+                },
+                {
+                  "id": "funded",
+                  "label": "The same, funded for 15 years and with the minimum on-site staffing",
+                  "points": 10
+                }
+              ],
+              "rule": "A services plan meeting the four factors is Pass-Basic. A 15-year funding commitment and the minimum staffing make it Pass-Exceed.",
+              "ref": "4.3.2"
+            },
+            {
+              "id": "4.3.3",
+              "label": "Accessible units",
+              "max": 5,
+              "basis": "design",
+              "input": "check",
+              "rule": "At least twice the fully accessible units otherwise required (preservation: raise them by 5% of all units, or already have twice the federal minimum).",
+              "ref": "4.3.3"
+            },
+            {
+              "id": "4.3.4.a",
+              "label": "Homes for large families",
+              "max": 10,
+              "basis": "design",
+              "input": "percent",
+              "occupancy": [
+                "general"
+              ],
+              "unit": "% of units with 3+ bedrooms",
+              "tiers": [
+                {
+                  "over": 25,
+                  "points": 10
+                },
+                {
+                  "over": 15,
+                  "points": 5
+                }
+              ],
+              "rule": "Affordable units with three or more bedrooms: over 15% of units is Pass-Basic, over 25% is Pass-Exceed. Not available to buildings of seven or more stories or to senior housing.",
+              "ref": "4.3.4",
+              "evidence": [
+                "families"
+              ]
+            },
+            {
+              "id": "4.3.4.b",
+              "label": "Housing authority operating subsidy",
+              "max": 5,
+              "basis": "finance",
+              "input": "check",
+              "rule": "For applications that do not pass on large-family units: committed operating subsidy from the municipal or county housing authority (a HAP contract, RAD or similar) on more than 75% of the units is Pass-Basic.",
+              "ref": "4.3.4"
+            },
+            {
+              "id": "4.3.5",
+              "label": "Section 811 units",
+              "max": 10,
+              "basis": "design",
+              "input": "choice",
+              "options": [
+                {
+                  "id": "basic",
+                  "label": "At least 10% of the units, or five units if more",
+                  "points": 5
+                },
+                {
+                  "id": "exceed",
+                  "label": "At least 20% of the units (no more than 25%), or eight units if more",
+                  "points": 10
+                }
+              ],
+              "rule": "Section 811 one-bedroom units for people with disabilities, two of them accessible at the 50% rent, named in the Intent to Submit and accepted by PHFA: 10% of units or five units (urban) is Pass-Basic; 20%, or eight units, is Pass-Exceed.",
+              "ref": "4.3.5"
+            }
+          ]
+        },
+        {
+          "id": "4.4",
+          "label": "Development characteristics",
+          "max": 20,
+          "items": [
+            {
+              "id": "4.4.1",
+              "label": "Brownfield site",
+              "max": 5,
+              "basis": "site",
+              "input": "check",
+              "rule": "The development is on a brownfield.",
+              "ref": "4.4.1"
+            },
+            {
+              "id": "4.4.2",
+              "label": "Adaptive reuse of an existing building",
+              "max": 5,
+              "basis": "site",
+              "input": "check",
+              "rule": "The development reuses an existing building.",
+              "ref": "4.4.2"
+            },
+            {
+              "id": "4.4.3",
+              "label": "Green building certification",
+              "max": 5,
+              "basis": "design",
+              "input": "check",
+              "rule": "Certification under Enterprise Green Communities 2020, LEED v4 Silver, or ICC 700-2020 National Green Building Standard Silver (preservation has its own list).",
+              "ref": "4.4.3",
+              "evidence": [
+                "sun",
+                "canopy"
+              ]
+            },
+            {
+              "id": "4.4.4",
+              "label": "Reduced HERS index",
+              "max": 5,
+              "basis": "design",
+              "input": "check",
+              "rule": "Agree to beat the Energy Star requirement with a lower HERS index, certified after construction.",
+              "ref": "4.4.4",
+              "evidence": [
+                "sun"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "4.5",
+          "label": "Development team and commitment of funds",
+          "max": 70,
+          "items": [
+            {
+              "id": "4.5.1",
+              "label": "Experience of the applicant",
+              "max": 10,
+              "basis": "team",
+              "input": "choice",
+              "options": [
+                {
+                  "id": "3-9",
+                  "label": "3 to 9 tax credit developments, or a qualifying housing consultant",
+                  "points": 5
+                },
+                {
+                  "id": "10+",
+                  "label": "10 or more tax credit developments",
+                  "points": 10
+                }
+              ],
+              "rule": "Tax credit developments of at least 10 units placed in service: 3 to 9, or a housing consultant engaged from application through cost certification, is Pass-Basic; 10 or more is Pass-Exceed.",
+              "ref": "4.5.1"
+            },
+            {
+              "id": "4.5.2",
+              "label": "Experience of the management agent",
+              "max": 10,
+              "basis": "team",
+              "input": "choice",
+              "options": [
+                {
+                  "id": "100-300",
+                  "label": "100 to 300 units managed",
+                  "points": 5
+                },
+                {
+                  "id": "300+",
+                  "label": "More than 300 units managed",
+                  "points": 10
+                }
+              ],
+              "rule": "Tax credit units managed: 100 to 300 is Pass-Basic, more than 300 is Pass-Exceed.",
+              "ref": "4.5.2"
+            },
+            {
+              "id": "4.5.3",
+              "label": "Agent compliance training",
+              "max": 5,
+              "basis": "team",
+              "input": "check",
+              "rule": "Management staff took PHFA's Agent Compliance Training within the year before the application.",
+              "ref": "4.5.3"
+            },
+            {
+              "id": "4.5.4",
+              "label": "Contractor approved by PHFA",
+              "max": 5,
+              "basis": "team",
+              "input": "check",
+              "rule": "The contractor's experience is approved by the Agency.",
+              "ref": "4.5.4"
+            },
+            {
+              "id": "4.5.5",
+              "label": "Architect approved by PHFA",
+              "max": 5,
+              "basis": "team",
+              "input": "check",
+              "rule": "The architect's experience is approved by the Agency.",
+              "ref": "4.5.5"
+            },
+            {
+              "id": "4.5.6",
+              "label": "Attorney approved by PHFA",
+              "max": 5,
+              "basis": "team",
+              "input": "check",
+              "rule": "The attorney's experience is approved by the Agency.",
+              "ref": "4.5.6"
+            },
+            {
+              "id": "4.5.7",
+              "label": "Qualified small business as owner or partner",
+              "max": 10,
+              "basis": "team",
+              "input": "choice",
+              "options": [
+                {
+                  "id": "30",
+                  "label": "Joint venture with 30% or more held by the qualified small business",
+                  "points": 5
+                },
+                {
+                  "id": "51",
+                  "label": "Sole owner, or 51% or more held by the qualified small business",
+                  "points": 10
+                }
+              ],
+              "rule": "A self-certified qualified small business or veteran business as sole owner or with at least 51% of a joint venture is Pass-Exceed; at least 30% is Pass-Basic.",
+              "ref": "4.5.7"
+            },
+            {
+              "id": "4.5.8",
+              "label": "Work for qualified small or veteran businesses",
+              "max": 10,
+              "basis": "team",
+              "input": "choice",
+              "options": [
+                {
+                  "id": "1-5",
+                  "label": "1% to 4.99% of total development cost",
+                  "points": 5
+                },
+                {
+                  "id": "5+",
+                  "label": "5% or more of total development cost",
+                  "points": 10
+                }
+              ],
+              "rule": "Material participation by qualified small or veteran businesses, sub-contractors and vendors included: 1% to 4.99% of total development cost is Pass-Basic, 5% or more is Pass-Exceed.",
+              "ref": "4.5.8"
+            },
+            {
+              "id": "4.5.9",
+              "label": "Commitment of funds",
+              "max": 10,
+              "basis": "finance",
+              "input": "choice",
+              "options": [
+                {
+                  "id": "10-30",
+                  "label": "10% to 30% of the developer fee reinvested to fill the gap",
+                  "points": 5
+                },
+                {
+                  "id": "under10",
+                  "label": "Under 10% of the developer fee reinvested",
+                  "points": 10
+                }
+              ],
+              "rule": "With all non-PHFA sources in place: under 10% of the developer fee reinvested to fill the gap is Pass-Exceed, 10% to 30% is Pass-Basic. Above 30% fails, and above 50% does not meet threshold.",
+              "ref": "4.5.9"
+            }
+          ]
+        },
+        {
+          "id": "4.6",
+          "label": "Noncompliance",
+          "max": 20,
+          "items": [
+            {
+              "id": "4.6.1",
+              "label": "Nothing on PHFA's negative ranking log",
+              "max": 10,
+              "basis": "team",
+              "input": "check",
+              "rule": "No delinquency, default, missed deadline, open IRS Form 8823 issue or early termination on record for the team.",
+              "ref": "4.6.1"
+            },
+            {
+              "id": "4.6.2",
+              "label": "Compliance and management record",
+              "max": 10,
+              "basis": "team",
+              "input": "choice",
+              "options": [
+                {
+                  "id": "2-4",
+                  "label": "2 to 4 findings since the last round",
+                  "points": 5
+                },
+                {
+                  "id": "0-1",
+                  "label": "0 or 1 finding since the last round",
+                  "points": 10
+                }
+              ],
+              "rule": "Times out of compliance since the last application round: 0 or 1 is Pass-Exceed, 2 to 4 is Pass-Basic, 5 or more fails.",
+              "ref": "4.6.2"
+            }
+          ]
+        },
+        {
+          "id": "4.7",
+          "label": "Cost efficiency",
+          "max": 20,
+          "items": [
+            {
+              "id": "4.7.1",
+              "label": "Cost below the round's median",
+              "max": 10,
+              "basis": "finance",
+              "input": "choice",
+              "options": [
+                {
+                  "id": "10-15",
+                  "label": "10% to 15% below the median",
+                  "points": 5
+                },
+                {
+                  "id": "15+",
+                  "label": "More than 15% below the median",
+                  "points": 10
+                }
+              ],
+              "rule": "Total development cost per square foot against the median of the round's applications of the same construction type: 10% to 15% below is Pass-Basic, more than 15% below is Pass-Exceed. Known only after the round closes.",
+              "ref": "4.7.1"
+            },
+            {
+              "id": "4.7.2",
+              "label": "Two construction bids, lowest bidder used",
+              "max": 10,
+              "basis": "finance",
+              "input": "check",
+              "rule": "At least two bids submitted with the application and the lowest responsible bidder used.",
+              "ref": "4.7.2"
+            }
+          ]
+        }
+      ],
+      "groups": [
+        {
+          "ids": [
+            "4.3.4.a",
+            "4.3.4.b"
+          ],
+          "best": true,
+          "label": "The housing authority subsidy counts only when the large-family line does not pass"
+        }
+      ]
+    }
+  ]
+}

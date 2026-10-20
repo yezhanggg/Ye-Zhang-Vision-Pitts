@@ -34,7 +34,7 @@ Solo entry by **Ye Zhang** (University of Pennsylvania) for the **AI for Housing
 
 | Rule | How VisionPitts follows it |
 |---|---|
-| Build window | Every commit in this repository was made inside the build window, Saturday, September 26, 9:00 a.m. ET to Sunday, September 27, 11:59 p.m. ET. The first commit is Saturday 3:31 p.m. ET, and the history is intact. |
+| Build window | The hackathon submission was built inside the build window, Saturday, September 26, 9:00 a.m. ET to Sunday, September 27, 11:59 p.m. ET. The first commit is Saturday 3:31 p.m. ET, and the history is intact. One feature was added afterwards, in October 2026: the sun-and-shadow layer in Explore ([method](docs/data/shadow.md)). |
 | AI tools | Allowed and disclosed below, under [How AI is used](#how-ai-is-used). AI helps explain results; it never produces a score or a recommendation. |
 | Libraries, APIs and data | Listed below. Public data only for everything the tool scores. |
 | Privacy | No information about individual people. Everything is shown for census tracts or larger areas. |
@@ -45,12 +45,18 @@ Solo entry by **Ye Zhang** (University of Pennsylvania) for the **AI for Housing
 
 **Explore:** a map of the city or the whole county, by census tract, block group, ZIP code or the 129 towns.
 - Color the map by any of 37 census figures, or by land use and zoning.
+- Under Data, turn on **Sun and shadow** to watch shadows cross the city through a summer, spring or fall, or winter day, or see hours of direct sun (added October 2026).
 - Click a place for a summary next to the city and the county, including rent and income from 2014 to 2024.
 - Ask a question in plain words. The answer uses only the tool's own numbers.
 
 **Analysis:** the 128 city neighborhoods, 114 of which have enough households to rank.
 - **Place:** pick a priority (for example, keeping current renters housed) and who you are planning for. The tool suggests which of five housing types fits and shows the numbers behind it.
-- **Compare places:** two neighborhoods side by side.
+- **Test a project here** (a card on Place, added October 2026, online only): set the homes, stories and financing once, and four questions answer in one line each, opening for the detail:
+  - **Who needs it:** renter share, one-person, senior and large renter households in the tract and its ZIP code. Renter demand orders the suggested types and sets a unit mix. The card also shows homes renting below what fits, how deep the qualifying market is, and the tax credit homes already nearby.
+  - **What can be built:** the zoning code's standards, district by district, give the homes allowed by right on vacant lots and on lots that hold fewer homes than allowed, plus the inclusionary housing overlay. **Try a lot** takes a district and a lot size and gives the homes, height and building types allowed by right, the lot the project needs, and a button that sends those homes to the project.
+  - **Tax credit score:** Pennsylvania's sheet is filled from the unit mix and the pencil, with the mix changes that would score.
+  - **Does it pencil:** sources and uses, tax credits under PHFA's caps or a market-rate yield on cost, and a sensitivity table, on your own numbers.
+- **Compare places:** two neighborhoods side by side, including the same project tested in both.
 - **Equity & policy:** where renters need help most, and what four policy ideas (such as allowing backyard homes) would change.
 
 | Explore | Place | Compare places | Equity & policy |
@@ -81,6 +87,7 @@ Solo entry by **Ye Zhang** (University of Pennsylvania) for the **AI for Housing
 | Transit | Pittsburgh Regional Transit schedules |
 | Flood risk | FEMA flood maps and a terrain-based flood screen |
 | Land use and zoning | Allegheny County property records; City of Pittsburgh zoning map (WPRDC) |
+| Sun and shadow (information only) | Allegheny County / Pittsburgh LiDAR 2015 surface model (PASDA), shadows cast on a GPU ([method](docs/data/shadow.md)) |
 | Asking rents (information only) | RentHub listings licensed through Dewey Data, shown only as area summaries |
 | Map, terrain, address search | OpenFreeMap, Mapterhorn, Photon, U.S. Census Geocoder |
 
@@ -88,11 +95,12 @@ Every source, with dates and links, is in the app under **Project Details & Sour
 
 ## Limitations
 
-- Zoning is a screening reading, not checked lot by lot; it does not say what can legally be built on a site.
-- No infrastructure capacity (roads, sewers) or building costs, and no carbon estimate for each housing type (no Pittsburgh data to base one on).
+- Zoning is a reading of the code (current through 2026-09-16), not a zoning determination: contextual setbacks, slopes, parking and variances are not modeled, so homes allowed on vacant lots are an upper bound.
+- No infrastructure capacity (roads, sewers), and no carbon estimate for each housing type (no Pittsburgh data to base one on). The pencil starts from labeled example costs that you replace; it is arithmetic, not an underwriting.
 - Census figures for small areas are estimates with margins of error.
 - Flood risk is a screening model, not an engineering study.
 - Asking rents come from online listings, which lean toward newer, market-rate homes.
+- Sun and shadow uses a 2015 surface, treats trees as solid and assumes a clear sky; it is not in the offline copy.
 - Suggestions follow the stated priorities; change the priorities and the suggestions change. All choices are in [docs/assumptions.md](docs/assumptions.md).
 
 ## Run it yourself
@@ -106,4 +114,4 @@ Rebuilding the data needs Python 3.12 and a free Census API key; see [docs/TECHN
 
 ## Libraries and services
 
-Python, pandas, GeoPandas (data) · React, MapLibre, Tailwind, Motion, Zustand (app) · Supabase (county-wide data for the live site) · Vercel (hosting) · Vitest, pytest, Playwright (tests).
+Python, pandas, GeoPandas, PyCUDA on Google Colab (data) · React, MapLibre, Tailwind, Motion, Zustand (app) · Supabase (county-wide data for the live site) · Vercel (hosting) · Vitest, pytest, Playwright (tests).

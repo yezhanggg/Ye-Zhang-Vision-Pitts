@@ -79,6 +79,8 @@ export default function PlanAnswer({
   size,
   age,
   homes,
+  context: ctx,
+  why,
 }: {
   rec: Recommendation;
   hud: HudTable;
@@ -86,6 +88,10 @@ export default function PlanAnswer({
   size: HouseholdSize;
   age: AgeGroup;
   homes: number | null;
+  /** Replaces the stance line top right (the online Place view names the screens instead). */
+  context?: string;
+  /** Replaces the short reason under "No suggestion here". */
+  why?: string;
 }) {
   const lead = rec.types[0] ?? null;
   const color = lead ? (typologyById.get(lead.typology)?.color ?? "#64748b") : "#94a3b8";
@@ -153,7 +159,7 @@ export default function PlanAnswer({
     DECIDE,
   ].filter(Boolean);
 
-  const context = [STANCE_LABEL[rec.stance], auto ? "" : personsWord(size as FixedSize), age === "any" ? "" : (AGE_LABEL[age] ?? ""), LEVEL_LABEL[level]].filter(Boolean).join(" · ");
+  const context = ctx ?? [STANCE_LABEL[rec.stance], auto ? "" : personsWord(size as FixedSize), age === "any" ? "" : (AGE_LABEL[age] ?? ""), LEVEL_LABEL[level]].filter(Boolean).join(" · ");
   const over = m.askingUsed != null && two ? m.askingUsed - two.rent : null;
 
   return (
@@ -184,7 +190,7 @@ export default function PlanAnswer({
             ) : (
               <>
                 <div className="mt-0.5 font-display text-title font-bold leading-tight text-slate-800">No suggestion here</div>
-                <p className="mt-0.5 text-small leading-snug text-slate-700">{shortWhy(rec, level, marketRule)}</p>
+                <p className="mt-0.5 text-small leading-snug text-slate-700">{why ?? shortWhy(rec, level, marketRule)}</p>
               </>
             )}
           </motion.div>

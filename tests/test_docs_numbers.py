@@ -19,6 +19,8 @@ DOCS = {
     "methods": ROOT / "docs" / "data" / "factor_methods.md",
     "technical": ROOT / "docs" / "TECHNICAL.md",
     "about": ROOT / "app" / "src" / "lib" / "about.ts",
+    "demand": ROOT / "docs" / "data" / "demand.md",
+    "zoning": ROOT / "docs" / "data" / "zoning_capacity.md",
 }
 WORDS = {5: "five", 6: "six", 7: "seven", 8: "eight", 9: "nine", 10: "ten"}
 MONEY = r"(\d{1,3}(?:,\d{3})*)"  # a dollar figure with thousands separators; never swallows a trailing comma
@@ -129,6 +131,34 @@ def expected() -> dict[str, str]:
         "fixture_cases": str(len(fixture["cases"])),
         "fixture_stability": str(len(fixture["stability"])),
         "flips": str(len(flips)),
+        **demand_values(),
+        **zoning_values(),
+    }
+
+
+def zoning_values() -> dict[str, str]:
+    """City-wide sums of the tract totals quoted in docs/data/zoning_capacity.md (app/src/data/lazy/zoning_capacity.json)."""
+    t = _json(ROOT / "app" / "src" / "data" / "lazy" / "zoning_capacity.json")["tracts"].values()
+    hz = _json(ROOT / "app" / "src" / "data" / "lazy" / "zoning_capacity.json")["tracts"]["42003562300"]["vacant"]
+    return {
+        "z_lots": _thousands(sum(x["lots"] for x in t)), "z_vac_computed": _thousands(sum(x["vacant"]["computed"] for x in t)),
+        "z_vac_homes": _thousands(sum(x["vacant"]["homes"] for x in t)), "z_below": _thousands(sum(x["vacant"]["below_min"] for x in t)),
+        "z_gentle_lots": _thousands(sum(x["gentle"]["lots"] for x in t)), "z_gentle_homes": _thousands(sum(x["gentle"]["homes"] for x in t)),
+        "z_izo": str(sum(1 for x in t if (x["izo_share"] or 0) > 0.5)),
+        "z_hz_acres": f"{hz['largest']['acres']:g}", "z_hz_big": _thousands(hz["largest"]["homes"]), "z_hz_all": _thousands(hz["homes"]),
+    }
+
+
+def demand_values() -> dict[str, str]:
+    """City shares and tax credit counts quoted in docs/data/demand.md, from app/src/data/lazy/demand.json."""
+    d = _json(ROOT / "app" / "src" / "data" / "lazy" / "demand.json")
+    city = d["city"]
+    share = lambda k: f"{city['shares'][k][0] * 100:.1f}"
+    return {
+        "d_renter": share("renter"), "d_one": share("one_person"), "d_large": share("large5"), "d_age65": share("age65"),
+        "d_small": share("small_bldg"), "d_renters": _thousands(city["renters"][0]),
+        "d_city_props": str(city["lihtc"]["projects"]), "d_city_li": _thousands(city["lihtc"]["li_units"]),
+        "d_props": str(d["lihtc"]["properties"]),
     }
 
 
@@ -201,6 +231,19 @@ CLAIMS: list[tuple[str, str, str, tuple[str, ...]]] = [
     ("technical", "voucher suppression", r"vouchers are suppressed in (\d+) of the (\d+) ranked tracts", ("hcv_ranked", "n_ranked")),
     ("technical", "flood confidence", r"low in the (\d+) tracts where more than half the land", ("flood_low",)),
     ("technical", "fixture size", r"shared fixture of (\d+) scoring cases and (\d+) stability cases", ("fixture_cases", "fixture_stability")),
+    # docs/data/demand.md
+    ("demand", "city shares", r"City values: renting households (\d+\.\d)%, one-person renters (\d+\.\d)%, renters of 5\+ people (\d+\.\d)%, "
+     r"renter householders 65\+ (\d+\.\d)%, renter homes in 1–4 unit buildings (\d+\.\d)%", ("d_renter", "d_one", "d_large", "d_age65", "d_small")),
+    ("demand", "city renters", r"add up to the city's ([\d,]+) renter households", ("d_renters",)),
+    ("demand", "tax credit properties", r"The layer held (\d+) Allegheny County properties[^.]*?; (\d+) of them, with ([\d,]+) homes, are in the city",
+     ("d_props", "d_city_props", "d_city_li")),
+    # docs/data/zoning_capacity.md
+    ("zoning", "city lots", r"From ([\d,]+) city lots", ("z_lots",)),
+    ("zoning", "city-wide capacity", r"Across the city: ([\d,]+) vacant lots in computed districts allow ([\d,]+) homes by right, and ([\d,]+) vacant lots are under",
+     ("z_vac_computed", "z_vac_homes", "z_below")),
+    ("zoning", "gentle density", r"In R2 and R3, ([\d,]+) lived-in lots hold fewer homes than allowed, worth ([\d,]+) more homes", ("z_gentle_lots", "z_gentle_homes")),
+    ("zoning", "IZ-O tracts", r"(\d+) tracts are mostly inside the IZ-O", ("z_izo",)),
+    ("zoning", "Hazelwood largest lot", r"In Hazelwood one ([\d.]+)-acre RM-M lot carries ([\d,]+) of ([\d,]+) homes", ("z_hz_acres", "z_hz_big", "z_hz_all")),
     # app/src/lib/about.ts
     ("about", "ranked count", r"(\d+) ranked of (\d+) city tracts", ("n_ranked", "n_tracts")),
     ("about", "factor count", r"from (\w+) public-data factors", ("n_factors_word",)),

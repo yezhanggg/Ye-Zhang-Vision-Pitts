@@ -67,6 +67,7 @@ export const LIMITS: { title: string; items: string[] }[] = [
       'Census figures for small areas are estimates from a survey and can be off, especially for block groups and ZIP codes.',
       'Neighborhoods at the city edge are compared only with neighbors inside the city.',
       '3D buildings are drawn for eight example neighborhoods only; guessed heights are shown faded.',
+      'Sun and shadow comes from a 2015 laser survey of the city: newer buildings are missing, trees count as solid, and it assumes a clear sky on three days of the year. It is for looking and is never used in a score.',
     ],
   },
   {

@@ -20,15 +20,41 @@ function load<T>(name: string, fallback: T): T {
 
 const EMPTY_FC: UnitFC = { type: 'FeatureCollection', features: [] };
 
+// Tree canopy by area (scripts/16_build_canopy.py). The online build carries it for every county unit; the offline
+// single file has no room for it and leaves the variable out.
+interface CanopyFile {
+  year: number;
+  values: Partial<Record<GeoLevel, Record<string, number>>>;
+}
+/** False in the offline single file, so everything behind it is dropped from that build. */
+export const ONLINE_DATA = import.meta.env.MODE !== 'export';
+function loadOnline<T>(name: string): T | null {
+  const text = (import.meta.glob('../../data/online/*.json', { eager: true, query: '?raw', import: 'default' }) as Record<string, string>)[`../../data/online/${name}.json`];
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
+const canopy = ONLINE_DATA ? loadOnline<CanopyFile>('canopy') : null;
+export const CANOPY_VAR = 'tree_canopy';
+const CANOPY_GROUPS: GroupDef[] = canopy ? [{ id: 'canopy', label: `Tree canopy (${canopy.year} lidar)` }] : [];
+const CANOPY_VARS: VariableDef[] = canopy
+  ? [{ id: CANOPY_VAR, label: 'Tree canopy', group: 'canopy', unit: 'share', kind: 'share', num: [], den: null, table_id: '', description: `Share of the area’s land under tree canopy in ${canopy.year}, mapped from lidar by Tree Pittsburgh and the University of Vermont. Canopy over streets, yards, parks and hillsides all counts. Water is left out of the land area, except for ZIP codes, which are measured on their whole area inside the county.`, sort: 10_000, source: 'canopy' }]
+  : [];
+/** Tree canopy for every county unit of a level, for units the bundle does not hold; null when this build has none. */
+export const canopyValues = (level: GeoLevel): Record<string, number> | null => (ONLINE_DATA ? canopy?.values?.[level] ?? null : null);
+
 export const catalogue = load<Catalogue>('acs_variables', { meta: {}, groups: [], variables: [] });
 /** Census variables (the ACS catalogue). */
-export const acsVariables: VariableDef[] = [...(catalogue.variables ?? [])].sort((a, b) => a.sort - b.sort).map((v) => ({ ...v, source: v.source ?? ('acs' as const) }));
+export const acsVariables: VariableDef[] = [...(catalogue.variables ?? []), ...CANOPY_VARS].sort((a, b) => a.sort - b.sort).map((v) => ({ ...v, source: v.source ?? ('acs' as const) }));
 /** Every browseable variable: the census catalogue, then the Analysis layers (city tracts only). */
 export const variables: VariableDef[] = [...acsVariables, ...ANALYSIS_VARS];
 export const variableById = new Map<string, VariableDef>(variables.map((v) => [v.id, v]));
 /** Ids of the census variables (the ones a unit's value record carries). */
 export const variableIds = acsVariables.map((v) => v.id);
-export const groups: GroupDef[] = [...(catalogue.groups ?? []), ...ANALYSIS_GROUPS];
+export const groups: GroupDef[] = [...(catalogue.groups ?? []), ...CANOPY_GROUPS, ...ANALYSIS_GROUPS];
 export const variablesByGroup = (groupId: string) => variables.filter((v) => v.group === groupId);
 /** False until scripts/07_build_acs_levels.py and the export have run; the panel then shows a note instead of a list. */
 export const hasBrowser = variables.length > 0 && groups.length > 0;
@@ -55,7 +81,14 @@ export const RELIABILITY = catalogue.meta?.reliability ?? { high: 0.15, medium: 
 const valuesCache: Partial<Record<GeoLevel, ValuesByGeoid>> = {};
 /** City-subset values for a geography: geoid → variable → [est, moe, cv]. */
 export function bundledValues(level: GeoLevel): ValuesByGeoid {
-  return (valuesCache[level] ??= load<ValuesByGeoid>(`acs_${level}`, {}));
+  return (valuesCache[level] ??= ONLINE_DATA ? withCanopy(level, load<ValuesByGeoid>(`acs_${level}`, {})) : load<ValuesByGeoid>(`acs_${level}`, {}));
+}
+
+/** The bundled value records with tree canopy added (no margin of error: it is a measurement, not a survey estimate). */
+function withCanopy(level: GeoLevel, values: ValuesByGeoid): ValuesByGeoid {
+  const c = canopyValues(level);
+  if (c) for (const geoid in values) values[geoid][CANOPY_VAR] = [c[geoid] ?? null, null, null];
+  return values;
 }
 
 const geoCache: Partial<Record<GeoLevel, UnitFC>> = {};

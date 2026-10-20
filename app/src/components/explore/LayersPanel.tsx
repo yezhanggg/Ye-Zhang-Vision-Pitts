@@ -4,6 +4,8 @@ import { cx } from '../../lib/format';
 import { Segmented } from '../primitives';
 import { hasZoning, useZoningLayer } from '../../lib/explore/zoning';
 import { setZoningMap, useLandUseLayer } from '../../lib/explore/landUseMap';
+import { setSunShadow, sunShadowBlocked, useSunShadow } from '../../lib/explore/sunShadowStore';
+import { canopyBlocked, setCanopy, useCanopy } from '../../lib/explore/canopyStore';
 
 /** Accessible toggle: a button with aria-pressed, a small track and knob, label and caption. */
 export function Switch({ on, onChange, label, caption, id, disabled }: { on: boolean; onChange: (on: boolean) => void; label: string; caption?: string; id?: string; disabled?: boolean }) {
@@ -69,6 +71,19 @@ export function LandUseMapSwitch({ id = 'layer-landuse' }: { id?: string }) {
   const on = useLandUseLayer((s) => s.on);
   const set = useLandUseLayer((s) => s.set);
   return <Switch id={id} on={on} label="Land-use map" caption="Each area colored by its main land use (county property assessments, 2026)" onChange={set} />;
+}
+
+/** Shadows through the day, cast from the 2015 lidar surface; opens its own control over the map. Listed first under Data (it needs no boundary). Flat map only, so it trades places with Terrain. */
+export function SunShadowSwitch({ id = 'layer-sun' }: { id?: string }) {
+  const on = useSunShadow((s) => s.on);
+  return <Switch id={id} on={on} disabled={!!sunShadowBlocked} label="Sun and shadow" caption={sunShadowBlocked ?? 'Shadows through a summer, spring or fall, and winter day, from the 2015 lidar surface (PASDA). Turns Terrain off.'} onChange={setSunShadow} />;
+}
+
+/** The tree canopy itself (2020 lidar), drawn in green over the map. Sits with the Tree canopy variable under Data. */
+export function CanopySwitch({ id = 'layer-canopy' }: { id?: string }) {
+  const on = useCanopy((s) => s.on);
+  const failed = useCanopy((s) => s.failed);
+  return <Switch id={id} on={on} disabled={!!canopyBlocked} label="Canopy map" caption={canopyBlocked ?? (failed ? 'The canopy map is not on this copy of the site.' : 'Draws the canopy itself in green: where trees stood in 2020. City of Pittsburgh.')} onChange={setCanopy} />;
 }
 
 /** How the map looks: buildings, terrain and hill shading, plus the flat-view shortcut. */

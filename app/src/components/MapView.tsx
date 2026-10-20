@@ -20,6 +20,7 @@ import {
   easeInOutCubic,
   easeOutCubic,
   loadBasemapStyle,
+  OVERLAY_TOP,
   loadDemConfig,
   seqExpression,
   type DemConfig,
@@ -66,6 +67,8 @@ export interface OverlayLayer {
   fill?: {
     paint?: MapPaint;
     color?: string;
+    /** A color read from each feature's own properties. Used instead of `paint`: nothing is kept per feature, which matters for sources with many thousands of shapes. */
+    expr?: ExpressionSpecification;
     opacity?: number | ExpressionSpecification;
   };
   line: {
@@ -82,8 +85,12 @@ export interface OverlayLayer {
     /** Name labels at the polygon's pole of inaccessibility, from `minzoom` on (skipped when the style has no glyphs). */
     label?: { field: string; minzoom?: number; color?: string; size?: number };
   };
+  /** Nothing of the overlay is drawn (or hit) below this zoom. */
+  minzoom?: number;
   interactive?: boolean;
   selectedId?: string | null;
+  /** `outline` marks the selected feature with a thin violet line only: no glow, and the rest of the map does not dim. */
+  selection?: "spotlight" | "outline";
   /** Ease the camera to the selected feature when the selection changes. */
   zoomTo?: boolean;
   onSelect?: (id: string) => void;
@@ -142,6 +149,8 @@ interface Props {
   baseTracts?: boolean;
   /** 3D buildings (OSM backdrop + focus-tract footprints), default true. */
   buildings?: boolean;
+  /** Draw the 3D buildings fully see-through for now (cheaper than `buildings`, which reloads the basemap tiles). */
+  buildingsFaded?: boolean;
   /** Shaded relief over the basemap, default false (the basemap stays evenly toned). */
   hillshade?: boolean;
   /** Feature under the cursor changed (tract layers and interactive overlays). */
@@ -231,7 +240,10 @@ interface OverlayRec {
 
 const overlaySource = (id: string) => `ov-${id}`;
 const fillVisible = (cfg: OverlayLayer) => !!cfg.fill || !!cfg.interactive;
+const zoomRange = (cfg: OverlayLayer) =>
+  cfg.minzoom != null ? { minzoom: cfg.minzoom } : {};
 function fillColor(cfg: OverlayLayer): ExpressionSpecification | string {
+  if (cfg.fill?.expr) return cfg.fill.expr;
   const p = cfg.fill?.paint;
   if (p?.kind === "cat") return catExpression(p.palette);
   if (p?.kind === "seq") return seqExpression(p.palette, p.bins ?? SCORE_BINS);
@@ -816,6 +828,15 @@ export default function MapView(props: Props) {
     st.overlayAnchor =
       ["contour-minor", "osm-3d", "focus-3d"].find((l) => map.getLayer(l)) ??
       firstSymbol;
+    // A hidden marker layer just under contours and buildings: overlay fills go below it, and the sun-and-shadow
+    // layer goes right above it, so shadows fall on the colored ground but never on top of the 3D buildings.
+    if (!map.getLayer(OVERLAY_TOP)) {
+      map.addLayer(
+        { id: OVERLAY_TOP, type: "background", layout: { visibility: "none" } },
+        st.overlayAnchor,
+      );
+    }
+    st.overlayAnchor = OVERLAY_TOP;
     st.lineAnchor = firstSymbol;
     const fontLayer = layers.find(
       (l) =>
@@ -1002,8 +1023,9 @@ export default function MapView(props: Props) {
     if (st.hoverOverlay === rec.cfg.id) {
       st.hoverOverlay = null;
       map.getCanvas().style.cursor = "";
-      setHover((h) => (h && h.overlay === rec.cfg.id ? null : h));
     }
+    // Its own tooltip goes whichever overlay was hovered last.
+    setHover((h) => (h && h.overlay === rec.cfg.id ? null : h));
   }
 
   function addOverlay(map: MLMap, cfg: OverlayLayer) {
@@ -1020,6 +1042,7 @@ export default function MapView(props: Props) {
         id: `${cfg.id}-fill`,
         type: "fill",
         source,
+        ...zoomRange(cfg),
         layout: { visibility: fillVisible(cfg) ? "visible" : "none" },
         paint: {
           "fill-color": fillColor(cfg) as never,
@@ -1035,6 +1058,7 @@ export default function MapView(props: Props) {
           id: `${cfg.id}-casing`,
           type: "line",
           source,
+          ...zoomRange(cfg),
           layout: { "line-join": "round", "line-cap": "round" },
           paint: {
             "line-color": cfg.line.casing.color,
@@ -1050,6 +1074,7 @@ export default function MapView(props: Props) {
         id: `${cfg.id}-line`,
         type: "line",
         source,
+        ...zoomRange(cfg),
         layout: { "line-join": "round" },
         paint: linePaint(cfg.line) as never,
       },
@@ -1060,6 +1085,7 @@ export default function MapView(props: Props) {
         id: `${cfg.id}-hover`,
         type: "line",
         source,
+        ...zoomRange(cfg),
         paint: {
           "line-color": "#334155",
           "line-width": [
@@ -1072,36 +1098,40 @@ export default function MapView(props: Props) {
       },
       lineAnchor,
     );
-    map.addLayer(
-      {
-        id: `${cfg.id}-sel-glow`,
-        type: "line",
-        source,
-        paint: {
-          "line-color": VIOLET,
-          "line-blur": 6,
-          "line-opacity": 0.45,
-          "line-width": [
-            "case",
-            ["boolean", ["feature-state", "selected"], false],
-            12,
-            0,
-          ],
+    const outlineOnly = cfg.selection === "outline";
+    if (!outlineOnly)
+      map.addLayer(
+        {
+          id: `${cfg.id}-sel-glow`,
+          type: "line",
+          source,
+          ...zoomRange(cfg),
+          paint: {
+            "line-color": VIOLET,
+            "line-blur": 6,
+            "line-opacity": 0.45,
+            "line-width": [
+              "case",
+              ["boolean", ["feature-state", "selected"], false],
+              12,
+              0,
+            ],
+          },
         },
-      },
-      lineAnchor,
-    );
+        lineAnchor,
+      );
     map.addLayer(
       {
         id: `${cfg.id}-sel`,
         type: "line",
         source,
+        ...zoomRange(cfg),
         paint: {
           "line-color": VIOLET,
           "line-width": [
             "case",
             ["boolean", ["feature-state", "selected"], false],
-            3.2,
+            outlineOnly ? 2.2 : 3.2,
             0,
           ],
         },
@@ -1115,7 +1145,7 @@ export default function MapView(props: Props) {
           id: `${cfg.id}-label`,
           type: "symbol",
           source,
-          minzoom: lb.minzoom ?? 11,
+          minzoom: Math.max(lb.minzoom ?? 11, cfg.minzoom ?? 0),
           layout: {
             "symbol-placement": "point",
             "text-field": ["get", lb.field],
@@ -1197,7 +1227,11 @@ export default function MapView(props: Props) {
 
   function updateOverlay(map: MLMap, rec: OverlayRec, cfg: OverlayLayer) {
     const prev = rec.cfg;
-    if (cfg.idField !== prev.idField) {
+    if (
+      cfg.idField !== prev.idField ||
+      cfg.minzoom !== prev.minzoom ||
+      cfg.selection !== prev.selection
+    ) {
       removeOverlay(map, rec);
       addOverlay(map, cfg);
       return;
@@ -1222,6 +1256,7 @@ export default function MapView(props: Props) {
     const fillChanged =
       dataChanged ||
       cfg.fill?.paint !== prev.fill?.paint ||
+      cfg.fill?.expr !== prev.fill?.expr ||
       cfg.fill?.color !== prev.fill?.color ||
       !cfg.fill !== !prev.fill;
     if (fillChanged)
@@ -1330,6 +1365,12 @@ export default function MapView(props: Props) {
     for (const l of ["osm-3d", "focus-3d"])
       if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", vis);
   }, [props.buildings, ready]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    for (const [l, opacity] of [["osm-3d", 0.5], ["focus-3d", 0.92]] as const)
+      if (map.getLayer(l)) map.setPaintProperty(l, "fill-extrusion-opacity", props.buildingsFaded ? 0 : opacity);
+  }, [props.buildingsFaded, ready]);
 
   // ------------------------------------------------------------ recolor (tweened through feature-state)
   useEffect(() => {
@@ -1455,7 +1496,7 @@ export default function MapView(props: Props) {
   // shade with a hole cut for it covers everything else, under the labels.
   const selGeom = useMemo(() => {
     for (const o of props.overlays ?? []) {
-      if (!o.interactive || !o.selectedId) continue;
+      if (!o.interactive || !o.selectedId || o.selection === "outline") continue;
       const f = (o.data.features as { properties?: Record<string, unknown>; geometry?: unknown }[]).find((x) => String(x.properties?.[o.idField]) === o.selectedId);
       if (f?.geometry) return { key: `${o.id}:${o.selectedId}`, geometry: f.geometry as { type: string; coordinates: unknown } };
     }
