@@ -398,7 +398,8 @@ function Studio({ active }: { active: boolean }) {
 
   return (
     <MotionConfig reducedMotion={!active || lite ? 'always' : 'user'}>
-      <div className="relative flex h-full gap-3 bg-[#fbfaf8] px-3 pb-3 pt-14">
+      {/* 72 px on top: a clear gap under the Home / Explore-Analysis / chat buttons (inline, so no new CSS class). */}
+      <div className="relative flex h-full gap-3 bg-[#fbfaf8] px-3 pb-3" style={{ paddingTop: 72 }}>
         <div className="absolute right-3 top-3 z-30">
           <ChatPill />
         </div>
