@@ -16,7 +16,7 @@ function HeroMap() {
   return <MapView paint={paint} selectedId={null} lite={lite} terrain terrainAlways interactive={false} autoOrbit initialView={HERO_VIEW} fillOpacity={0.38} />;
 }
 
-function Tile({ title, sub, onClick, primary }: { title: string; sub: string; onClick: () => void; primary?: boolean }) {
+export function Tile({ title, sub, onClick, primary }: { title: string; sub: string; onClick: () => void; primary?: boolean }) {
   return (
     <button
       onClick={onClick}
@@ -35,18 +35,20 @@ function Tile({ title, sub, onClick, primary }: { title: string; sub: string; on
   );
 }
 
+/** Leave the landing page for the app, fresh. */
+export const enter = () => {
+  const s = useApp.getState();
+  // A fresh visit starts clean: nothing selected, nothing painted, the summary folded away and the tip back.
+  useTour.getState().reset();
+  // A fresh open: the Explore panel shows, with Boundary, Data and Settings folded.
+  const ui = { ...s.ui, left: !isPhone(), sections: { ...s.ui.sections, ...Object.fromEntries(EXPLORE_SECTIONS.map((id) => [id, 'collapsed' as const])) } };
+  s.setUi(ui);
+  useApp.setState({ view: 'app', mode: 'explore', introNonce: s.introNonce + 1, introDone: false, hintClosed: false, browsePanel: false, browse: { level: s.browse.level, variable: null, selected: null } });
+};
+
 export default function LandingPage() {
   const [about, setAbout] = useState(false);
   const set = useApp((s) => s.set);
-  const enter = () => {
-    const s = useApp.getState();
-    // A fresh visit starts clean: nothing selected, nothing painted, the summary folded away and the tip back.
-    useTour.getState().reset();
-    // A fresh open: the Explore panel shows, with Boundary, Data and Settings folded.
-    const ui = { ...s.ui, left: !isPhone(), sections: { ...s.ui.sections, ...Object.fromEntries(EXPLORE_SECTIONS.map((id) => [id, 'collapsed' as const])) } };
-    s.setUi(ui);
-    useApp.setState({ view: 'app', mode: 'explore', introNonce: s.introNonce + 1, introDone: false, hintClosed: false, browsePanel: false, browse: { level: s.browse.level, variable: null, selected: null } });
-  };
 
   return (
     <div className="grid h-full grid-rows-[48vh_1fr] bg-[#fbfaf8] text-foreground md:grid-cols-[minmax(0,1.35fr)_minmax(400px,1fr)] md:grid-rows-1">

@@ -20,6 +20,7 @@ const ON_DEMAND = [
   'components/place/PlaceRail.tsx',
   'components/TopNav.tsx',
   'components/ChatPill.tsx',
+  'components/LandingStory.tsx',
   'components/place/PlaceStudio.tsx',
   'components/place/flat/',
   'lib/policy/',

@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import { sectionOf, useApp } from './lib/store';
 import AppShell from './components/AppShell';
@@ -5,6 +6,9 @@ import LandingPage from './components/LandingPage';
 import ExploreView from './components/explore/ExploreView';
 import AnalysisView from './components/AnalysisView';
 import DetailsModal from './components/DetailsModal';
+
+/** Online, the landing page leads with the Central Business District story video; the offline file keeps the 3D map. */
+const LandingStory = import.meta.env.MODE === 'export' ? null : lazy(() => import('./components/LandingStory'));
 
 export default function App() {
   const view = useApp((s) => s.view);
@@ -16,7 +20,13 @@ export default function App() {
       <AnimatePresence mode="wait" initial={false}>
         {view === 'landing' ? (
           <motion.div key="landing" className="h-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.985 }} transition={{ duration: 0.35 }}>
-            <LandingPage />
+            {LandingStory ? (
+              <Suspense fallback={null}>
+                <LandingStory />
+              </Suspense>
+            ) : (
+              <LandingPage />
+            )}
           </motion.div>
         ) : (
           <motion.div key="app" className="h-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.35 }}>
