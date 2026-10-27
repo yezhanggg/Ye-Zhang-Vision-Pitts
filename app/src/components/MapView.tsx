@@ -142,6 +142,8 @@ interface Props {
   terrainAlways?: boolean;
   fillOpacity?: number;
   pin?: Pin | null;
+  /** The pin can be dragged; called where it is dropped (Place online). */
+  onPinDrag?: (lng: number, lat: number) => void;
   elevationReadout?: boolean;
   /** Extra polygon layers (Explore). */
   overlays?: OverlayLayer[];
@@ -1614,16 +1616,22 @@ export default function MapView(props: Props) {
     }
     let m = markerRef.current;
     if (!m) {
-      m = new maplibregl.Marker({ color: VIOLET, scale: 0.95 });
+      m = new maplibregl.Marker({ color: VIOLET, scale: 0.95, draggable: !!props.onPinDrag });
+      m.on("dragend", (e) => {
+        const p = e.target.getLngLat();
+        live.current.onPinDrag?.(p.lng, p.lat);
+      });
       const label = document.createElement("div");
       label.className = "vp-pin-label";
       m.getElement().appendChild(label);
       markerRef.current = m;
     }
+    // A pin dropped by dragging is already in view: the camera stays.
+    const dropped = m.getLngLat()?.lng === pin.lng && m.getLngLat()?.lat === pin.lat;
     m.setLngLat([pin.lng, pin.lat]).addTo(map);
     const label = m.getElement().querySelector(".vp-pin-label");
     if (label) label.textContent = pin.label;
-    if (performance.now() - st.camAt > 100) {
+    if (!dropped && performance.now() - st.camAt > 100) {
       const target = {
         center: [pin.lng, pin.lat] as [number, number],
         zoom: Math.max(map.getZoom(), 14.5),

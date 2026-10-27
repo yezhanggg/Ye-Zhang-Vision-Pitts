@@ -10,7 +10,8 @@ import type { Entries } from '../lihtc/store';
 import type { PlanLevel } from '../place/plan';
 import type { HudTable, PlaceMeasures } from '../place/types';
 import { pencil, type PencilArgs, type PencilResult } from '../pencil/finance';
-import { resolveInputs, type Branch, type InputKind } from '../pencil/inputs';
+import { DEFAULTS, planOfSheet, resolveInputs, type Branch, type InputKind } from '../pencil/inputs';
+import { qctYears, type QctYears } from '../pencil/designations';
 import { marketRents } from '../pencil/rents';
 import { tractCapacity, type TractCapacity } from '../zoning/capacity';
 import { AFFORDABLE_LEVELS, homesAt, projectMix, type ProjectMix } from './plan';
@@ -26,7 +27,9 @@ export interface ProjectBase {
   zip: DemandUnit | null;
   zipId: string | null;
   signals: Signal[];
+  /** QCT on HUD's 2027 list (the next round's) or a Small Area DDA: the 130% boost in the pencil. */
   qctOrDda: boolean;
+  qct: QctYears;
   cap: TractCapacity | null;
   inIzo: boolean;
   rents: PencilArgs['marketRents'];
@@ -48,9 +51,11 @@ export function projectBase(geoid: string, place: PlaceMeasures, hud: HudTable, 
     zip,
     zipId,
     signals: tract ? signalsFor(tract, zip, demandCity()) : [],
-    qctOrDda: !!(place.programs?.qct || place.programs?.dda),
+    qctOrDda: qctYears(geoid).y2027 || !!place.programs?.dda,
+    qct: qctYears(geoid),
     cap,
-    inIzo: (cap?.izo_share ?? 0) > 0.5,
+    // The pin's reading when there is one (Place online), else the tract's: mostly in the overlay.
+    inIzo: project.sites[geoid]?.pin?.izo ?? (cap?.izo_share ?? 0) > 0.5,
     rents: marketRents(place, hud).rents,
     depth: depthHomes(tract),
   };
@@ -94,7 +99,7 @@ export function atSize(b: ProjectBase, homes: number | null, branch: Branch | nu
   let mix = projectMix(b.project, b.level, homes, b.tract, b.zip);
   if (scale && mix.mode === 'mine' && homes != null) mix = { ...mix, counts: scaleCounts(mix.counts, homes), homes };
   const f = branch ? { branch, chosen: true } : branchFor(b, mix);
-  const { inputs, kinds } = resolveInputs(b.project.pencil, f.branch);
+  const { inputs, kinds } = resolveInputs(b.project.pencil, f.branch, DEFAULTS, { plan: planOfSheet(b.entries.sheet), senior: b.entries.setup.occupancy === 'senior' });
   const args: PencilArgs = { counts: mix.counts, inputs, marketRents: b.rents, qctOrDda: b.qctOrDda, inOverlay: b.inIzo };
   return { mix, args, result: pencil(args), kinds, ...f };
 }

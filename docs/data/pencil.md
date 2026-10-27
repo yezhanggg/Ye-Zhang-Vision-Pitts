@@ -4,11 +4,13 @@ Added October 2026. Question 4 of the Place page's project card ("Test a project
 
 - rents, operating income and the loan they carry;
 - the tax credits and equity under PHFA's caps (9% credits, or 4% with tax-exempt bonds), or a market-rate yield on cost;
-- sources against uses, the gap, and PHFA's own feasibility tests.
+- sources against uses, the gap as PHFA counts it, and PHFA's own feasibility tests, including 15 years of cash flow.
+
+**Update 8 (2026-10-21).** The pencil now follows the PHFA plan the tax credit sheet is scored on: the 2027/2028 draft by default, because the next 9% round (due 2027-02-17) runs under it once adopted. It takes PHFA's underwriting values as sourced defaults on tax credit paths, and splits soft funds into committed and applied for or expected. PHFA counts uncommitted funds as gap. The loan is held so cash flow stays at or above zero through year 10. Credits are sized to need ("headroom", not "surplus"). The 130% boost reads HUD's 2027 QCT list. "Close call" is now "over PHFA's limit", and only "closes" counts as closing.
 
 It is arithmetic on the person's inputs, not an underwriting, an appraisal or financial advice. Nothing here enters VisionPitts' scoring. The card is online only.
 
-Inputs: `config/pencil_defaults.json`, built with HUD's MTSP limits into `app/src/data/lazy/pencil_defaults.json` by `scripts/19_build_pencil_defaults.py` (`src/visionpitts/pencil_defaults.py`). Arithmetic: `app/src/lib/pencil/` (`inputs.ts`, `rents.ts`, `finance.ts`, `grid.ts`). Card: `app/src/components/place/project/Pencil.tsx`.
+Inputs: `config/pencil_defaults.json`, built with HUD's MTSP limits into `app/src/data/lazy/pencil_defaults.json` by `scripts/19_build_pencil_defaults.py` (`src/visionpitts/pencil_defaults.py`). Arithmetic: `app/src/lib/pencil/` (`inputs.ts`, `rents.ts`, `finance.ts`, `operating.ts`, `designations.ts`, `breakeven.ts`, `grid.ts`). HUD's QCT lists: `scripts/21_build_designations.py` → `app/src/data/lazy/designations.json`. Card: `app/src/components/place/project/Pencil.tsx`.
 
 ## Two kinds of input
 
@@ -19,13 +21,15 @@ Every input is labeled on the card.
 | Input | Value | Source |
 |---|---|---|
 | Credit rates | 9% (new buildings not federally subsidized); 4% (bond-financed) | 26 U.S.C. §42(b) |
-| Basis boost | 130% in a QCT or DDA, applied automatically from the place's flags; PHFA's state boost only by waiver and only for 9% | §42(d)(5)(B); PHFA QAP §2.6 |
+| Basis boost | 130% in a QCT on HUD's 2027 list or a Small Area DDA, applied automatically; PHFA's state boost only by waiver and only for 9%. The 2027 lists apply to allocations and bond issues after 2026-12-31 (HUD's 730-day rule can keep 2026's for a complete earlier application). Eight Allegheny County tracts leave the list, among them East Liberty 1115, South Side Flats 1702, Hazelwood 5629.01 and East Allegheny 5632.02; four join | §42(d)(5)(B); PHFA QAP §2.6; 91 FR 63573 |
 | Credit period | 10 years | §42(f)(1) |
-| Bond test (4%) | Tax-exempt bonds of at least 25% of the aggregate basis of building and land, for buildings placed in service after 2025 | H.R. 1, 119th Congress (2025); confirm with bond counsel |
-| Basis limit per home | $320,000 (9%), $380,000 (4%) | PHFA 2025/2026 QAP §3.4 |
-| Credits per project (9%) | $1.7M; $1.8M with 60 or more affordable homes and at least 51% of homes with 2+ bedrooms; $1.85M supportive housing | QAP §2.4 |
-| Developer fee | 15% of the first $10M of the lesser of cost (less acquisition) and the basis limit, 10% after. 9% caps: $2.0M (60+ affordable homes and 51% 2BR+) and $1.75M otherwise. 4%: $2.55M paid fee | QAP §3.5 |
-| Feasibility | Any gap, unsecured sources included, under 50% of the developer fee | QAP §3.2.20 |
+| Bond test (4%) | Tax-exempt bonds of at least 25% of the aggregate basis of building and land, and at least one bond issue after 2025 financing 5% or more of it, for buildings placed in service after 2025 | P.L. 119-21 §70422; confirm with bond counsel |
+| Basis limit per home | Adopted: $320,000 (9%), $380,000 (4%). Draft: none for 9% (costs reviewed as excessive or not); for 4%, $400,000 only when the bond test exceeds 35% (the pencil assumes 25–35%) | Adopted QAP §3.4; draft §3.4.1, §7.2 |
+| Credits per project (9%) | Adopted: $1.7M; $1.8M with 60 or more affordable homes and at least 51% with 2+ bedrooms; $1.85M supportive. Draft: $1.85M; $2.0M with 65 or more affordable homes and 51% 2BR+, or in the supportive preference | Adopted §2.4; draft §2.4 |
+| Developer fee | 15% of the first $10M of the base, 10% after; the base is the lesser of cost (less acquisition) and the basis limit (the draft has none, so the cost). Adopted 9% caps: $2.0M (60+ and 51% 2BR+, or supportive), $1.75M otherwise; 4% $2.55M paid. Draft 9% caps: $2.3M (65+ and 51% 2BR+), $2.1M supportive, $1.9M otherwise ($2.2M joint venture, not modeled); 4% the higher of $2.55M and $10,000 a home | Adopted §3.5; draft §5.1–5.3 |
+| Feasibility | Any gap, unsecured sources included, under 50% of the developer fee, and no negative cash flow before year 11 | Adopted §3.2.20; draft §3.4.2; Tab 2 |
+| Underwriting (tax credit paths) | 5% vacancy; replacement reserves $500 a home a year (general or family), $375 (55+ and 62+); 1.15 debt service coverage; income +2% and expenses +3% a year; cash flow positive through year 10 | PHFA 2025 Underwriting Application, Tab 2 |
+| Pools (draft, 9%) | A LIHTC-only pool (credits and an amortizing first mortgage) and a LIHTC + Soft Resources pool (any PHFA soft funds), within the Urban and Suburban/Rural pools | Draft §2.2.1 |
 | Fully funded (D.4.a) | A gap under 25% of the developer fee | Selection criteria D.4.a |
 | Set-aside | 20% of homes at 50% AMI, or 40% at 60%, or income averaging (40% of homes, average at most 60%, none above 80%) | §42(g)(1) |
 | Income limits | HUD FY2026 MTSP limits, Pittsburgh HMFA, 30/50/60/80% for 1 to 8 people (4 people: $33,120 / $55,200 / $66,240 / $88,320) | HUD User API |
@@ -40,13 +44,15 @@ Every input is labeled on the card.
 | Land | $15,000 a home |
 | Home sizes | 500, 700, 950, 1,200 net sq ft (studio to 3BR+) |
 | Efficiency | 85% net of gross floor area |
-| Vacancy | 7% |
+| Vacancy | 7% (market rate; tax credit paths use PHFA's 5%) |
 | Operating cost | $6,500 a home a year, with property taxes |
-| Reserves | $350 a home a year |
-| Loan | 6.25%, 35 years, 1.20 coverage |
+| Reserves | $350 a home a year (market rate; tax credit paths use PHFA's $500 or $375) |
+| Loan | 6.25%, 35 years; 1.20 coverage for market rate (PHFA's 1.15 for tax credits) |
 | Credit price | $0.88 (9%), $0.85 (4%) |
 | Ineligible cost | 10% of hard and soft cost |
-| Soft funds | $0 |
+| Soft funds committed | $0 (in writing: award letters) |
+| Soft funds applied for or expected | $0 (counted by PHFA as gap until committed) |
+| Supportive housing preference | off |
 | Target yield on cost | 6.5% (market rate) |
 
 No public source gives a site's construction cost, operating cost, loan terms or credit price. That is why they are examples and never presented as facts. HUD's public-housing cost limits are not used as a cost estimate.
@@ -65,7 +71,7 @@ The Place page's other rent figure, "the rent that fits", uses the Section 8 lim
 - Gross rent = homes × rent × 12, by level and size.
 - Effective gross income = gross rent × (1 − vacancy).
 - Net operating income = effective gross income − homes × (operating cost + reserves).
-- Loan = net operating income ÷ coverage ÷ the mortgage constant, where the constant is 12 × the monthly payment on $1 at the rate and amortization.
+- Loan = net operating income ÷ coverage ÷ the mortgage constant, where the constant is 12 × the monthly payment on $1 at the rate and amortization. On tax credit paths it is also held to the lowest net operating income of years 1–10 ÷ the constant, on PHFA's trends (income +2%, expenses +3%), so cash flow never falls below zero before year 11. That is how PHFA sizes the mortgage.
 
 **Uses**
 
@@ -86,13 +92,17 @@ The Place page's other rent figure, "the rent that fits", uses the Section 8 lim
 
 **Sources and gap**
 
-- Sources = loan + equity + soft funds you expect.
-- Gap = uses − sources.
+- Sources = loan + equity + soft funds committed.
+- Gap (as PHFA counts it) = uses − sources. Soft funds applied for or expected are not a source until committed; the card adds a line with the gap if they come.
+- Headroom: a gap below zero means more equity than the project needs. PHFA sizes credits to need (adopted §2.10; draft §7.2), so the card shows the credits PHFA would issue, (equity − headroom) ÷ (10 × price), as a share of the most the project could get. Headroom is not money the developer keeps.
 - The developer fee is deferred against a gap before anything else. The card shows the gap before and after, and the tax credit sheet reads the deferred share for line 4.5.9.
+- Cash flow (`operating.ts`): 15 years at income +2% and expenses +3% a year, with debt service fixed. Cash flow below zero before year 11 fails PHFA's test. "Deferred fee repaid by year 15" compares the cumulative cash flow with the fee deferred. It is investor practice: the adopted plan ties 15-year repayment to fee waivers only (§5.4), and the draft drops it. It is shown, not counted. Rents that do not cover operating cost get their own line: the deal needs an operating subsidy.
 
 **Checks**
 
-- PHFA feasibility and D.4.a (above);
+- PHFA feasibility (gap under half the fee) and D.4.a (above);
+- cash flow at or above zero in years 1–10 (counted), and the deferred fee repaid by year 15 (shown only);
+- the 9% pool the stack competes in under the draft;
 - the federal set-aside (which test the mix meets);
 - homes at 80% AMI count only under income averaging;
 - for 4% deals, the bond volume the 25% test asks for.
@@ -107,13 +117,18 @@ Where most of the tract is in the inclusionary overlay and the project has 20 or
 
 **Sensitivity:** a 5 × 5 table of hard cost (±10% and ±20%) against the credit price (±3 and ±6 cents) for the gap, or against market rents (±5% and ±10%) for the yield. The middle cell is the base case, and a test holds it equal to the card's own figure.
 
+**Where it would close** (`lib/pencil/breakeven.ts`, one line under the Sensitivity table): when a project does not close, the value of one input at a time where it would, with every other input held. The levers are hard cost a square foot (searched down to 30% of the input), the credit price (up to $1.10), soft funds (exact: today's soft funds plus the gap above half the developer fee, plus $1, rounded up to $1,000) and homes moved from 30% then 50% AMI to 60% AMI, same sizes, deepest first. Market rate: hard cost and market rents (up to twice the tract's). Each edge is found by halving and tested to close at its value. "No value in range" is said plainly. Beside Homes, "Use N, the largest that closes" sets the size from the financing path's size sweep (`lib/project/size`).
+
+**Show the arithmetic:** a switch that prints each line's formula under it, the same text as the hover title, so it also works on a touch screen.
+
 ## What it feeds
 
 The tax credit sheet reads the pencil for D.4.b (loan and soft funds ÷ total development cost) and the draft's 4.5.9 (deferred fee ÷ developer fee), and hints at D.4.a. "Project sheet (CSV)" downloads every line with its arithmetic.
 
 ## Limits
 
-- **Not an underwriting:** no construction loan, no lease-up, no operating pro forma by year, no tax abatement, no project-based subsidy, no historic credits, no acquisition credits.
+- **Not an underwriting:** no construction loan, no lease-up, no tax abatement, no project-based subsidy, no historic credits, no acquisition credits. The 15-year cash flow trends the year-one figures only.
 - **Examples:** the costs, operating figures, loan terms and credit price are the person's to enter.
-- **The tract stands in for the site:** QCT and DDA status and the overlay come from the tract, not the site.
-- **Rules change:** PHFA can change its caps each round, and the 2027/2028 plan was a draft on 2026-10-15.
+- **The tract stands in for the site:** QCT and DDA status come from the tract, not the site. The overlay comes from the tract unless a pin is set.
+- **Rules change:** PHFA can change its caps each round. The 2027/2028 plan was still a draft on 2026-10-21: the news page listed only the 07/13 board-approved draft, and adoption needs the board and the Governor. The pencil labels it "draft" until then. The 2027 QCT list is assumed for the allocation; HUD's 730-day rule is named, not modeled.
+- **Pools and preferences:** the pool line names where the stack would compete; it does not model the pools' competition.

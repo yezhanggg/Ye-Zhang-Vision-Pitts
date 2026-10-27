@@ -1,7 +1,8 @@
 // The tax credit score sheet on Analysis > Place: Pennsylvania's selection criteria for Low Income Housing Tax Credits
 // (PHFA), filled in for the selected place. The place settles one line and informs others; the rest are entered by
 // the person planning the development. Both the adopted 2025/2026 sheet and the 2027/2028 draft can be read.
-// `part="edit"` is the entry form for the left panel; the default is the scored sheet, read only, for the right.
+// A result on the right panel (question 3 of the project card) that is also where its lines are entered: an entry here
+// applies at once (to the shared entries and the left panel's draft together), with no Confirm.
 // Loaded on demand and left out of the offline single file.
 import { useMemo, type ReactNode } from 'react';
 import { cx } from '../../lib/format';
@@ -10,7 +11,7 @@ import { SHEET_FILE, type SheetState } from '../../lib/lihtc/sheetState';
 import { designations } from '../../lib/lihtc/place';
 import { STATUS_OF, STATUS_WORD, TRANSIT_KEY, moves, transitMet, type Answer, type Answers, type Basis, type Item, type Kind, type Line, type Occupancy, type Score } from '../../lib/lihtc/score';
 import { clearSheet, putAnswer } from '../../lib/lihtc/store';
-import { useSide } from '../../lib/project/side';
+import { setLihtcBoth } from '../../lib/project/draft';
 import type { PlaceMeasures } from '../../lib/place/types';
 import type { TractProps } from '../../lib/types';
 import { Explainer } from '../primitives';
@@ -78,22 +79,12 @@ function Entry({ item, value, onChange }: { item: Item; value: Answer; onChange:
   );
 }
 
-/** A line's entry as words, for the read-only sheet. */
-function answerWords(item: Item, value: Answer, near: boolean): string {
-  if (item.input === 'auto') return near ? 'Yes' : 'No';
-  if (value == null || value === '' || value === false) return item.input === 'check' ? 'No' : 'Not entered';
-  if (value === true) return 'Yes';
-  if (item.input === 'choice') return item.options?.find((o) => o.id === value)?.label ?? String(value);
-  return item.input === 'percent' ? `${value}%` : String(value);
-}
-
-function LineRow({ line, answers, evidence, near, onAnswer, plan, typed, onUsePlan, edit }: { line: Line; answers: Answers; evidence: Record<string, string>; near: boolean; onAnswer: (item: Item | typeof TRANSIT_KEY, v: Answer) => void; plan?: PlanAnswer; typed: boolean; onUsePlan: () => void; edit: boolean }) {
+function LineRow({ line, answers, evidence, near, onAnswer, plan, typed, onUsePlan }: { line: Line; answers: Answers; evidence: Record<string, string>; near: boolean; onAnswer: (item: Item | typeof TRANSIT_KEY, v: Answer) => void; plan?: PlanAnswer; typed: boolean; onUsePlan: () => void }) {
   const { item } = line;
-  const facts = edit ? [] : (item.evidence ?? []).map((k) => evidence[k]).filter(Boolean);
-  const wide = edit && item.input === 'choice';
-  const control = !edit ? (
-    <span className="text-caption text-slate-700">{answerWords(item, answers[item.id], near)}</span>
-  ) : item.input === 'auto' ? (
+  const facts = (item.evidence ?? []).map((k) => evidence[k]).filter(Boolean);
+  const wide = item.input === 'choice';
+  const control =
+    item.input === 'auto' ? (
       <input type="checkbox" className="h-4 w-4 accent-violet-600" checked={near} onChange={(e) => onAnswer(TRANSIT_KEY, e.target.checked)} aria-label={`${item.label} (${item.ref})`} />
     ) : (
       <Entry item={item} value={answers[item.id]} onChange={(v) => onAnswer(item, v)} />
@@ -103,9 +94,9 @@ function LineRow({ line, answers, evidence, near, onAnswer, plan, typed, onUsePl
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <div className="text-small font-medium leading-snug text-slate-900">
-            {item.label} <span className="text-caption font-normal text-slate-500">{item.ref}{!edit && ` · ${BASIS_WORD[item.basis]}, ${STATUS_WORD[STATUS_OF[item.basis]]}`}</span>
+            {item.label} <span className="text-caption font-normal text-slate-500">{item.ref} · {BASIS_WORD[item.basis]}, {STATUS_WORD[STATUS_OF[item.basis]]}</span>
           </div>
-          {!edit && <p className="mt-0.5 text-caption leading-snug text-slate-600">{item.rule}</p>}
+          <p className="mt-0.5 text-caption leading-snug text-slate-600">{item.rule}</p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-0.5">
           {!wide && control}
@@ -115,26 +106,18 @@ function LineRow({ line, answers, evidence, near, onAnswer, plan, typed, onUsePl
         </div>
       </div>
       {wide && <div className="mt-1">{control}</div>}
-      {plan && !typed && !edit && <p className="mt-1 text-caption leading-snug text-violet-900">From your plan: {plan.formula}.</p>}
-      {plan && !typed && edit && <p className="mt-0.5 text-caption text-violet-900" title={plan.formula}>From your plan</p>}
-      {plan && typed && !edit && (
+      {plan && !typed && <p className="mt-1 text-caption leading-snug text-violet-900">From your plan: {plan.formula}.</p>}
+      {plan && typed && (
         <p className="mt-1 text-caption leading-snug text-slate-600">
           Your entry. The plan says {plan.formula}.{' '}
-          {edit && (
-            <button type="button" className="font-medium text-violet-700 underline hover:text-violet-900" onClick={onUsePlan}>
-              Use the plan
-            </button>
-          )}
+          <button type="button" className="font-medium text-violet-700 underline hover:text-violet-900" onClick={onUsePlan}>
+            Use the plan
+          </button>
         </p>
       )}
-      {plan && typed && edit && (
-        <button type="button" className="mt-0.5 text-caption font-medium text-violet-700 hover:text-violet-900" onClick={onUsePlan} title={`The plan says ${plan.formula}`}>
-          Use the plan
-        </button>
-      )}
-      {!edit && item.requires === 'transit' && !near && <p className="mt-1 text-caption leading-snug text-amber-900">Scores only when the site is within half a mile of a transit stop (set at the top of Tax credit entries).</p>}
-      {!edit && line.points !== line.counted && <p className="mt-1 text-caption leading-snug text-amber-900">A cap on this part of the sheet holds this line to {line.counted}.</p>}
-      {!edit && line.next && line.next.gain > 0 && line.points > 0 && (
+      {item.requires === 'transit' && !near && <p className="mt-1 text-caption leading-snug text-amber-900">Scores only when the site is within half a mile of a transit stop (the check at the top of this sheet).</p>}
+      {line.points !== line.counted && <p className="mt-1 text-caption leading-snug text-amber-900">A cap on this part of the sheet holds this line to {line.counted}.</p>}
+      {line.next && line.next.gain > 0 && line.points > 0 && (
         <p className="mt-1 text-caption leading-snug text-slate-700">
           Next step: {line.next.need} adds {line.next.gain}.
         </p>
@@ -144,7 +127,7 @@ function LineRow({ line, answers, evidence, near, onAnswer, plan, typed, onUsePl
           {f}
         </p>
       ))}
-      {!edit && item.link && (
+      {item.link && (
         <a className="mt-1 inline-block text-caption font-medium text-violet-700 underline hover:text-violet-900" href={item.link.url} target="_blank" rel="noreferrer">
           {item.link.label}
         </a>
@@ -176,7 +159,7 @@ const Row = ({ k, children }: { k: ReactNode; children: ReactNode }) => (
   </div>
 );
 
-export default function TaxCreditSheet({ t, place, plan, state, market, part = 'read' }: { t: TractProps; place: PlaceMeasures; /** The project's mix and pencil, which answer some lines. */ plan: PlanFacts; state: SheetState; /** The pencil is market rate: the sheet is shown for the last credit picked. */ market: boolean; part?: 'edit' | 'read' }) {
+export default function TaxCreditSheet({ t, place, plan, state, market }: { t: TractProps; place: PlaceMeasures; /** The project's mix and pencil, which answer some lines. */ plan: PlanFacts; state: SheetState; /** The pencil is market rate: the sheet is shown for the last credit picked. */ market: boolean }) {
   const { sheet, setup, facts, evidence, typed, auto, answers, score } = state;
   const mixChanges = useMemo(() => mixMoves(sheet, setup, typed, facts, plan), [plan, sheet, setup, typed, facts]);
   const planHints = useMemo(() => hints(sheet, plan), [plan, sheet]);
@@ -212,21 +195,20 @@ export default function TaxCreditSheet({ t, place, plan, state, market, part = '
     .sort((x, y) => y.gain - x.gain)
     .slice(0, MOVES_SHOWN + mixChanges.length);
 
-  const lihtc = useSide().lihtc;
-  const onAnswer = (item: Item | typeof TRANSIT_KEY, v: Answer) => lihtc.setState((e) => putAnswer(e, sheet.id, t.GEOID, item, v, item !== TRANSIT_KEY && auto[item.id] != null));
-  const followPlan = (item: Item) => lihtc.setState((e) => putAnswer(e, sheet.id, t.GEOID, item, undefined, false, true));
-  const setSetup = (p: Partial<typeof setup>) => lihtc.setState((e) => ({ setup: { ...e.setup, ...p } }));
+  const onAnswer = (item: Item | typeof TRANSIT_KEY, v: Answer) => setLihtcBoth((e) => putAnswer(e, sheet.id, t.GEOID, item, v, item !== TRANSIT_KEY && auto[item.id] != null));
+  const followPlan = (item: Item) => setLihtcBoth((e) => putAnswer(e, sheet.id, t.GEOID, item, undefined, false, true));
+  const setSetup = (p: Partial<typeof setup>) => setLihtcBoth((e) => ({ setup: { ...e.setup, ...p } }));
   const sheetName = (x: typeof sheet) => (x.status === 'adopted' ? `${x.label} adopted` : x.label);
-  const lineRows = (s: (typeof score.sections)[number], edit: boolean) => (
+  const lineRows = (s: (typeof score.sections)[number]) => (
     <div className="divide-y divide-stone-100">
       {s.lines.map((l) => (
-        <LineRow key={l.item.id} line={l} answers={answers} evidence={evidence} near={near} onAnswer={onAnswer} plan={auto[l.item.id]} typed={typed[l.item.id] !== undefined} onUsePlan={() => followPlan(l.item)} edit={edit} />
+        <LineRow key={l.item.id} line={l} answers={answers} evidence={evidence} near={near} onAnswer={onAnswer} plan={auto[l.item.id]} typed={typed[l.item.id] !== undefined} onUsePlan={() => followPlan(l.item)} />
       ))}
     </div>
   );
   // Each PHFA section folds, named first with PHFA's own letter or number after it (A–F on the adopted sheet, 4.2–4.7
-  // on the draft), the same in the entry form and the scored sheet.
-  const sections = (edit: boolean) =>
+  // on the draft).
+  const sections = () =>
     score.sections.map((s) => (
       <Explainer
         key={s.section.id}
@@ -242,37 +224,25 @@ export default function TaxCreditSheet({ t, place, plan, state, market, part = '
           </span>
         }
       >
-        {lineRows(s, edit)}
+        {lineRows(s)}
       </Explainer>
     ));
-
-  if (part === 'edit') {
-    return (
-      <div className="space-y-2.5" data-tax-credit-entries>
-        <div className="grid grid-cols-2 gap-1.5">
-          <Pick label="Development" value={setup.kind} onChange={(kind) => setSetup({ kind })} options={KINDS} />
-        </div>
-        <label className="flex items-start gap-2 text-small">
-          <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-violet-600" checked={near} onChange={(e) => onAnswer(TRANSIT_KEY, e.target.checked)} />
-          <span className="min-w-0 flex-1 text-slate-800" title={evidence.transit ?? 'Not measured for this place.'}>
-            Site within half a mile of a transit stop
-          </span>
-        </label>
-        <div className="space-y-1.5">{sections(true)}</div>
-        {entered && (
-          <button type="button" className="text-caption font-medium text-violet-700 underline hover:text-violet-900" onClick={() => lihtc.setState((e) => clearSheet(e, sheet.id, t.GEOID))}>
-            Clear entries
-          </button>
-        )}
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-2.5" data-tax-credit-sheet>
       <p className="text-caption text-slate-600">
-        {sheetName(sheet)} sheet · {KINDS.find((k) => k.value === setup.kind)?.label} · {RESIDENTS.find((k) => k.value === setup.occupancy)?.label} residents. Entries are under Tax credit entries on the left.
+        {sheetName(sheet)} sheet · {KINDS.find((k) => k.value === setup.kind)?.label} · {RESIDENTS.find((k) => k.value === setup.occupancy)?.label} residents. Enter the lines in the sections below; each entry counts at once.
       </p>
+      <div className="flex items-end justify-between gap-2">
+        <div className="w-1/2">
+          <Pick label="Development" value={setup.kind} onChange={(kind) => setSetup({ kind })} options={KINDS} />
+        </div>
+        {entered && (
+          <button type="button" className="text-caption font-medium text-violet-700 underline hover:text-violet-900" onClick={() => setLihtcBoth((e) => clearSheet(e, sheet.id, t.GEOID))}>
+            Clear entries
+          </button>
+        )}
+      </div>
       {sheet.status === 'draft' && <p className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-caption leading-snug text-amber-900 ring-1 ring-amber-200">{sheet.remarks[0]}</p>}
       {market && <p className="rounded-lg bg-stone-100 px-2.5 py-1.5 text-caption leading-snug text-slate-700">The pencil is market rate, so no credits are applied for. The sheet below is scored for {credit?.label ?? 'credits'}; pick 9% or 4% under Financing to test a tax credit deal.</p>}
 
@@ -313,9 +283,9 @@ export default function TaxCreditSheet({ t, place, plan, state, market, part = '
             </>
           }
         >
-          {near ? 'Yes' : 'No'}
+          <input type="checkbox" className="h-4 w-4 accent-violet-600" checked={near} onChange={(e) => onAnswer(TRANSIT_KEY, e.target.checked)} aria-label="Site within half a mile of a transit stop" />
         </Row>
-        {designations(place).map((d) => (
+        {designations(place, t.GEOID).map((d) => (
           <Row
             key={d.key}
             k={
@@ -370,7 +340,7 @@ export default function TaxCreditSheet({ t, place, plan, state, market, part = '
             </ul>
           </Explainer>
         )}
-        {sections(false)}
+        {sections()}
         {score.lost.length > 0 && (
           <p className="px-1 text-caption leading-snug text-amber-900">
             Caps in force: {score.lost.map((l) => `${l.label} (${l.lost} not counted)`).join('; ')}.

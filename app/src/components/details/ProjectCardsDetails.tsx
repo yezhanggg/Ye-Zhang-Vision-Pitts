@@ -53,7 +53,7 @@ function Overview() {
   return (
     <section>
       <h3 className="mb-1 text-body font-semibold text-slate-900">Test a project here</h3>
-      <p className="mb-2 text-small text-slate-600">Added October 2026 for developers and planners: one card below the suggestion for any city tract. Every input sits in one flat left panel, applied with Confirm: the project, the unit mix and income, a lot, the policies that apply here (binding rules, funding and incentives, and your screens, each with its document), open space, the tax credit entries and the pencil's inputs. The right panel shows five questions that answer in one line each and open for the detail; the fifth is open space and sun. Compare places shows the project in both places, with one set of settings or a separate one for each side. Online only: the offline file has no room for them.</p>
+      <p className="mb-2 text-small text-slate-600">Added October 2026 for developers and planners: one card below the suggestion for any city tract. Every input sits in one flat left panel, applied with Confirm: the project, the unit mix and income, a lot, the policies that apply here (binding rules, funding and incentives, and your screens, each with its document), open space and the pencil's inputs. The right panel shows five questions that answer in one line each and open for the detail; the third is the tax credit sheet, whose lines are entered on the sheet itself, and the fifth is open space and sun. Compare places shows the project in both places, with one set of settings or a separate one for each side. Online only: the offline file has no room for them.</p>
       <div className="grid gap-2 sm:grid-cols-2">
         {TILES.map((t) => (
           <div key={t.title} className="rounded-xl bg-violet-50/60 p-3 ring-1 ring-violet-100">
@@ -129,9 +129,9 @@ function Method() {
       <Card title="Three ways to pay for it, and Find places for a project">
         <List
           items={[
-            'The same project is tested at a range of sizes: about ten sizes, then each edge of the sizes that close is found exactly. Closes = gap under half the developer fee (PHFA feasibility); close call = covered only by deferring more of the fee; market rate closes at the target yield.',
+            'The same project is tested at a range of sizes: about ten sizes, then each edge of the sizes that close is found exactly. Closes = the gap PHFA counts (soft funds not yet committed are gap) is under half the developer fee and cash flow stays at or above zero in years 1–10; over PHFA’s limit = covered only by deferring more than half the fee; market rate closes at the target yield.',
             "The range is the person's own, cut by the homes zoning allows by right and, for tax credits, by market depth: renter households at or below 60% AMI within a mile (CHAS; 60% interpolated across the 50–80% band), less HUD tax credit homes within that mile, × a 10% capture rate (an example; 5% and 15% beside it).",
-            'Paths and places are ordered by a printed rule, never a composite number: closes, then close call, then gap; then the smaller gap a home; then PHFA points. The person decides.',
+            'Paths and places are ordered by a printed rule, never a composite number: closes, then over PHFA’s limit, then gap; then the smaller gap a home; then PHFA points. The person decides.',
             'PHFA points carry a range: low drops lines still to confirm (parcel, partners, team), high adds every point still open as a choice (design, financing). Chance of award is not modeled: PHFA does not publish past scores.',
             <>{doc('docs/data/finder.md', 'Method: docs/data/finder.md')} · assumptions §18</>,
           ]}

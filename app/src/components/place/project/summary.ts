@@ -3,7 +3,8 @@
 import type { ShareKey } from '../../../lib/demand/types';
 import { fmtCount, fmtShare, isNum } from '../../../lib/place/format';
 import type { ProjectMix } from '../../../lib/project/plan';
-import type { SizeRow } from '../../../lib/project/size';
+import { tierOf, type SizeRow } from '../../../lib/project/size';
+import type { LotNeed } from '../../../lib/zoning/capacity';
 import { AFFORDABLE_LEVELS, homesAt, homesOfSize } from '../../../lib/project/plan';
 import type { ProjectModel } from './useProjectModel';
 
@@ -57,6 +58,15 @@ export function buildHeadline(m: ProjectModel): Headline {
   };
 }
 
+/** Question 2 once a lot is set (district or area, typed or read at the pin): the person's lot, not the tract totals. */
+export function lotHeadline(lot: { district: string; lotSqft: number; calc: { homes: number }; need: LotNeed }, homes: number): Headline {
+  const n = lot.calc.homes;
+  const fits = homes > 0 && n >= homes;
+  const verdict =
+    homes <= 0 ? '' : fits ? ` · your ${fmtCount(homes)} fit` : lot.need.kind === 'fits' ? ` · ${fmtCount(homes)} need about ${fmtCount(lot.need.lotSqft)} sq ft` : lot.need.kind === 'cap' ? ` · ${lot.district} allows at most ${lot.need.max} a lot` : ` · ${fmtCount(homes)} do not fit in ${lot.district}`;
+  return { value: n > 0 ? `${fmtCount(n)} ${n === 1 ? 'home' : 'homes'} by right` : 'No homes by right', sub: `on your ${fmtCount(lot.lotSqft)} sq ft lot in ${lot.district}${verdict}`, tone: homes > 0 ? (fits ? 'good' : 'bad') : 'plain' };
+}
+
 export function scoreHeadline(m: ProjectModel): Headline {
   const s = m.sheet.score;
   const market = m.branch === 'market';
@@ -73,24 +83,29 @@ export function pencilHeadline(m: ProjectModel): Headline {
     return { value: `${(y * 100).toFixed(1)}% yield`, sub: `target ${(m.args.inputs.targetYield * 100).toFixed(1)}% · breaks even at ${usd(r.market.breakEven.value)} a month`, tone: y >= m.args.inputs.targetYield ? 'good' : 'bad' };
   }
   const affordable = homesAt(r.counts, AFFORDABLE_LEVELS);
-  if (r.gap <= 0) return { value: `${usdShort(-r.gap)} surplus`, sub: `${usdShort(r.tdc)} to build · ${m.exampleCount} example inputs`, tone: 'good' };
+  const cash = r.checks.find((c) => c.label === 'Cash flow, years 1–10');
+  if (cash?.ok === false) return { value: 'Negative cash flow', sub: `before year 11, which PHFA does not allow · ${usdShort(r.tdc)} to build`, tone: 'bad' };
+  const ifExpected = r.expected > 0 ? ` · ${r.gapIfExpected <= 0 ? 'closed' : `${usdShort(r.gapIfExpected)}`} if the ${usdShort(r.expected)} expected comes` : '';
+  if (r.gap <= 0) return { value: `${usdShort(-r.gap)} headroom`, sub: `credits not needed, not money to keep · ${usdShort(r.tdc)} to build${ifExpected}`, tone: 'good' };
+  const tier = tierOf(r, m.args.inputs.targetYield);
   return {
-    value: `${usdShort(r.gap)} gap`,
-    sub: `${affordable > 0 ? `${usdShort(r.gap / affordable)} a home with an income limit · ` : ''}${usdShort(Math.max(0, r.gapAfterFee))} after deferring fee`,
-    tone: 'bad',
+    value: tier === 'close' ? `${usdShort(r.gap)} gap, over PHFA's limit` : `${usdShort(r.gap)} gap`,
+    sub: `${affordable > 0 ? `${usdShort(r.gap / affordable)} a home with an income limit · ` : ''}${tier === 'closes' ? 'under half the developer fee' : `${usdShort(Math.max(0, r.gapAfterFee))} after deferring fee`}${ifExpected}`,
+    tone: tier === 'closes' ? 'good' : 'bad',
   };
 }
 
-/** One size's result in words: "$1.2M to spare", "$300k gap, covered by deferring fee", "6.1% yield (target 6.5%)". */
+/** One size's result in words: "$1.2M headroom", "$300k gap, over PHFA's limit", "6.1% yield (target 6.5%)". */
 export function sizeWords(row: SizeRow): string {
   const r = row.run.result;
   if (r.branch === 'market' && r.market) {
     const y = r.market.yieldOnCost.value;
     return `${(y * 100).toFixed(1)}% yield (target ${(row.run.args.inputs.targetYield * 100).toFixed(1)}%)`;
   }
-  if (r.gap <= 0) return `${usdShort(-r.gap)} to spare`;
+  if (r.checks.find((c) => c.label === 'Cash flow, years 1–10')?.ok === false) return 'negative cash flow before year 11';
+  if (r.gap <= 0) return `${usdShort(-r.gap)} headroom`;
   if (row.tier === 'closes') return `${usdShort(r.gap)} gap, under half the fee`;
-  if (row.tier === 'close') return `${usdShort(r.gap)} gap, covered by deferring fee`;
+  if (row.tier === 'close') return `${usdShort(r.gap)} gap, over PHFA's limit (more than half the fee deferred)`;
   return `${usdShort(r.gapAfterFee)} gap after deferring fee`;
 }
 

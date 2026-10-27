@@ -7,6 +7,7 @@ import { capitalize, fmtCount, isNum } from '../../../lib/place/format';
 import { TYPOLOGY_LABEL } from '../../../lib/place/thresholds';
 import type { Typology } from '../../../lib/place/types';
 import { useSide } from '../../../lib/project/side';
+import type { Site } from '../../../lib/project/store';
 import { CAPACITY, districtName, homesByRight, inclusionaryHomes, lotFor, STANDARD_BY_CODE, STANDARDS, storiesOf, type TractCapacity, type UseKey, type UseStatus } from '../../../lib/zoning/capacity';
 import { InfoTip } from '../../primitives';
 
@@ -44,14 +45,10 @@ const round100 = (v: number) => Math.max(100, Math.round(v / 100) * 100);
 
 export type LotProps = { geoid: string; cap: TractCapacity; lead: Typology | null; homes: number; homesExample: boolean };
 
-/** The lot being tried and what the code allows on it, on the side in context (lib/project/side). */
-export function useLot({ geoid, cap, lead, homes }: LotProps) {
-  const side = useSide();
-  const site = side.project((s) => s.sites[geoid]) ?? {};
-  const setSite = (p: Partial<typeof site>) => side.project.setState((s) => ({ sites: { ...s.sites, [geoid]: { ...s.sites[geoid], ...p } } }));
-  const setHomes = (n: number) => side.plan.getState().setPlan({ homes: n });
+/** The lot read for a tract: the district and lot set on the left, else the defaults Try a lot opens on, and what the
+ *  code allows there. `set` says whether the person (or the pin) set a district or a lot area. */
+export function lotRead(cap: TractCapacity, lead: Typology | null, homes: number, site: Site) {
   const here = Object.keys(cap.districts).filter((c) => STANDARD_BY_CODE.has(c));
-  const elsewhere = STANDARDS.districts.map((d) => d.code).filter((c) => !here.includes(c));
   // Opens on a district here that allows the suggested type by right, else the most common one here.
   const byRightHere = lead ? here.find((c) => statusFor(c, lead).tone === 'yes') : undefined;
   const district = site.district && STANDARD_BY_CODE.has(site.district) ? site.district : byRightHere ?? here[0] ?? STANDARDS.districts[0].code;
@@ -62,6 +59,17 @@ export function useLot({ geoid, cap, lead, homes }: LotProps) {
   const frontage = site.frontageFt ?? null;
   const calc = homesByRight(std, lotSqft, frontage, frontage ? lotSqft / frontage : null);
   const need = lotFor(std, homes, frontage);
+  return { here, typical, district, std, lotSqft, frontage, calc, need, set: !!(site.district || site.lotSqft) };
+}
+
+/** The lot being tried and what the code allows on it, on the side in context (lib/project/side). */
+export function useLot({ geoid, cap, lead, homes }: LotProps) {
+  const side = useSide();
+  const site = side.project((s) => s.sites[geoid]) ?? {};
+  const setSite = (p: Partial<typeof site>) => side.project.setState((s) => ({ sites: { ...s.sites, [geoid]: { ...s.sites[geoid], ...p } } }));
+  const setHomes = (n: number) => side.plan.getState().setPlan({ homes: n });
+  const { here, typical, district, std, lotSqft, frontage, calc, need } = lotRead(cap, lead, homes, site);
+  const elsewhere = STANDARDS.districts.map((d) => d.code).filter((c) => !here.includes(c));
   const stories = storiesOf(std);
   const parking = STANDARDS.parking.rules.find((r) => r.use === 'Multi-unit');
   const z = STANDARDS.inclusionary;
@@ -77,7 +85,7 @@ export function useLot({ geoid, cap, lead, homes }: LotProps) {
     { label: '1 acre', v: 43560 },
   ].filter(Boolean) as { label: string; v: number }[];
 
-  return { setSite, setHomes, here, elsewhere, district, std, lotSqft, frontage, calc, need, stories, parking, z, inIzo, a, num, presets };
+  return { setSite, setHomes, here, elsewhere, district, std, lotSqft, frontage, calc, need, stories, parking, z, inIzo: site.pin?.izo ?? inIzo, a, num, presets, pin: site.pin };
 }
 
 /** The lot's inputs, for the left panel: a district, the lot area and width, and a lot large enough for the homes. */
@@ -142,7 +150,7 @@ export function LotInputs(props: LotProps) {
 /** What the code allows on the lot set in the left panel, for the right panel. */
 export default function TryLot(props: LotProps) {
   const { lead, homes, homesExample } = props;
-  const { district, std, calc, need, stories, parking, z, inIzo, a, lotSqft } = useLot(props);
+  const { district, std, calc, need, stories, parking, z, inIzo, a, lotSqft, pin } = useLot(props);
   return (
     <div className="rounded-xl bg-violet-50/60 p-3 ring-1 ring-violet-200/70" data-try-lot>
       <div className="flex items-baseline justify-between gap-2">
@@ -152,6 +160,13 @@ export default function TryLot(props: LotProps) {
         </span>
       </div>
 
+      {pin?.code && (
+        <p className="mt-1 text-caption leading-snug text-slate-600">
+          {pin.computed
+            ? `District at your pin: ${pin.code}, a map reading${pin.near ? ' from the lots around it (the pin is on a street)' : ''}; confirm with the Zoning Administrator.${district !== pin.code ? ` You picked ${district} on the left.` : ''}`
+            : `District at your pin: ${pin.code}, not computed here${pin.why ? ` (${pin.why})` : ''}. Try a lot shows ${district} instead.`}
+        </p>
+      )}
       <div className="mt-2 rounded-lg bg-white p-2.5 ring-1 ring-stone-200/80" aria-live="polite">
         <div className="flex items-baseline justify-between gap-2">
           <div className="text-lead font-semibold text-slate-900 tnum">

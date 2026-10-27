@@ -87,7 +87,6 @@ export const NEXT: { title: string; items: string[] }[] = [
     title: 'Next steps',
     items: [
       'Suggest housing types for all 394 neighborhoods in the county, not only the 128 in the city.',
-      'Check each neighborhood against the zoning code: which housing types are allowed outright, which need approval, which are not allowed.',
       'Add access to jobs, schools and everyday services as a factor.',
       'Let people save and share their settings with a link.',
       'Show groups of neighborhoods that point the same way, so a planner can see whole corridors.',
@@ -98,7 +97,6 @@ export const NEXT: { title: string; items: string[] }[] = [
     items: [
       'An option to show how certain each census number is, for readers who want it.',
       'Answers in the question box that point to the number they quote, and questions that compare two places.',
-      'A heat and tree-cover measure, using data already collected for every neighborhood.',
       'A way to change the housing-fit rules on screen, to test a different opinion.',
     ],
   },

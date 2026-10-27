@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { emptyCounts } from '../project/store';
-import { applyInclusionary, developerFee, mortgageConstant, pencil } from './finance';
+import { tierOf, TIER_WORD } from '../project/size';
+import { applyInclusionary, developerFee, feeCap, mortgageConstant, pencil } from './finance';
 import { sensitivity } from './grid';
 import { DEFAULTS, resolveInputs } from './inputs';
 import { mtspLimit, taxCreditRent } from './rents';
@@ -63,8 +64,15 @@ describe('a whole pencil, by hand', () => {
     expect(r.rents['50'].slice(1)).toEqual([902, 1071, 1225]);
     const gpr = (20 * 902 + 15 * 1071 + 5 * 1225) * 12;
     expect(r.income[0].value).toBe(gpr);
-    expect(r.noi).toBeCloseTo(gpr * 0.93 - 40 * (6500 + 350), 6);
-    expect(r.loan.value).toBeCloseTo(r.noi / 1.2 / mortgageConstant(0.0625, 35), 6);
+    // Tax credit paths take PHFA's underwriting values: 5% vacancy, $500 reserves (general), 1.15 coverage.
+    expect(r.noi).toBeCloseTo(gpr * 0.95 - 40 * (6500 + 500), 6);
+    // The loan is the lesser of the coverage test and the debt that keeps years 1–10 at or above zero (+2% / +3%).
+    const k = mortgageConstant(0.0625, 35);
+    let low = r.noi;
+    for (let y = 1; y < 10; y++) low = Math.min(low, gpr * 0.95 * 1.02 ** y - 40 * 7000 * 1.03 ** y);
+    expect(r.loan.value).toBeCloseTo(Math.max(0, Math.min(r.noi / 1.15 / k, low / k)), 6);
+    expect(r.operating!.years[0]).toBeCloseTo(r.noi - r.loan.value * k, 6);
+    expect(r.checks.find((c) => c.label === 'Cash flow, years 1–10')!.ok).toBe(true);
   });
   it('costs, credits and the gap', () => {
     const net = 20 * 700 + 15 * 950 + 5 * 1200;
@@ -99,11 +107,56 @@ describe('a whole pencil, by hand', () => {
     expect(m.market!.yieldOnCost.value).toBeCloseTo(m.noi / m.tdc, 9);
     expect(m.finance).toBeNull();
   });
+  it('soft funds not yet committed are gap to PHFA, shown with the gap if they come', () => {
+    const a = { counts, marketRents: [900, 1100, 1400, 1700] as [number, number, number, number], qctOrDda: true, inOverlay: false };
+    const exp = pencil({ ...a, inputs: { ...nine, softFunds: 1_000_000 } });
+    const com = pencil({ ...a, inputs: { ...nine, softCommitted: 1_000_000 } });
+    expect(exp.gap).toBeCloseTo(r.gap, 4);
+    expect(exp.gapIfExpected).toBeCloseTo(r.gap - 1_000_000, 4);
+    expect(com.gap).toBeCloseTo(r.gap - 1_000_000, 4);
+  });
+  it('40 homes at 30% AMI in a QCT with $4M expected does not close (rents cannot carry the operating cost)', () => {
+    const c = emptyCounts();
+    c['30'] = [0, 20, 15, 5];
+    const x = pencil({ counts: c, inputs: { ...nine, softFunds: 4_000_000 }, marketRents: [900, 1100, 1400, 1700], qctOrDda: true, inOverlay: false });
+    expect(x.noi).toBeLessThan(0);
+    expect(x.rentNotes.join(' ')).toMatch(/operating subsidy/);
+    expect(tierOf(x, nine.targetYield)).not.toBe('closes');
+    expect(TIER_WORD.close).toBe("over PHFA's limit");
+  });
+  it('headroom: credits sized to need, not money to keep', () => {
+    const rich = pencil({ counts, inputs: { ...nine, hardPerSf: 150, softCommitted: 2_000_000 }, marketRents: [900, 1100, 1400, 1700], qctOrDda: true, inOverlay: false });
+    expect(rich.gap).toBeLessThan(0);
+    expect(rich.headroom).toBeCloseTo(-rich.gap, 4);
+    expect(rich.needAnnual! * 10 * 0.88).toBeCloseTo(rich.equity + rich.gap, 2);
+  });
+  it('the 2027/2028 draft: higher caps, 65 homes for large, no 9% basis limit, 4% fee by home', () => {
+    expect(feeCap('nine', 40, false, false, 'draft')).toBe(1_900_000);
+    expect(feeCap('nine', 70, true, false, 'draft')).toBe(2_300_000);
+    expect(feeCap('nine', 40, false, true, 'draft')).toBe(2_100_000);
+    expect(feeCap('nine', 40, false, true, 'adopted')).toBe(2_000_000);
+    expect(feeCap('four', 300, false, false, 'draft')).toBe(3_000_000);
+    expect(feeCap('four', 300, false, false, 'adopted')).toBe(2_550_000);
+    // No basis limit in the draft: the fee base is the cost.
+    expect(developerFee(12_000_000, 20, 'nine', false, DEFAULTS, 'draft').value).toBe(1_700_000);
+    expect(developerFee(12_000_000, 20, 'nine', false, DEFAULTS, 'adopted').value).toBe(0.15 * 6_400_000);
+    // Large at 60 adopted, 65 draft (51% 2BR+): 62 affordable homes, all 2BR.
+    const c = emptyCounts();
+    c['60'] = [0, 0, 62, 0];
+    const base = { counts: c, marketRents: null, qctOrDda: false, inOverlay: false };
+    const big = { ...nine, hardPerSf: 600 };
+    expect(pencil({ ...base, inputs: { ...big, plan: 'adopted' } }).credits[2].value).toBe(1_800_000);
+    expect(pencil({ ...base, inputs: { ...big, plan: 'draft' } }).credits[2].value).toBe(1_850_000);
+  });
   it('inputs: your entries win and are marked yours', () => {
     const { inputs, kinds } = resolveInputs({ hardPerSf: 250 }, 'four');
     expect(inputs.hardPerSf).toBe(250);
     expect(kinds.hardPerSf).toBe('yours');
     expect(inputs.price).toBe(0.85);
     expect(kinds.ua).toBe('sourced');
+    expect(kinds.vacancy).toBe('sourced');
+    expect(inputs.vacancy).toBe(0.05);
+    expect(resolveInputs({}, 'nine', DEFAULTS, { senior: true }).inputs.reservesPerHome).toBe(375);
+    expect(resolveInputs({}, 'market').kinds.vacancy).toBe('example');
   });
 });

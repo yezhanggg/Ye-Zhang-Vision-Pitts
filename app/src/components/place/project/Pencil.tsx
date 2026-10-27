@@ -6,7 +6,7 @@ import { cx } from '../../../lib/format';
 import { downloadCsv, exportFilename, toCsv } from '../../../lib/export/csv';
 import type { PencilArgs, PencilResult } from '../../../lib/pencil/finance';
 import { sensitivity } from '../../../lib/pencil/grid';
-import { DEFAULTS, type Branch, type InputKind, type PencilInputs } from '../../../lib/pencil/inputs';
+import { DEFAULTS, planRules, type Branch, type InputKind, type PencilInputs } from '../../../lib/pencil/inputs';
 import { useSide } from '../../../lib/project/side';
 import { BEDROOM_LABEL, MIX_LEVEL_LABEL, MIX_LEVELS } from '../../../lib/project/store';
 import { Explainer } from '../../primitives';
@@ -22,9 +22,9 @@ const FIELDS: { group: string; fields: Field[] }[] = [
   { group: 'Cost', fields: [{ key: 'hardPerSf', label: 'Hard cost a gross sq ft', as: 'usd', step: 5 }, { key: 'softShare', label: 'Soft cost, of hard', as: 'pct', step: 1 }, { key: 'landPerHome', label: 'Land a home', as: 'usd', step: 1000 }, { key: 'efficiency', label: 'Net ÷ gross floor area', as: 'pct', step: 1 }] },
   { group: 'Operating', fields: [{ key: 'vacancy', label: 'Vacancy', as: 'pct', step: 0.5 }, { key: 'opexPerHome', label: 'Operating cost a home a year', as: 'usd', step: 100 }, { key: 'reservesPerHome', label: 'Reserves a home a year', as: 'usd', step: 25 }] },
   { group: 'Loan', fields: [{ key: 'rate', label: 'Interest rate', as: 'pct', step: 0.125 }, { key: 'amortYears', label: 'Amortization, years', as: 'num', step: 5 }, { key: 'dscr', label: 'Debt service coverage', as: 'num', step: 0.05 }] },
-  { group: 'Credits and other funds', fields: [{ key: 'price', label: 'Credit price', as: 'price', step: 0.01, credits: true }, { key: 'ineligibleShare', label: 'Ineligible cost share', as: 'pct', step: 1, credits: true }, { key: 'softFunds', label: 'Soft funds you expect', as: 'usd', step: 50000, credits: true }, { key: 'targetYield', label: 'Target yield on cost', as: 'pct', step: 0.25, markets: true }] },
+  { group: 'Credits and other funds', fields: [{ key: 'price', label: 'Credit price', as: 'price', step: 0.01, credits: true }, { key: 'ineligibleShare', label: 'Ineligible cost share', as: 'pct', step: 1, credits: true }, { key: 'softCommitted', label: 'Soft funds committed', as: 'usd', step: 50000, credits: true }, { key: 'softFunds', label: 'Soft funds applied for or expected', as: 'usd', step: 50000, credits: true }, { key: 'targetYield', label: 'Target yield on cost', as: 'pct', step: 0.25, markets: true }] },
 ];
-const ESSENTIAL = ['hardPerSf', 'landPerHome', 'price', 'softFunds'];
+const ESSENTIAL = ['hardPerSf', 'landPerHome', 'price', 'softCommitted', 'softFunds'];
 const ESSENTIAL_MARKET = ['hardPerSf', 'landPerHome', 'targetYield'];
 const shown = (f: Field, v: number) => (f.as === 'pct' ? +(v * 100).toFixed(3) : v);
 const shownText = (f: Field, v: number) => (f.as === 'pct' ? `${shown(f, v)}%` : f.as === 'usd' ? usd(v) : f.as === 'price' ? `$${v.toFixed(2)}` : String(v));
@@ -42,7 +42,7 @@ function Lines({ rows, total }: { rows: { label: string; value: number; formula:
   );
 }
 
-export default function Pencil({ name, result, args, kinds, branch, qctOrDda }: { name: string; result: PencilResult; args: PencilArgs; kinds: Record<string, InputKind>; branch: Branch; qctOrDda: boolean }) {
+export default function Pencil({ name, result, args, kinds, branch, qctOrDda, qctNote }: { name: string; result: PencilResult; args: PencilArgs; kinds: Record<string, InputKind>; branch: Branch; qctOrDda: boolean; qctNote?: string | null }) {
   const r = result;
   const market = branch === 'market';
   const grid = sensitivity(args);
@@ -87,9 +87,9 @@ export default function Pencil({ name, result, args, kinds, branch, qctOrDda }: 
           ) : (
             <>
               <div className="bg-white px-3 py-2">
-                <div className="text-caption text-slate-600">{r.gap > 0 ? 'Gap' : 'Surplus'}</div>
+                <div className="text-caption text-slate-600">{r.gap > 0 ? 'Gap PHFA counts' : 'Headroom'}</div>
                 <div className={cx('text-lead font-semibold tnum', r.gap > 0 ? 'text-rose-700' : 'text-emerald-700')}>{usd(Math.abs(r.gap))}</div>
-                <div className="text-caption text-slate-500">{perHome != null && r.gap > 0 ? `${usd(perHome)} a home with an income limit` : 'uses − sources'}</div>
+                <div className="text-caption text-slate-500">{perHome != null && r.gap > 0 ? `${usd(perHome)} a home with an income limit` : r.gap > 0 ? 'uses − committed sources' : 'credits not needed, not money to keep'}</div>
               </div>
               <div className="bg-white px-3 py-2">
                 <div className="text-caption text-slate-600">After deferring developer fee</div>
@@ -100,6 +100,16 @@ export default function Pencil({ name, result, args, kinds, branch, qctOrDda }: 
           )}
         </div>
 
+        {!market && r.expected > 0 && (
+          <p className="mt-1.5 text-caption leading-snug text-slate-700">
+            If the {usd(r.expected)} applied for or expected comes: {r.gapIfExpected > 0 ? `a ${usd(r.gapIfExpected)} gap` : `${usd(-r.gapIfExpected)} headroom`}. PHFA counts it as gap until it is committed in writing.
+          </p>
+        )}
+        {!market && r.needAnnual != null && (
+          <p className="mt-1 text-caption leading-snug text-slate-700">
+            PHFA would issue about {usd(r.needAnnual)} a year ({Math.round((r.needAnnual / Math.max(1, r.maxAnnual)) * 100)}% of the most this project can get): credits are sized to need, so the headroom is not money you keep.
+          </p>
+        )}
         {r.izo && <p className="mt-1.5 text-caption leading-snug text-amber-900">{r.izo.formula}.</p>}
         {r.rentNotes.map((n) => (
           <p key={n} className="mt-1 text-caption text-rose-800">
@@ -118,7 +128,18 @@ export default function Pencil({ name, result, args, kinds, branch, qctOrDda }: 
             ))}
           </ul>
         )}
-        {!market && <p className="mt-1.5 text-caption text-slate-600">Basis boost: {qctOrDda ? '130%, because the tract is a QCT or DDA.' : args.inputs.stateBoost ? '130% by PHFA waiver (your setting).' : 'none (the tract is not a QCT or DDA).'}</p>}
+        {!market && (
+          <p className="mt-1.5 text-caption text-slate-600">
+            Caps and fees: PHFA {planRules(r.plan).label}
+            {r.plan === 'draft' && !DEFAULTS.plans.draft.adopted ? ' (not adopted yet; the 2027-02-17 round runs under it once adopted)' : ''}. Switch it under Policies that apply here.
+          </p>
+        )}
+        {!market && (
+          <p className="mt-1.5 text-caption text-slate-600">
+            Basis boost: {qctOrDda ? "130%, because the tract is a QCT on HUD's 2027 list or a Small Area DDA." : args.inputs.stateBoost ? '130% by PHFA waiver (your setting).' : "none (not a QCT on HUD's 2027 list or a DDA)."}
+            {qctNote ? ` ${qctNote}` : ''}
+          </p>
+        )}
       </div>
 
       <div className="space-y-1.5 px-0.5">
@@ -199,7 +220,7 @@ export default function Pencil({ name, result, args, kinds, branch, qctOrDda }: 
               </tbody>
             </table>
           </div>
-          <p className="mt-1 text-caption text-slate-600">{grid.measure === 'gap' ? 'The gap (red) or surplus (green) as hard cost and the credit price move.' : 'Yield on cost as hard cost and market rents move; green meets your target.'} The outlined cell is the base case.</p>
+          <p className="mt-1 text-caption text-slate-600">{grid.measure === 'gap' ? 'The gap (red) or headroom (green) as hard cost and the credit price move.' : 'Yield on cost as hard cost and market rents move; green meets your target.'} The outlined cell is the base case.</p>
         </Explainer>
 
         <SourceLine className="px-1">
@@ -265,6 +286,12 @@ export function PencilInputs({ args, kinds, branch, qctOrDda }: { args: PencilAr
         <label className="flex items-center gap-2 text-small text-slate-800">
           <input type="checkbox" className="h-4 w-4 accent-violet-600" checked={args.inputs.stateBoost} disabled={branch !== 'nine' || qctOrDda} onChange={(e) => side.project.setState((s) => ({ pencil: { ...s.pencil, stateBoost: e.target.checked } }))} />
           PHFA state basis boost by waiver (9% only; a QCT or DDA has it already)
+        </label>
+      )}
+      {!market && (
+        <label className="flex items-center gap-2 text-small text-slate-800">
+          <input type="checkbox" className="h-4 w-4 accent-violet-600" checked={args.inputs.supportive} onChange={(e) => side.project.setState((s) => ({ pencil: { ...s.pencil, supportive: e.target.checked } }))} />
+          Supportive housing preference (25% of homes set aside, Urban pool; its caps apply if awarded)
         </label>
       )}
     </div>

@@ -2,7 +2,8 @@
 // financing) feeds five questions in the order a developer or planner asks them: who needs homes here and in what mix,
 // what can be built, how it would score for tax credits, whether it pencils, and whether its open space fits and gets
 // sun. Each question shows its answer in one line and opens for the detail, one at a time. Results only: every input
-// is in the left panel (place/flat), and "Change … on the left" scrolls there. Compare places reads the same model.
+// is in the left panel (place/flat), and "Change … on the left" scrolls there, except the tax credit sheet's lines,
+// which are entered on the sheet itself. Compare places reads the same model.
 // Loaded on demand and left out of the offline single file (MatchView imports this module lazily, never statically).
 import { useEffect, type ReactNode } from 'react';
 import { placeExtra } from '../../../lib/export/builders/place';
@@ -27,7 +28,9 @@ import KeyDates from './KeyDates';
 import OpenSun, { openHeadline, useOpenSun } from './OpenSun';
 import Paths from './Paths';
 import Pencil from './Pencil';
-import { buildHeadline, needHeadline, pencilHeadline, pointsWords, scoreHeadline, sizeWords, type Headline } from './summary';
+import { qctChangeWords } from '../../../lib/pencil/designations';
+import { lotRead } from './TryLot';
+import { buildHeadline, lotHeadline, needHeadline, pencilHeadline, pointsWords, scoreHeadline, sizeWords, type Headline } from './summary';
 import { useProjectModel, type ProjectModel } from './useProjectModel';
 
 const TONE_CLASS = { good: 'text-emerald-700', bad: 'text-rose-700', plain: 'text-slate-900' } as const;
@@ -64,9 +67,11 @@ function Question({ n, part, title, head, open, onToggle, children }: { n: numbe
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0, transition: { ...SPRING_FOLD, opacity: { duration: 0.12 } } }} transition={SPRING_FOLD} className="overflow-hidden">
             <div className="px-4 pb-4 pt-0.5">
               {children}
-              <div className="mt-2">
-                <EditLink part={part} />
-              </div>
+              {part !== 'score' && (
+                <div className="mt-2">
+                  <EditLink part={part} />
+                </div>
+              )}
             </div>
           </motion.div>
         )}
@@ -87,7 +92,9 @@ function OpenQuestion({ geoid, m, rec, open, onToggle }: { geoid: string; m: Pro
 
 export default function ProjectPanel({ t, place, hud, rec, fitOrder }: { t: TractProps; place: PlaceMeasures; hud: HudTable; rec: Recommendation; fitOrder: Typology[] }) {
   const m = useProjectModel(t.GEOID, place, hud);
-  const stories = useSide().project((s) => s.stories);
+  const side = useSide();
+  const stories = side.project((s) => s.stories);
+  const site = side.project((s) => s.sites[t.GEOID]);
   const open = useEditPart((s) => s.open);
   // While the card is open, the place's PDF and CSV carry the project too (lib/project/report).
   useEffect(() => {
@@ -101,6 +108,7 @@ export default function ProjectPanel({ t, place, hud, rec, fitOrder }: { t: Trac
   if (!m) return null;
   const toggle = toggleEditPart;
   const lead = rec.lead ? capitalize(TYPOLOGY_LABEL[rec.lead]) : null;
+  const lot = m.cap ? lotRead(m.cap, rec.lead, m.mix.homes, site ?? {}) : null;
 
   return (
     <section className="overflow-hidden rounded-2xl bg-white ring-1 ring-stone-200/80" data-project-panel>
@@ -125,7 +133,7 @@ export default function ProjectPanel({ t, place, hud, rec, fitOrder }: { t: Trac
         <Question n={1} part="need" title="Who needs it" head={needHeadline(m, lead)} open={open === 'need'} onToggle={() => toggle('need')}>
           <DemandMix model={m} place={place} hud={hud} rec={rec} fitOrder={fitOrder} />
         </Question>
-        <Question n={2} part="build" title="What can be built" head={buildHeadline(m)} open={open === 'build'} onToggle={() => toggle('build')}>
+        <Question n={2} part="build" title="What can be built" head={lot?.set ? lotHeadline(lot, m.mix.homes) : buildHeadline(m)} open={open === 'build'} onToggle={() => toggle('build')}>
           {m.cap ? <BuildCapacity geoid={t.GEOID} cap={m.cap} rec={rec} homes={m.mix.homes} homesExample={m.mix.example} /> : <p className="text-small text-slate-600">No zoning capacity was computed for this tract.</p>}
         </Question>
         <Question n={3} part="score" title="Tax credit score" head={scoreHeadline(m)} open={open === 'score'} onToggle={() => toggle('score')}>
@@ -137,7 +145,7 @@ export default function ProjectPanel({ t, place, hud, rec, fitOrder }: { t: Trac
         <Question n={4} part="pencil" title="Does it pencil" head={pencilHeadline(m)} open={open === 'pencil'} onToggle={() => toggle('pencil')}>
           <Paths base={m.base} homes={m.mix.homes} stories={stories} branch={m.branch} />
           <div className="mt-3" />
-          <Pencil name={tractLabel(t)} result={m.result} args={m.args} kinds={m.kinds} branch={m.branch} qctOrDda={m.qctOrDda} />
+          <Pencil name={tractLabel(t)} result={m.result} args={m.args} kinds={m.kinds} branch={m.branch} qctOrDda={m.qctOrDda} qctNote={qctChangeWords(m.base.qct)} />
         </Question>
         <OpenQuestion geoid={t.GEOID} m={m} rec={rec} open={open === 'open'} onToggle={() => toggle('open')} />
       </div>

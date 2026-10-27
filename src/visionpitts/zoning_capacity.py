@@ -32,6 +32,7 @@ OUT_JSON = APP_DATA / "lazy" / "zoning_capacity.json"
 STANDARDS_COPY = APP_DATA / "lazy" / "zoning_standards.json"
 FIXTURE = ROOT / "tests" / "fixtures" / "zoning_capacity_cases.json"
 IZO_GEOJSON = RAW / "benchmark" / "zoning" / "izo_overlay.geojson"
+IZO_OUT = APP_DATA / "lazy" / "izo_overlay.json"
 IZO_URL = ("https://services1.arcgis.com/YZCmUqbcsUpOKfj7/arcgis/rest/services/InclusionaryHousingOverlayDistrict/FeatureServer/0/"
            "query?where=1%3D1&outFields=OBJECTID_1&returnGeometry=true&outSR=4326&f=geojson")
 
@@ -110,6 +111,19 @@ def izo_overlay(refresh: bool = False) -> gpd.GeoDataFrame:
         IZO_GEOJSON.parent.mkdir(parents=True, exist_ok=True)
         IZO_GEOJSON.write_bytes(r.content)
     return gpd.read_file(IZO_GEOJSON).to_crs(CRS_PA_SOUTH)
+
+
+def write_izo(izo: gpd.GeoDataFrame) -> None:
+    """The IZ-O outline for the Place page's pin lookup (lib/policy/applies): one simplified shape, no lots or owners.
+    Simplified at 15 ft, so a pin within a few feet of the edge can read either way; the card says it is a map reading."""
+    shape = gpd.GeoSeries([izo.union_all().simplify(15)], crs=CRS_PA_SOUTH).to_crs(4326)
+    geom = json.loads(shape.to_json())["features"][0]["geometry"]
+
+    def r6(c):
+        return [r6(x) for x in c] if isinstance(c[0], list) else [round(c[0], 6), round(c[1], 6)]
+
+    geom["coordinates"] = r6(geom["coordinates"])
+    IZO_OUT.write_text(json.dumps({"source": IZO_URL.split("/query")[0], "geometry": geom}, separators=(",", ":")))
 
 
 def city_lots(tracts: gpd.GeoDataFrame) -> gpd.GeoDataFrame:

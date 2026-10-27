@@ -124,7 +124,7 @@ export const STEPS: TourStep[] = [
     target: 'rail',
     placement: 'right',
     title: 'Set the question',
-    text: 'Pick the issue you are focusing on and who you are planning for. The map shows where each housing type fits.',
+    text: 'Say who you are planning for and, on Place, the project to test. The map shows where each housing type fits.',
     enter: openLeft,
     camera: { kind: 'ease', view: { center: [-79.94, 40.45], zoom: 12.2, pitch: 55, bearing: -40 }, duration: 3200 },
   },
@@ -134,7 +134,7 @@ export const STEPS: TourStep[] = [
     target: 'right',
     placement: 'left',
     title: 'Evidence, not a verdict',
-    text: 'Click a tract for its reading and the data behind it. The tool offers evidence; the decision stays with you.',
+    text: 'Click a tract or search an address: its reading, a project test and the data behind it. The decision stays with you.',
     enter: () => useApp.getState().select(TOUR_TRACT),
   },
   {
@@ -159,8 +159,8 @@ export const STEPS: TourStep[] = [
     part: 'analysis',
     target: 'compare-focus',
     placement: 'bottom',
-    title: 'One focus for both',
-    text: 'Pick what matters most, such as keeping renters housed. Both places are judged by the same focus, so the comparison is fair.',
+    title: 'Same settings for both',
+    text: 'Both places are read with the same settings, so the comparison is fair.',
   },
   {
     id: 'compare-income',

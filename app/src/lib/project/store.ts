@@ -16,6 +16,9 @@ export interface Site {
   district?: string;
   lotSqft?: number | null;
   frontageFt?: number | null;
+  /** What the map reads at the search or dropped pin (lib/zoning/atPin, Place online): the district under it, whether it
+   *  has standards here, and whether the pin is in the IZ-O. Cleared when the pin goes. */
+  pin?: { code: string | null; computed: boolean; near: boolean; why: string | null; izo: boolean | null };
 }
 
 export interface ProjectState {

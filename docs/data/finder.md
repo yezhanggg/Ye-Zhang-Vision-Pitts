@@ -21,9 +21,11 @@ If a bound falls below the bottom of the range, the person's range is tested as 
 
 | Tier | Tax credits | Market rate |
 |---|---|---|
-| closes | gap under 50% of the developer fee (PHFA's feasibility test) | yield on cost at or above the target |
-| close call | gap covered only by deferring more of the fee (gap after deferral ≤ 0) | — |
-| gap | otherwise | otherwise |
+| closes | the gap PHFA counts (soft funds not yet committed are gap) under 50% of the developer fee, and cash flow at or above zero in years 1–10 (PHFA's feasibility tests) | yield on cost at or above the target |
+| over PHFA's limit | gap covered only by deferring more than half the fee (gap after deferral ≤ 0), which PHFA does not accept | — |
+| gap | otherwise, or negative cash flow before year 11 | otherwise |
+
+Only "closes" counts as closing in the sweep. Until 2026-10-21 the middle tier was called "close call" and counted as closing.
 
 **The right size** is the largest size that closes inside the range. The sweep also names what holds it there, as one of:
 
@@ -100,9 +102,9 @@ On Analysis > Place, before a place is picked, "Or find places for a project" op
 **How places are tested.** Every one of the 114 ranked tracts is swept. "9% or 4%" keeps the better credit by the rule below. Places left out are counted by reason.
 
 **The order (printed under the list):**
-1. Tier: closes, then close call, then gap.
+1. Tier: closes, then over PHFA's limit, then gap.
 2. Places whose range zoning and market depth left whole come first.
-3. The smaller gap a home at the reference size (money to spare counts below zero). The reference size is the right size; otherwise the largest size that closes; otherwise the size with the smallest gap a home.
+3. The smaller gap a home at the reference size (headroom counts below zero). The reference size is the right size; otherwise the largest size that closes; otherwise the size with the smallest gap a home.
 4. More PHFA points from the place.
 5. The lower cost a home.
 
@@ -114,6 +116,8 @@ On Analysis > Place, before a place is picked, "Or find places for a project" op
 - the type the current stance suggests
 
 Rows can be shortlisted, and two shortlisted places open in Compare places.
+
+**One filter away** (`findPlaces` `nearMisses`, `relax`): places that fail exactly one filter are run through the same model, and one line under "Left out" says how many each filter alone holds out, e.g. "71 held out only by “not a QCT or DDA”". A test holds each count equal to re-running the finder without that filter. A place failing two filters or more is not run. With the transit screen on, the line also counts places it alone holds out.
 
 ## Dates and the stamp
 
@@ -133,4 +137,4 @@ While the project card is open, the place's PDF carries "The project tested here
 - PHFA's key dates
 - the stamp
 
-The card registers this through `placeExtra` in `lib/export/builders/place.ts`, which costs 82 bytes in the offline file. The builder itself loads only with the card. The offline file carries no project card, so its export is unchanged.
+Compare places' PDF adds "Your project in each place" before the maps, and its CSV adds `Project:` rows. Both are the same nine rows the section shows, A and B side by side.

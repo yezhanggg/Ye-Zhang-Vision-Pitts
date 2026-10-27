@@ -15,9 +15,14 @@ def test_every_input_is_labeled(cfg):
     for key, v in cfg["inputs"].items():
         assert v["kind"] == "example", key
         assert v["note"] and "unit" in v
-    for block in (cfg["credit"], cfg["phfa"]):
+    for block in (cfg["credit"], cfg["phfa"], cfg["phfa_draft"]):
         for key, v in block.items():
+            if key == "label":
+                continue
             assert v["kind"] == "sourced" and v["source"] in cfg["sources"] and v["ref"], key
+    u = cfg["underwriting"]
+    assert u["kind"] == "sourced" and u["source"] in cfg["sources"]
+    assert all(v["ref"] for k, v in u.items() if isinstance(v, dict))
     assert cfg["ua"]["source"] in cfg["sources"] and cfg["set_aside"]["source"] in cfg["sources"]
 
 
@@ -51,3 +56,15 @@ def test_built_file_when_present(cfg):
     assert all(len(m["l"][lv]) == 8 for lv in pd_.LEVELS)
     for fifty, sixty in zip(m["l"]["50"], m["l"]["60"]):
         assert abs(round(fifty * 1.2) - sixty) <= 50  # HUD rounds to the nearest $50
+
+
+def test_draft_and_underwriting_as_transcribed(cfg):
+    d = cfg["phfa_draft"]
+    assert (d["credit_cap"]["base"], d["credit_cap"]["large"], d["credit_cap"]["supportive"]) == (1_850_000, 2_000_000, 2_000_000)
+    f = d["fee"]
+    assert (f["cap_nine_base"], f["cap_nine_large"], f["cap_nine_supportive"], f["cap_four_paid"], f["cap_four_per_home"]) == (1_900_000, 2_300_000, 2_100_000, 2_550_000, 10_000)
+    assert d["large_homes"]["value"] == 65 and d["basis_per_home"]["nine"] is None
+    u = cfg["underwriting"]
+    assert (u["vacancy"]["value"], u["reserves_general"]["value"], u["reserves_senior"]["value"], u["dscr"]["value"]) == (0.05, 500, 375, 1.15)
+    assert (u["income_trend"]["value"], u["expense_trend"]["value"], u["positive_years"]["value"]) == (0.02, 0.03, 10)
+    assert cfg["plans"]["draft"]["sheet"] == "pa-2027-2028-draft" and cfg["plans"]["adopted"]["sheet"] == "pa-2025-2026"

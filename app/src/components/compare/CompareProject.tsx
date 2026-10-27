@@ -176,7 +176,7 @@ export default function CompareProject({ A, B, sideA = SIDE_A, sideB = SIDE_A, s
           B={B}
           rows={[
             ...(own ? [row("Financing", both((m) => FINANCING[m.branch]))] : []),
-            row(any.branch === "market" ? "Yield on cost" : "Gap or surplus", head(pencilHeadline)),
+            row(any.branch === "market" ? "Yield on cost" : "Gap or headroom", head(pencilHeadline)),
             row("Cost a home", both((m) => (m.result.homes > 0 ? usd(m.result.tdc / m.result.homes) : "—"))),
             row(any.branch === "market" ? "Break-even rent" : "PHFA feasibility", any.branch === "market" ? both((m) => (m.result.market ? `${usd(m.result.market.breakEven.value)} a month` : "—")) : [feasibility(ma), feasibility(mb)]),
             row("Example inputs", both((m) => `${m.exampleCount} of ${Object.keys(m.kinds).length}`), "Inputs no public source gives for a site: replace them under Pencil inputs"),

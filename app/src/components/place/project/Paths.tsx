@@ -41,7 +41,7 @@ export default function Paths({ base, homes, stories, branch }: { base: ProjectB
         })}
       </div>
       <SourceLine className="mt-1.5">
-        {LEAD_RULE} You decide: the order follows that rule, not a recommendation; pick under Financing on the left. Closes = gap under half the developer fee (PHFA feasibility); close call = covered only by deferring more of the fee. {AWARD_NOTE}
+        {LEAD_RULE} You decide: the order follows that rule, not a recommendation; pick under Financing on the left. Closes = the gap PHFA counts (soft funds not yet committed are gap) is under half the developer fee, and cash flow stays at or above zero in years 1–10; over PHFA's limit = covered only by deferring more than half the fee. {AWARD_NOTE}
       </SourceLine>
     </div>
   );

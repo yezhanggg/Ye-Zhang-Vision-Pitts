@@ -57,7 +57,7 @@ export const POLICIES: Policy[] = [
     status: 'adopted',
     source: 'Pittsburgh Code §907.04.A',
     url: 'https://ecode360.com/45475368',
-    rule: '20 or more new homes in the overlay: at least 10% (rounded up) at or below 50% AMI to rent, or 80% to own, for 35 years.',
+    rule: '20 or more new homes in the overlay: at least 10% (rounded up) at or below 50% AMI to rent, or 80% to own, for 35 years. A bill held in Council (2025-1545) would add a sunset clause.',
   },
   {
     id: 'fpo',
@@ -84,7 +84,7 @@ export const POLICIES: Policy[] = [
     status: 'adopted',
     source: 'PHFA Qualified Allocation Plan 2025–2026',
     url: 'https://www.phfa.org/forms/multifamily_program_notices/qap/2025_and_2026/2025-2026-lihtc-qap.pdf',
-    rule: 'Scores 9% tax credit applications (minimum 125); counted when the project uses credits. The score sheet is under Tax credit entries.',
+    rule: 'Scores 9% tax credit applications (minimum 125); counted when the project uses credits. The score sheet is under Tax credit score, on the right.',
   },
   {
     id: 'qct',
@@ -93,7 +93,7 @@ export const POLICIES: Policy[] = [
     status: 'federal',
     source: 'Internal Revenue Code §42(d)(5)(B); HUD QCT and DDA lists',
     url: 'https://www.huduser.gov/portal/datasets/qct.html',
-    rule: 'Tax credit projects in a Qualified Census Tract or Difficult Development Area get a 130% eligible basis. Applied in the pencil automatically.',
+    rule: 'Tax credit projects in a Qualified Census Tract or Difficult Development Area get a 130% eligible basis. HUD’s 2027 lists (published 2026-10-06) apply to allocations and bond issues after 2026-12-31, unless HUD’s 730-day rule keeps an earlier list for a complete application; the pencil uses the 2027 list.',
   },
   {
     id: 'perf',
@@ -111,16 +111,16 @@ export const POLICIES: Policy[] = [
     status: 'draft',
     source: 'PHFA draft QAP 2027–2028 (board-approved draft, July 2026)',
     url: 'https://www.phfa.org/forms/multifamily_news/news/2026/2027-2028-draft-qap.pdf',
-    rule: 'Scores the project on the draft sheet instead of the adopted one. 9% applications due Feb 17, 2027 under the draft.',
+    rule: 'On by default: the next 9% round (applications due Feb 17, 2027) runs under this plan once PHFA adopts it. Sets the score sheet and the pencil’s credit caps, developer fees and pools. Switch it off to use the adopted 2025/2026 plan.',
   },
   {
     id: 'ahb',
-    label: 'Affordable Housing Bonus',
+    label: 'Affordable Housing Bonus (Bill 2025-1545)',
     kind: 'funding',
     status: 'proposed',
     source: 'City Council Bill 2025-1545 (June 2026 draft)',
     url: 'https://engage.pittsburghpa.gov/implementing-the-housing-needs-assessment/affordable-housing-bonus-program',
-    rule: 'If adopted: 10–20% of homes at or below 50% AMI to rent (80% to own) for 20 years earn 2, 4 or 6 points, each up to 15 ft more height, in districts that allow 4+ unit buildings.',
+    rule: 'If adopted: 10–20% of homes at or below 50% AMI to rent (80% to own) for 20 years earn 2, 4 or 6 points, each up to 15 ft more height, in districts that allow 4+ unit buildings. The same bill would also sunset the IZ-O, amend performance points and remove minimum off-street parking. Held in Council (record last changed 2026-10-21).',
   },
   {
     id: 'hof',
@@ -129,7 +129,7 @@ export const POLICIES: Policy[] = [
     status: 'adopted',
     source: 'URA Housing Opportunity Fund, 2026 Annual Allocation Plan (approved Nov 2025)',
     url: 'https://www.ura.org/pages/hof',
-    rule: 'Gap funding for affordable rental homes (Rental Gap program). Income targets vary by program; enter the amount you expect as Soft funds under Pencil inputs.',
+    rule: 'Gap funding for affordable rental homes (Rental Gap program). Income targets vary by program; enter it under Pencil inputs as soft funds applied for or expected, and as committed once you hold an award letter.',
   },
   {
     id: 'abatement',

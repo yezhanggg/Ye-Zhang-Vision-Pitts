@@ -133,6 +133,13 @@ SOURCES: list[dict] = [
                 "app/src/data/lazy/lihtc_pa.json and added up as entered (docs/data/lihtc.md).",
          caveats="A self-score: PHFA scores every application itself, and the draft can change. Which lines the place decides "
                  "is this project's reading."),
+    dict(id="hud_qct_2027", online=True, name="HUD 2027 Qualified Census Tracts and Small Area DDAs (with the 2026 lists)",
+         url="https://www.huduser.gov/portal/datasets/qct.html", vintage="2027 (91 FR 63573, 2026-10-06)", geography="tract; ZCTA",
+         method="Listed QCTs in Allegheny County and Pittsburgh HUD Metro FMR Area ZCTAs with SDDA = 1, both years "
+                "(scripts/21_build_designations.py). The pencil's 130% basis boost reads the 2027 list, which applies to "
+                "allocations and bond issues after 2026-12-31; the scored subsidy factor stays on 2026.",
+         caveats="HUD's 730-day rule can keep the 2026 list for a complete application made earlier. Allegheny County: 90 QCTs "
+                 "in 2026, 86 in 2027 (8 leave, 4 join); the Small Area DDAs do not change."),
     dict(id="acs_demand", online=True, name="ACS 5-year 2020-2024: renter households by size, age and income, the homes they rent and their rents (Census API)",
          url="https://api.census.gov/data/2024/acs/acs5", vintage="2020-2024 (growth from 2010-2014 on 2020 tracts)",
          geography="city tracts, the city's ZCTAs, the city",
@@ -381,6 +388,7 @@ RAW_FILES = {
     "mva2021": ["benchmark/mva/mva2021.geojson"],
     "mva2016": ["benchmark/mva/mva2016.zip", "benchmark/mva/pittsmva2016.zip"],
     "qct": ["benchmark/flags/QCT2026CSV.zip"],
+    "hud_qct_2027": ["benchmark/flags/QCT2027CSV.zip", "benchmark/flags/2027-DDAs-Data-Used-to-Designate.xlsx"],
     "dda": ["benchmark/flags/2026-DDAs-Data-Used-to-Designate.xlsx"],
     "zcta": ["benchmark/flags/zcta2020_allegheny.geojson"],
     "oz": ["benchmark/flags/oz_42003.json"],

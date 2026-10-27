@@ -66,6 +66,24 @@ export function confirmDraft() {
   useDraft.setState({ dirty: false });
 }
 
+/** A change that is not an edit (the map read at the pin): made to the shared project and to the draft together, so
+ *  Confirm keeps it and nothing waits for Confirm because of it. */
+export function setProjectBoth(f: (s: ProjectState) => Partial<ProjectState>) {
+  hush(() => {
+    useProject.setState(f);
+    useProjectDraft.setState(f);
+  });
+}
+
+/** An entry on the tax credit sheet (a result on the right that takes entries): applied to the shared entries and the
+ *  draft together, so it counts at once and Confirm keeps it. */
+export function setLihtcBoth(f: (e: Entries) => Partial<Entries>) {
+  hush(() => {
+    useLihtc.setState(f);
+    useLihtcDraft.setState(f);
+  });
+}
+
 const edited = () => {
   if (!quiet) useDraft.setState({ dirty: true });
 };

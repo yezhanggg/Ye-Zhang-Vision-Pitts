@@ -15,7 +15,8 @@ export interface Entries {
   site: Record<string, Answers>;
 }
 
-export const DEFAULT_ENTRIES: Entries = { sheet: 'pa-2025-2026', setup: { kind: 'new', occupancy: 'general', credit: 'nine' }, project: {}, site: {} };
+// The plan the next round runs under (Ye, 2026-10-21: by round date): the 2027/2028 draft for the Feb 17, 2027 round.
+export const DEFAULT_ENTRIES: Entries = { sheet: 'pa-2027-2028-draft', setup: { kind: 'new', occupancy: 'general', credit: 'nine' }, project: {}, site: {} };
 
 const siteKey = (sheet: string, geoid: string) => `${sheet}|${geoid}`;
 

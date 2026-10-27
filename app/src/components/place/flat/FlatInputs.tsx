@@ -1,6 +1,6 @@
 // Every input of the Place tab in one list of sections, in the order a project is worked: the project, its unit mix
-// and income, the site, the policies that apply, open space and sun, the tax credit entries and the pencil. Each
-// section has a heading with its current value and folds on a click; chips at the top open one and jump to it. Reads
+// and income, the site, the policies that apply, open space and sun, and the pencil (the tax credit sheet takes its
+// entries on the right). Each section has a heading with its current value and folds on a click; chips at the top open one and jump to it. Reads
 // and writes the side in context (lib/project/side): the Place tab's draft until Confirm, or a side of Compare places. Before a place is
 // picked it holds the project, the income level, the policies and the finder's form.
 // Loaded on demand; the offline single file keeps the earlier panel.
@@ -26,7 +26,6 @@ import { STANDARD_BY_CODE } from '../../../lib/zoning/capacity';
 import { tractLabel } from '../../../lib/data';
 import type { TractProps } from '../../../lib/types';
 import { Segmented } from '../PlanInputs';
-import TaxCreditSheet from '../TaxCreditSheet';
 import { FinderInputs } from '../finder/FinderCard';
 import { MixInputs } from '../project/DemandMix';
 import { PencilInputs } from '../project/Pencil';
@@ -49,8 +48,8 @@ const STATUS_CLASS: Record<PolicyStatus, string> = {
 const DRAFT_SHEET = SHEET_FILE.sheets.find((x) => x.status === 'draft')?.id ?? null;
 const ADOPTED_SHEET = SHEET_FILE.sheets.find((x) => x.status === 'adopted')?.id ?? SHEET_FILE.sheets[0].id;
 
-export type SectionId = 'setup' | 'need' | 'build' | 'policy' | 'open' | 'score' | 'pencil' | 'finder';
-const SECTION_TITLE: Record<SectionId, string> = { setup: 'Project', need: 'Unit mix and income', build: 'Site', policy: 'Policies that apply here', open: 'Open space and sun', score: 'Tax credit entries', pencil: 'Pencil inputs', finder: 'Find places for a project' };
+export type SectionId = 'setup' | 'need' | 'build' | 'policy' | 'open' | 'pencil' | 'finder';
+const SECTION_TITLE: Record<SectionId, string> = { setup: 'Project', need: 'Unit mix and income', build: 'Site', policy: 'Policies that apply here', open: 'Open space and sun', pencil: 'Pencil inputs', finder: 'Find places for a project' };
 
 /** Sections folded by the person (all open at first); kept while the session lasts, shared by both Compare strips. */
 const useFolded = create<{ closed: Partial<Record<SectionId, boolean>> }>(() => ({ closed: {} }));
@@ -233,7 +232,7 @@ function PoliciesSection({ ctx }: { ctx: PolicyContext | null }) {
           <PolicyLine row={rowOf('phfa')} auto />
           <PolicyLine row={rowOf('qct')} auto />
           <PolicyLine row={rowOf('perf')} auto />
-          {DRAFT_SHEET && <PolicyLine row={rowOf('phfa_draft')} control={<Check checked={sheet === DRAFT_SHEET} onChange={(v) => side.lihtc.setState({ sheet: v ? DRAFT_SHEET : ADOPTED_SHEET })} label="Score on the 2027/2028 draft sheet" />} />}
+          {DRAFT_SHEET && <PolicyLine row={rowOf('phfa_draft')} control={<Check checked={sheet === DRAFT_SHEET} onChange={(v) => side.lihtc.setState({ sheet: v ? DRAFT_SHEET : ADOPTED_SHEET })} label="Use the 2027/2028 draft plan (scores, caps and fees)" />} />}
           {(['ahb', 'hof', 'abatement', 'parking'] as const).map((id) => (
             <PolicyLine key={id} row={rowOf(id)} control={<Check checked={!!pol.on[id]} onChange={(v) => setOn(id, v)} label={POLICIES.find((p) => p.id === id)!.label} />} />
           ))}
@@ -335,8 +334,8 @@ export function FlatInputsFor({ t, place, hud, rec, area = false, only }: { t: T
   const site = useSiteLot(t, m, rec);
   const homes = side.plan((s) => s.homes);
   const show = (id: SectionId) => !only || only.includes(id);
-  const ctx: PolicyContext | null = t && m ? { label: tractLabel(t), place, cap: m.cap, homes: m.mix.homes, branch: m.branch, qctOrDda: m.qctOrDda, score: m.sheet.score, draftSheet: false } : null;
-  const ids: SectionId[] = (t ? (['setup', 'need', 'build', 'policy', 'open', 'score', 'pencil'] as SectionId[]) : (['setup', 'need', 'policy', 'finder'] as SectionId[])).filter(show);
+  const ctx: PolicyContext | null = t && m ? { label: tractLabel(t), place, cap: m.cap, homes: m.mix.homes, branch: m.branch, qctOrDda: m.qctOrDda, qct: m.base.qct, score: m.sheet.score, draftSheet: false, pinIzo: m.base.project.sites[t.GEOID]?.pin?.izo } : null;
+  const ids: SectionId[] = (t ? (['setup', 'need', 'build', 'policy', 'open', 'pencil'] as SectionId[]) : (['setup', 'need', 'policy', 'finder'] as SectionId[])).filter(show);
   return (
     <div ref={root} className="space-y-3" data-flat-inputs>
       {area && <AreaSwitch />}
@@ -350,11 +349,6 @@ export function FlatInputsFor({ t, place, hud, rec, area = false, only }: { t: T
       )}
       {show('policy') && <PoliciesSection ctx={ctx ?? (t ? null : null)} />}
       {t && m && show('open') && <OpenSection m={m} lot={site} />}
-      {t && m && place && show('score') && (
-        <Section id="score" summary={`${m.sheet.score.total} of ${m.sheet.score.max} points${m.sheet.score.threshold != null ? ` · minimum ${m.sheet.score.threshold}` : ''}`}>
-          <TaxCreditSheet t={t} place={place} plan={m.facts} state={m.sheet} market={m.branch === 'market'} part="edit" />
-        </Section>
-      )}
       {t && m && show('pencil') && (
         <Section id="pencil" summary={`${m.exampleCount} examples`}>
           <PencilInputs args={m.args} kinds={m.kinds} branch={m.branch} qctOrDda={m.qctOrDda} />

@@ -2,10 +2,11 @@
 // same model the Place page runs (lib/project/model, the size sweep in lib/project/size), and the places ordered by a
 // rule printed in words. No composite number: a place's standing is its rank, its tier and its figures.
 //
-// Order: tier (closes, then close call, then gap); places whose size range zoning or market depth did not cut come
-// before those it did; then the gap a home at the reference size (money to spare counts below zero); then more PHFA
+// Order: tier (closes, then over PHFA's limit, then gap); places whose size range zoning or market depth did not cut come
+// before those it did; then the gap a home at the reference size (headroom counts below zero); then more PHFA
 // points the place itself brings; then the lower cost a home. "Either credit" tests 9% and 4% and keeps the better one
 // by the same rule.
+import { qctYears } from '../pencil/designations';
 import { planFacts } from '../lihtc/fromPlan';
 import { sheetState } from '../lihtc/sheetState';
 import type { Entries } from '../lihtc/store';
@@ -64,7 +65,7 @@ export interface FinderRow {
   geoid: string;
   sweep: Sweep;
   tier: Tier;
-  /** Gap a home at the reference size (below zero: money to spare). */
+  /** Gap a home at the reference size (below zero: headroom). */
   gapPerHome: number;
   costPerHome: number;
   points: Points | null;
@@ -75,7 +76,12 @@ export interface FinderRow {
 export interface FinderResult {
   rows: FinderRow[];
   tested: number;
+  /** Places left out, counted under the first filter they fail. */
   excluded: Partial<Record<Reason, number>>;
+  /** Places that fail exactly one filter, ranked by the same rule, with the filter. */
+  nearMisses: { row: FinderRow; reason: Reason }[];
+  /** For each filter, the places that would join if it alone were dropped (the near misses it holds out). */
+  relax: Partial<Record<Reason, number>>;
 }
 
 const TIER_ORDER: Record<Tier, number> = { closes: 0, close: 1, gap: 2 };
@@ -93,19 +99,27 @@ export function compareRows(a: FinderRow, b: FinderRow): number {
   );
 }
 
-/** Why a place is left out before any arithmetic, or null when it passes every filter on the place itself. */
-export function placeFilter(place: PlaceMeasures | null, i: FinderInputs, izoShare: number | null): Reason | null {
-  if (!place) return 'no data';
+/** Every filter on the place itself that a place fails (before any arithmetic), in the order they are checked. */
+export function placeReasons(place: PlaceMeasures | null, i: FinderInputs, izoShare: number | null, geoid?: string): Reason[] {
+  if (!place) return ['no data'];
+  const out: Reason[] = [];
   if (i.byRight) {
     const ok = (s: string | undefined) => s === 'yes' || (i.conditionalOk && s === 'conditional');
     const by = place.zoning?.by_type;
-    if (!by || !(i.type ? ok(by[i.type]) : MULTI.some((t) => ok(by[t])))) return 'zoning';
+    if (!by || !(i.type ? ok(by[i.type]) : MULTI.some((t) => ok(by[t])))) out.push('zoning');
   }
-  if (i.maxFlood != null && (place.flood?.fema_sfha_pct ?? 0) > i.maxFlood) return 'flood';
-  if (i.qctOrDda && !(place.programs?.qct || place.programs?.dda)) return 'qct';
+  if (i.maxFlood != null && (place.flood?.fema_sfha_pct ?? 0) > i.maxFlood) out.push('flood');
+  // The next round's list (HUD 2027) when the tract is known, as the pencil reads it.
+  const qct = geoid ? qctYears(geoid).y2027 : place.programs?.qct;
+  if (i.qctOrDda && !(qct || place.programs?.dda)) out.push('qct');
   const inside = (izoShare ?? 0) > 0.5;
-  if ((i.overlay === 'inside' && !inside) || (i.overlay === 'outside' && inside)) return 'overlay';
-  return null;
+  if ((i.overlay === 'inside' && !inside) || (i.overlay === 'outside' && inside)) out.push('overlay');
+  return out;
+}
+
+/** Why a place is left out before any arithmetic (the first filter it fails), or null when it passes them all. */
+export function placeFilter(place: PlaceMeasures | null, i: FinderInputs, izoShare: number | null, geoid?: string): Reason | null {
+  return placeReasons(place, i, izoShare, geoid)[0] ?? null;
 }
 
 export interface FinderContext {
@@ -132,7 +146,8 @@ function rowFor(ctx: FinderContext, geoid: string, place: PlaceMeasures, branch:
   const lv = ctx.level === 'market' ? null : (String(ctx.level) as '30' | '50' | '60' | '80');
   const own = lv ? r.rents[lv]?.[2] ?? null : null;
   if (mkt != null) drivers.push(own != null ? `2BR market rent ${usd(mkt)} vs ${usd(own)} at ${lv}% AMI` : `2BR market rent ${usd(mkt)}`);
-  if (base.qctOrDda && branch !== 'market') drivers.push(`${place.programs?.qct ? 'QCT' : 'DDA'}: 130% basis`);
+  if (base.qctOrDda && branch !== 'market') drivers.push(`${base.qct.y2027 ? 'QCT (2027 list)' : 'DDA'}: 130% basis`);
+  else if (base.qct.y2026 && branch !== 'market') drivers.push('leaves the QCT list on 2027-01-01');
   if (sweep.bounds.zoning != null) drivers.push(`${sweep.bounds.zoning.toLocaleString('en-US')} homes by right`);
   if (sweep.bounds.depth != null) drivers.push(`market depth ${sweep.bounds.depth.toLocaleString('en-US')} homes`);
   if (r.capped) drivers.push("PHFA's credit cap binds");
@@ -141,28 +156,36 @@ function rowFor(ctx: FinderContext, geoid: string, place: PlaceMeasures, branch:
 
 export function findPlaces(ctx: FinderContext, i: FinderInputs, izoShare: (geoid: string) => number | null): FinderResult {
   const excluded: FinderResult['excluded'] = {};
-  const out = (r: Reason) => (excluded[r] = (excluded[r] ?? 0) + 1);
+  const relax: FinderResult['relax'] = {};
   const rows: FinderRow[] = [];
+  const nearMisses: FinderResult['nearMisses'] = [];
   const branches: Branch[] = i.financing === 'either' ? ['nine', 'four'] : [i.financing];
   for (const geoid of ctx.geoids) {
     const place = ctx.placeFor(geoid);
-    const why = placeFilter(place, i, izoShare(geoid));
-    if (why) {
-      out(why);
+    const why = placeReasons(place, i, izoShare(geoid), geoid);
+    // Two filters or more (or no data): left out, and not a near miss, so no arithmetic is spent on it.
+    if (!place || why.length > 1) {
+      excluded[why[0]] = (excluded[why[0]] ?? 0) + 1;
       continue;
     }
-    const base = projectBase(geoid, place!, ctx.hud, ctx.level, ctx.project, ctx.entries);
-    if (i.minDepth != null && (base.depth?.homes ?? 0) < i.minDepth) {
-      out('depth');
+    const base = projectBase(geoid, place, ctx.hud, ctx.level, ctx.project, ctx.entries);
+    if (i.minDepth != null && (base.depth?.homes ?? 0) < i.minDepth) why.push('depth');
+    if (why.length > 1) {
+      excluded[why[0]] = (excluded[why[0]] ?? 0) + 1;
       continue;
     }
-    const row = branches.map((b) => rowFor(ctx, geoid, place!, b, i, base)).sort(compareRows)[0];
-    if (i.maxCost != null && row.costPerHome > i.maxCost) {
-      out('cost');
-      continue;
+    const row = branches.map((b) => rowFor(ctx, geoid, place, b, i, base)).sort(compareRows)[0];
+    if (i.maxCost != null && row.costPerHome > i.maxCost) why.push('cost');
+    if (why.length === 0) rows.push(row);
+    else {
+      excluded[why[0]] = (excluded[why[0]] ?? 0) + 1;
+      if (why.length === 1) {
+        nearMisses.push({ row, reason: why[0] });
+        relax[why[0]] = (relax[why[0]] ?? 0) + 1;
+      }
     }
-    rows.push(row);
   }
   rows.sort(compareRows);
-  return { rows, tested: ctx.geoids.length, excluded };
+  nearMisses.sort((a, b) => compareRows(a.row, b.row));
+  return { rows, tested: ctx.geoids.length, excluded, nearMisses, relax };
 }

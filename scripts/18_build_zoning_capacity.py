@@ -40,6 +40,7 @@ def main() -> None:
     print(f"city lots: {len(lots):,}; with a district {lots['district'].notna().sum():,}; vacant {(lots['use'] == 'vacant').sum():,}")
     cap = zc.lot_capacity(lots, standards)
     izo = zc.izo_overlay(refresh=args.refresh)
+    zc.write_izo(izo)
     totals = zc.tract_totals(lots, cap, standards, tracts, izo)
     cases = zc.fixture_cases(standards)
 

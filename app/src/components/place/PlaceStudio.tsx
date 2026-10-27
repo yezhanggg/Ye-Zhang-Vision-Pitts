@@ -4,8 +4,8 @@
 // switch on, each with the document behind it. The weights only order types inside that set, at the published
 // equal-weights reference. The left panel (PlaceRail) holds every input, flat, behind Confirm.
 // Loaded on demand; the offline single file keeps MatchView.
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { rankedTracts, scoring, tractById, tractLabel, typologyById } from '../../lib/data';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { rankedTracts, scoring, tractAt, tractById, tractLabel, typologyById } from '../../lib/data';
 import { useAllResults } from '../../lib/derived';
 import { TYPOLOGY_COLORS, type MapPaint } from '../../lib/paint';
 import { presetWeights, useApp } from '../../lib/store';
@@ -20,6 +20,9 @@ import { useDemandScores } from '../../lib/place/useDemandScores';
 import { useZipView } from '../../lib/place/zipView';
 import { composeAll, screensWords, type Composed } from '../../lib/policy/compose';
 import { usePolicy } from '../../lib/policy/store';
+import { setProjectBoth } from '../../lib/project/draft';
+import type { Site } from '../../lib/project/store';
+import { inIzoAt, zoningAtPin } from '../../lib/zoning/atPin';
 import type { PolicyContext } from '../../lib/policy/applies';
 import { insertBefore, swapStance } from '../../lib/policy/report';
 import { buildPlaceReport, MEASURE_COLUMNS, placeMeasureRows } from '../../lib/export/builders/place';
@@ -30,6 +33,7 @@ import { mapPadding, usePhoneTakeTurns, useViewport } from '../../lib/viewport';
 import { useTour } from '../../lib/tour';
 import type { TractProps } from '../../lib/types';
 import ChatPill from '../ChatPill';
+import TractSearch from '../TractSearch';
 import MapView from '../MapView';
 import { DetailHeader, placeDataFor, StartCard, SuggestTooltip, TractDetail } from '../MatchView';
 import PanelFrame, { RightColumn } from '../PanelFrame';
@@ -42,6 +46,29 @@ import ZipPanel, { useZipOverlays } from './ZipPanel';
 import PoliciesCard from './flat/PoliciesCard';
 import ProjectPanel from './project/ProjectPanel';
 import { useProjectModel } from './project/useProjectModel';
+
+/** Read the map at the pin into the pin's tract (lib/project/store Site.pin): the district under it, which Try a lot then
+ *  opens on when it has standards, and the IZ-O. With no pin, every reading goes, so nothing stale is left behind. */
+function readPin(pin: { lng: number; lat: number } | null) {
+  setProjectBoth((s) => {
+    const sites: Record<string, Site> = Object.fromEntries(Object.entries(s.sites).map(([g, v]) => [g, { ...v, pin: undefined }]));
+    const g = pin ? tractAt(pin.lng, pin.lat) : null;
+    if (pin && g) {
+      const z = zoningAtPin(pin.lng, pin.lat);
+      const code = z.kind === 'none' ? null : z.code;
+      sites[g] = { ...sites[g], ...(z.kind === 'computed' ? { district: z.code } : {}), pin: { code, computed: z.kind === 'computed', near: z.kind !== 'none' && z.near, why: z.kind === 'not_computed' ? z.why : null, izo: inIzoAt(pin.lng, pin.lat) } };
+    }
+    return { sites };
+  });
+}
+
+/** The pin dropped by dragging: a new pin there, and the tract under it (none outside the city). */
+function dropPin(lng: number, lat: number) {
+  const g = tractAt(lng, lat);
+  const { set, select } = useApp.getState();
+  set({ pin: { lng, lat, label: 'Dropped pin' } });
+  if (g) select(g);
+}
 
 const TYPOLOGY_INDEX = new Map(scoring.typologies.map((t, i) => [t.id, i]));
 /** The fit order's weights: the published equal-weights reference, now that no focus picks a preset. */
@@ -88,7 +115,8 @@ function StudioDetail({ t, c, fitOrder, words, onClose }: { t: TractProps; c: Co
   const { place, hud } = placeDataFor(t.GEOID);
   const m = useProjectModel(t.GEOID, place, hud);
   if (!place || !hud) return null;
-  const ctx: PolicyContext | null = m ? { label: tractLabel(t), place, cap: m.cap, homes: m.mix.homes, branch: m.branch, qctOrDda: m.qctOrDda, score: m.sheet.score, draftSheet: m.sheet.sheet.status === 'draft' } : null;
+  const pinIzo = m?.base.project.sites[t.GEOID]?.pin?.izo;
+  const ctx: PolicyContext | null = m ? { label: tractLabel(t), place, cap: m.cap, homes: m.mix.homes, branch: m.branch, qctOrDda: m.qctOrDda, qct: m.base.qct, score: m.sheet.score, draftSheet: m.sheet.sheet.status === 'draft', pinIzo } : null;
   return (
     <div>
       <DetailHeader t={t} onClose={onClose} actions={<StudioExport t={t} place={place} hud={hud} c={c} words={words} />} />
@@ -139,6 +167,9 @@ export default function PlaceStudio() {
     return { paint, counts };
   }, [suggestions]);
 
+  useEffect(() => readPin(pin), [pin]);
+
+
   const zipMode = useZipView((s) => s.area) === 'zip';
   const zipOverlays = useZipOverlays(zipMode, paint);
   const t = selectedId ? tractById.get(selectedId) : null;
@@ -176,6 +207,7 @@ export default function PlaceStudio() {
           hillshade={layers.hillshade}
           padding={padding}
           pin={pin}
+          onPinDrag={dropPin}
           elevationReadout
           onSelect={(id) => select(useApp.getState().selectedId === id ? null : id)}
           idleOrbit
@@ -188,6 +220,12 @@ export default function PlaceStudio() {
       <PlaceRail t={t ?? null} rec={rec} zipMode={zipMode} title={UI.matchTab} legend={<SuggestionLegend focus={words} level={LEVEL_LABEL[plan.level]} counts={counts} noneLabel={noneLabel} />} />
       <RightColumn>
         <ChatPill />
+        {/* The address box in sight, so "search above" on the start card is true without opening the chat. */}
+        {!zipMode && (
+          <div className="pointer-events-auto w-full">
+            <TractSearch dense value={selectedId} onChange={select} showQuickPicks={false} label="Address or place" />
+          </div>
+        )}
         <PanelFrame inline>
           {zipMode ? (
             <ZipPanel suggestions={suggestions} hud={hudTable} level={plan.level} />

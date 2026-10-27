@@ -159,7 +159,7 @@ export default function FinderCard({ suggestions }: { suggestions: Map<string, R
             </button>
           </div>
           <SourceLine>
-            Order: places that close first (gap under half the developer fee, PHFA’s feasibility test), then close calls (covered only by deferring more of the fee), then gaps; within each, places whose size range zoning and market depth leave whole, then the smaller gap a home, then more PHFA points from the place, then the lower cost a home. Each place is swept across your homes, cut by the homes zoning allows by right and, for tax credits, market depth (renters at or below 60% AMI within a mile, less tax credit homes there, × 10%). Costs and rents beyond the place’s own data are the project card’s example inputs. {AWARD_NOTE} {stamp()}. {SCREENING_NOTE}
+            Order: places that close first (gap under half the developer fee and cash flow at or above zero in years 1–10, PHFA’s feasibility tests), then those over PHFA’s limit (covered only by deferring more than half the fee), then gaps; within each, places whose size range zoning and market depth leave whole, then the smaller gap a home, then more PHFA points from the place, then the lower cost a home. Each place is swept across your homes, cut by the homes zoning allows by right and, for tax credits, market depth (renters at or below 60% AMI within a mile, less tax credit homes there, × 10%). Costs and rents beyond the place’s own data are the project card’s example inputs. {AWARD_NOTE} {stamp()}. {SCREENING_NOTE}
           </SourceLine>
         </>
       )}

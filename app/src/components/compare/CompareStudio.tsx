@@ -1,6 +1,6 @@
 // Analysis > Compare places as three strips: place A on the left and place B on the right, each with its map on top
 // (colored under that side's screens and income level) and its inputs underneath (the Place tab's flat sections: the
-// project, the mix and income, the site, the policies and screens, open space, the tax credit entries, the pencil), and
+// project, the mix and income, the site, the policies and screens, open space, the pencil), and
 // the comparison in the middle: at a glance, what each place would get, why they differ and the project
 // in each place. Side A uses the Place tab's settings; side B
 // shares them or, with "Separate settings", keeps its own (lib/compare/store, lib/project/side). So it reads two
@@ -553,12 +553,12 @@ function Studio({ active }: { active: boolean }) {
                 { value: 'separate', label: 'Its own' },
               ]}
             />
-            <p className="text-caption leading-snug text-slate-500">{separate ? 'B keeps its own screens, residents, income and project, starting from a copy of A. It can be the same place as A. Tax credit entries stay shared; B’s financing picks its credit.' : 'B is read under A’s screens, residents, income and project. Its own lot, open space and tax credit site lines are below; Its own lets B differ in anything.'}</p>
+            <p className="text-caption leading-snug text-slate-500">{separate ? 'B keeps its own screens, residents, income and project, starting from a copy of A. It can be the same place as A. Tax credit entries stay shared; B’s financing picks its credit.' : 'B is read under A’s screens, residents, income and project. Its own lot and open space are below; Its own lets B differ in anything.'}</p>
           </div>
           {separate ? (
             <SideInputs key="B" side={SIDE_B} info={B} />
           ) : tb && B.p && hudTable ? (
-            <SideInputs key="B-site" side={SIDE_A} info={B} only={['build', 'open', 'score']} />
+            <SideInputs key="B-site" side={SIDE_A} info={B} only={['build', 'open']} />
           ) : (
             <p className="text-caption text-slate-600">Pick place B above.</p>
           )}

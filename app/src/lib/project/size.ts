@@ -5,9 +5,10 @@
 // lots (lib/zoning/capacity) and, for tax credit financing, by market depth (lib/demand/depth). About ten sizes are
 // run across it, then each edge of the closing sizes is found exactly by halving.
 //
-// Tiers, from PHFA's own feasibility test (lib/pencil/finance checks): "closes" when the gap is under half the
-// developer fee (PHFA feasibility); "close call" when deferring more of the fee still covers it; otherwise "gap".
-// Market rate closes when the yield on cost reaches the target; it has no close call.
+// Tiers, from PHFA's own feasibility tests (lib/pencil/finance checks): "closes" when the gap PHFA counts (soft funds
+// not yet committed are gap) is under half the developer fee and cash flow stays at or above zero in years 1–10;
+// "over PHFA's limit" when deferring more of the fee would cover the gap but PHFA would not accept it; otherwise "gap".
+// Only "closes" counts as closing in the size sweep. Market rate closes when the yield on cost reaches the target.
 import type { PencilResult } from '../pencil/finance';
 import type { Branch } from '../pencil/inputs';
 import { atSize, type AtSize, type ProjectBase } from './model';
@@ -15,7 +16,7 @@ import { atSize, type AtSize, type ProjectBase } from './model';
 export type Tier = 'closes' | 'close' | 'gap';
 export type Limit = 'your range' | 'zoning' | 'depth' | 'credit cap' | 'gap';
 
-export const TIER_WORD: Record<Tier, string> = { closes: 'closes', close: 'close call', gap: 'gap' };
+export const TIER_WORD: Record<Tier, string> = { closes: 'closes', close: "over PHFA's limit", gap: 'gap' };
 export const LIMIT_WORD: Record<Limit, string> = {
   'your range': 'your largest size',
   zoning: 'homes zoning allows by right here',
@@ -27,7 +28,7 @@ export const LIMIT_WORD: Record<Limit, string> = {
 export interface SizeRow {
   homes: number;
   tier: Tier;
-  /** Gap before deferring fee; below zero is money to spare. */
+  /** Gap before deferring fee; below zero is headroom (credits not needed). */
   gap: number;
   run: AtSize;
 }
@@ -55,11 +56,12 @@ export interface Sweep {
 export function tierOf(r: PencilResult, targetYield: number): Tier {
   if (r.homes === 0) return 'gap';
   if (r.branch === 'market') return r.market && r.market.yieldOnCost.value >= targetYield ? 'closes' : 'gap';
+  if (r.checks.find((c) => c.label === 'Cash flow, years 1–10')?.ok === false) return 'gap';
   if (r.checks.find((c) => c.label === 'PHFA feasibility')?.ok) return 'closes';
   return r.gapAfterFee <= 0 ? 'close' : 'gap';
 }
 
-const passes = (t: Tier) => t !== 'gap';
+const passes = (t: Tier) => t === 'closes';
 
 /** Sizes to run across a range: both ends and about `n` steps between. */
 export function grid(lo: number, hi: number, n = 10): number[] {

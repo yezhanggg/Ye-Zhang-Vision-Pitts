@@ -1,6 +1,7 @@
 // What a place brings to the tax credit score sheet: the one line it settles (transit), and the measured figures shown
 // next to the lines a person decides. Sun, shade, tree canopy and vacant lots come from data/lazy/site_tract.json
 // (scripts/16_build_canopy.py); the rest is the place data the Analysis tab already carries. Loaded with the sheet.
+import { qctChangeWords, qctYears } from '../pencil/designations';
 import siteJson from '../../data/lazy/site_tract.json';
 import { isNum } from '../format';
 import { CITY_GEOID, bundledValues } from '../explore/catalog';
@@ -115,10 +116,12 @@ export function evidenceFor(geoid: string, place: PlaceMeasures | null = placeFo
 }
 
 /** The federal and state place designations that change the financing rather than the score. */
-export function designations(place: PlaceMeasures | null): { key: string; label: string; on: boolean | null; note: string }[] {
+export function designations(place: PlaceMeasures | null, geoid?: string): { key: string; label: string; on: boolean | null; note: string }[] {
   const p = place?.programs;
+  const q = geoid ? qctYears(geoid) : null;
+  const change = q ? qctChangeWords(q) : null;
   return [
-    { key: 'qct', label: 'Qualified Census Tract', on: p?.qct ?? null, note: 'Eligible basis counts at 130%. More equity, no points.' },
+    { key: 'qct', label: q ? 'Qualified Census Tract (HUD 2027 list)' : 'Qualified Census Tract', on: q ? q.y2027 : (p?.qct ?? null), note: `Eligible basis counts at 130%. More equity, no points.${change ? ` ${change}` : ''}` },
     { key: 'dda', label: 'Difficult Development Area', on: p?.dda ?? null, note: 'Eligible basis counts at 130%. More equity, no points.' },
     { key: 'oz', label: 'Opportunity Zone', on: p?.oz ?? null, note: 'PHFA names Opportunity Zones among the programs that can back the community revitalization lines.' },
   ];

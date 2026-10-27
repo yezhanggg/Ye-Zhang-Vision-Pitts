@@ -380,6 +380,13 @@ Method, sources and checks: [docs/data/pencil.md](data/pencil.md).
 | Tax credit rents | MTSP limits at 1.5 persons a bedroom, rounded down, less utilities, never above the market rent for the size | The program's rule; capping at market keeps the income honest where tax credit rents exceed what the market pays | Author |
 | Boost | Automatic in a QCT or DDA; PHFA's state boost only as a 9% waiver the person turns on | §42(d)(5)(B) and PHFA §2.6 | Author |
 | Developer fee deferral | Deferred against the gap first; the deferred share feeds line 4.5.9 | How a gap is usually closed, and the measure PHFA's draft scores | Author |
+| Plan in force | The plan the tax credit sheet is scored on, the 2027/2028 draft by default ("by round date": the 2027-02-17 round runs under it once adopted), labeled draft until adopted; the adopted plan one switch away | The next round's rules, not the last round's | Ye (2026-10-21) |
+| Underwriting values | PHFA's on tax credit paths, tagged sourced: 5% vacancy, $500 / $375 reserves (general / 55+), 1.15 coverage, +2% / +3% trends; market rate keeps the examples | PHFA underwrites with these (Tab 2) | Ye (2026-10-21) |
+| Committed and expected funds | Two inputs; PHFA's tests read committed only, and the card shows the gap if the expected funds come. New amounts start as expected | PHFA counts unsecured sources as gap (§3.2.20; draft §3.4.2) | Author |
+| Loan and cash flow | Loan held to the debt that keeps cash flow at or above zero through year 10; negative cash flow before year 11 fails; the deferred fee repaid by year 15 is shown, not counted | PHFA's threshold; the 15-year repayment is investor practice (adopted §5.4 for fee waivers only, dropped in the draft) | Ye (2026-10-21) |
+| Headroom | A gap below zero is headroom: credits sized to need, shown as the share of the most the project could get | PHFA issues credits to need (adopted §2.10; draft §7.2) | Author |
+| QCT list | HUD's 2027 list for the pencil's boost, the finder's QCT filter and the sheet's designation line; the scored subsidy factor stays on 2026 | Allocations after 2026-12-31 use 2027's; changing the scores is a separate decision | Author |
+| Where it would close (a line under Sensitivity) | One input at a time (hard cost, credit price, committed soft funds, homes moved to 60% AMI; market rate: hard cost, rents), with every other input held | Arithmetic on the person's own inputs; each line says whose number it moves | Author |
 | Market rate | Yield on cost against a target, the rent that breaks even, the land value the rents support; the IZ-O set-aside applied at 20 or more homes where most of the tract is inside | The three questions a market-rate developer asks first | Author |
 | Not modeled | Construction loan, lease-up, multi-year pro forma, abatements, subsidies, historic or acquisition credits | Each needs a deal; the card says it is arithmetic, not an underwriting | Author |
 | Offline file | Not included | No room under the 6 MB mark | Author |
@@ -393,10 +400,10 @@ Method: [docs/data/finder.md](data/finder.md).
 | Where | Find places in the Place view's start card (no tract picked); the paths on "Does it pencil"; no new sub-tab | Ye's choice, 2026-10-20 | Ye |
 | Standing | Ranks, tiers and figures; no composite number or "/ 100" | Ye's rule since update 3 | Ye |
 | Award odds | PHFA points against the minimum with a low–high range; chance of award not modeled | PHFA publishes no past scores to draw a base rate from | Ye |
-| Tiers | Closes = gap under 50% of the developer fee (PHFA feasibility); close call = covered only by deferring more of the fee; market rate closes at the target yield | PHFA's own test, already on the pencil | Author |
+| Tiers | Closes = the gap PHFA counts (uncommitted soft funds are gap) under 50% of the developer fee and cash flow at or above zero in years 1–10; over PHFA's limit = covered only by deferring more than half the fee; market rate closes at the target yield. Only "closes" counts in the sweep | PHFA's own tests; "close call" renamed "over PHFA's limit" because PHFA does not accept it, and because "close call" means a near tie between types elsewhere in the app | Ye (2026-10-21) |
 | Size range | The person's range cut by homes by right (vacant and lived-in lots) and, for tax credits, market depth | Zoning and demand bound a project before money does | Author |
 | Market depth | Renters ≤ 60% AMI within a mile (60% = ≤ 50% + ⅓ of the 50–80% band), less tax credit homes within the mile, × 10% (5–15%) | A common screening capture rate, labeled an example; city tracts only | Author |
-| Order | Closes → close call → gap; uncut range first; smaller gap a home; more place points; lower cost a home | Printed under every list; the person decides | Author |
+| Order | Closes → over PHFA's limit → gap; uncut range first; smaller gap a home; more place points; lower cost a home | Printed under every list; the person decides | Author |
 | PHFA dates | 2027 9% due 2027-02-17 3:00 p.m.; 4% rolling to 2027-07-01; from the 2027/2028 draft, checked 2026-10-20 | The plan was still a draft; re-check on adoption | Author |
 | Map tint by tier | Not built | No room under the 6 MB mark (80 bytes left after this update) | Author |
 | Offline file | Not included, apart from the 82-byte export hook | No room under the 6 MB mark | Author |

@@ -58,4 +58,15 @@ describe('findPlaces', () => {
     const r = findPlaces({ ...ctx, geoids: [HAZELWOOD], level: 'market' }, { ...DEFAULT_INPUTS, financing: 'market' }, izo);
     expect(r.rows[0].points).toBeNull();
   });
+  it('near misses: one filter away, and dropping that filter alone adds exactly them', () => {
+    const i = { ...DEFAULT_INPUTS, qctOrDda: true, overlay: 'outside' as const };
+    const r = findPlaces(ctx, i, izo);
+    for (const reason of ['qct', 'overlay'] as const) {
+      const without = findPlaces(ctx, reason === 'qct' ? { ...i, qctOrDda: false } : { ...i, overlay: 'any' }, izo);
+      expect(without.rows.length - r.rows.length).toBe(r.relax[reason] ?? 0);
+      const joined = new Set(without.rows.map((x) => x.geoid));
+      for (const m of r.nearMisses.filter((x) => x.reason === reason)) expect(joined.has(m.row.geoid)).toBe(true);
+    }
+    for (let k = 1; k < r.nearMisses.length; k++) expect(compareRows(r.nearMisses[k - 1].row, r.nearMisses[k].row)).toBeLessThanOrEqual(0);
+  });
 });

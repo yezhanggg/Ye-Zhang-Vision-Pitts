@@ -1,6 +1,6 @@
 // The Place tab's left panel online: wider than the offline one, every input flat and in view (place/flat), and every
 // change waiting for Confirm. The panel edits a draft (lib/project/draft): the project, its mix and income, the site,
-// the policies and screens, open space, the tax credit entries, the pencil, or the finder's form. Confirm applies it,
+// the policies and screens, open space, the pencil, or the finder's form. Confirm applies it,
 // and only then do the map, the suggestion and the right panel change.
 // Loaded on demand; the offline single file keeps MatchView's own panel, which applies every change at once.
 import type { ReactNode } from 'react';

@@ -87,12 +87,16 @@ Only tract totals are written: no lot, parcel number, owner or address leaves th
 
 §907.04.A: new construction or substantial improvement of 20 or more homes in the IZ-O sets aside at least 10% of them, rounded up. They are for households at or below 50% of area median income to rent, or 80% to own, for 35 years. The overlay's boundary is the City's own feature layer (2,457 acres: Bloomfield, the three Lawrencevilles, Polish Hill, and parts of Oakland). The card applies the set-aside where more than half of the tract is inside, and says to check the site where less is. The citywide affordable housing bonus (Council Bill 2025-1545) was pending, not adopted, on 2026-10-15; it is shown as proposed.
 
+## At the pin (Place online)
+
+An address searched on the Place view, or the pin dragged onto a lot, is read against the same zoning polygons (`lib/zoning/atPin.ts`). A geocoded address often lands on the street centerline, which no district covers. A miss looks 15, 30 and then 50 m around the point in 8 directions, and the nearest ring that reaches a district decides by majority. A district with standards opens Try a lot on it, with the line "District at your pin: …, a map reading; confirm with the Zoning Administrator". One of the 34 districts without standards is named with the reason the standards file gives. The IZ-O is tested at the pin against the overlay outline, simplified at 15 ft (`app/src/data/lazy/izo_overlay.json`, written by step 18). When a pin is in the tract, that reading replaces the tract-share test for the policy row and the pencil's set-aside. The reading lives on the person's project for that tract and is cleared when the pin goes. Nothing about the lot is written by the build: the outline is the City's published overlay boundary.
+
 ## Limits
 
 - **Not a determination:** a reading of the code, current through 2026-09-16. Later amendments are not in it.
 - **Upper bound:** vacant land is not buildable land, so the vacant-lot homes are a ceiling.
 - **Assumed home size:** envelope districts count homes at an assumed size, and the actual building depends on its design, code and parking.
-- **Tract test, not site test:** the overlay is tested by tract share, not by site.
+- **Tract test unless a pin is set:** without a pin, the overlay is tested by tract share, not by site.
 
 ## Rebuild
 
