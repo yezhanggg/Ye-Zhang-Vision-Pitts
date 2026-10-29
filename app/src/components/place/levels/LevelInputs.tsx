@@ -1,6 +1,7 @@
 // The project's inputs (levels.ts): numbered groups, always open, in the order the right panel answers them, the same
 // at every level and on each side of Compare places. Project (development type, units or floor area, stories, income
-// level, unit mix), Capital (the capital stack's basics), Open space, Policies; the Parcel level adds its Site (the lot
+// level, unit mix), Capital (the capital stack's basics), Open space (both can be turned off), Policies (what applies
+// here), I want to study; the Parcel level adds its Site (the lot
 // picked), and before a lot is picked offers Project and Find places. Online only: loaded on demand.
 import { useMemo, type ReactNode } from 'react';
 import { isSeniorAge, LEVEL_LABEL } from '../../../lib/place/plan';
@@ -25,35 +26,62 @@ import { useBrowse } from './browse';
 import { FinderInputs } from '../finder/FinderCard';
 import { MixInputs } from '../project/DemandMix';
 import { useProjectModel } from '../project/useProjectModel';
-import LotCard from './LotCard';
 import { INPUT_TITLE, inputsFor, type InputGroup, type Level } from './levels';
+import { confirmNow, useConfirmed } from '../../../lib/project/confirm';
 
 const FIELD = 'w-full rounded-lg border border-stone-300 bg-white px-2 py-1 text-small text-slate-900 tnum focus:border-violet-500 focus:outline-none';
 const NOTE = 'text-small text-slate-600';
 
-/** One numbered group: its heading, then its inputs. */
+/** Capital and Open space can be turned off: the results then leave the money (or the open space) out. */
+const TOGGLE: Partial<Record<InputGroup, { key: 'capitalOff' | 'openOff'; off: string }>> = {
+  money: { key: 'capitalOff', off: 'Off: the money is not checked. Zoning, the lot and the area still are.' },
+  open: { key: 'openOff', off: 'Off: no open space is set aside on the lot.' },
+};
+
+/** The on/off switch in a group's heading. */
+function GroupSwitch({ id }: { id: InputGroup }) {
+  const side = useSide();
+  const t = TOGGLE[id]!;
+  const on = !side.project((s) => s[t.key]);
+  return (
+    <button type="button" role="switch" aria-checked={on} aria-label={`${INPUT_TITLE[id]} ${on ? 'on' : 'off'}`} title={on ? 'Turn off' : 'Turn on'} onClick={() => side.project.setState({ [t.key]: on })} className="ml-auto flex items-center gap-1.5 text-caption font-medium normal-case tracking-normal text-slate-600">
+      {on ? 'On' : 'Off'}
+      <span aria-hidden className={cx('relative inline-block h-4 w-7 rounded-full transition-colors', on ? 'bg-violet-600' : 'bg-stone-300')}>
+        <span className="absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-all" style={{ left: on ? 14 : 2 }} />
+      </span>
+    </button>
+  );
+}
+
+/** One numbered group: its heading (with its on/off switch, for Capital and Open space), then its inputs. */
 function Group({ n, id, children }: { n: number; id: InputGroup; children: ReactNode }) {
+  const side = useSide();
+  const t = TOGGLE[id];
+  const off = side.project((s) => (t ? !!s[t.key] : false));
   return (
     <section data-edit={id} className="border-t border-stone-200/80 pt-3">
       <h3 className="flex items-center gap-1.5 text-small font-bold uppercase tracking-wide text-violet-700">
         <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-100 text-[11px] font-semibold text-violet-800 tnum">{n}</span>
         {INPUT_TITLE[id]}
+        {t && <GroupSwitch id={id} />}
       </h3>
-      <div className="space-y-2 pt-2">{children}</div>
+      <div className="space-y-2 pt-2">{off ? <p className={NOTE}>{t!.off}</p> : children}</div>
     </section>
   );
 }
 
 const zipWord = (z: string) => `ZIP ${z} · ${zipPlaces(z, (g) => tractLabel(tractById.get(g)), 2)}`;
 
-/** The ZIP picker at the top of the panel at ZIP level (the map's ZIP outlines pick too). */
-export function ZipPicker() {
-  const zip = useZipView((s) => s.zip);
+/** The ZIP picker at the top of the panel at ZIP level (the map's ZIP outlines pick too). Compare places passes each
+ *  side's own `zip` and `onChange`; without them it reads and sets the Place tab's ZIP. */
+export function ZipPicker({ zip: own, onChange, label = 'ZIP code' }: { zip?: string | null; onChange?: (zip: string | null) => void; label?: string } = {}) {
+  const shared = useZipView((s) => s.zip);
+  const zip = own === undefined ? shared : own;
   const zips = useMemo(() => [...placeZips].sort(), []);
   return (
     <label className="block">
-      <span className="sr-only">ZIP code</span>
-      <select className={cx(FIELD, 'py-1.5')} value={zip ?? ''} onChange={(e) => useZipView.getState().set({ zip: e.target.value || null })} aria-label="ZIP code">
+      <span className="sr-only">{label}</span>
+      <select className={cx(FIELD, 'py-1.5')} value={zip ?? ''} onChange={(e) => (onChange ?? ((z) => useZipView.getState().set({ zip: z })))(e.target.value || null)} aria-label={label}>
         <option value="">Pick a ZIP code…</option>
         {zips.map((z) => (
           <option key={z} value={z}>
@@ -150,8 +178,6 @@ function PlaceInputs({ level, t, rec }: { level: Level; t: TractProps | null; re
   useLotDefaults(parcel ? m : null, type, lot);
   const body = (g: InputGroup): ReactNode => {
     switch (g) {
-      case 'site':
-        return lot ? <LotCard lot={lot} izo={pinIzo} /> : <p className={NOTE}>No lot yet.</p>;
       case 'who':
         return null;
       case 'project':
@@ -168,7 +194,9 @@ function PlaceInputs({ level, t, rec }: { level: Level; t: TractProps | null; re
           <p className={NOTE}>For housing projects.</p>
         );
       case 'policy':
-        return <PolicyPicker ctx={ctx} />;
+        return <PolicyPicker ctx={ctx} part="applies" />;
+      case 'study':
+        return <PolicyPicker ctx={ctx} part="study" />;
       case 'finder':
         return <FinderInputs />;
     }
@@ -185,8 +213,10 @@ function PlaceInputs({ level, t, rec }: { level: Level; t: TractProps | null; re
   );
 }
 
-function ZipInputs() {
-  const zip = useZipView((s) => s.zip);
+/** The inputs at the ZIP level: the Place tab's ZIP, or the `zip` given (a side of Compare places). */
+export function ZipInputs({ zip: own }: { zip?: string | null } = {}) {
+  const shared = useZipView((s) => s.zip);
+  const zip = own === undefined ? shared : own;
   const side = useSide();
   const m = useZipModel(zip);
   const counts = useMemo(() => (zip ? zipPolicyCounts(zip) : null), [zip]);
@@ -207,8 +237,10 @@ function ZipInputs() {
         ) : (
           <p className={NOTE}>For housing projects.</p>
         );
+      case 'study':
+        return <PolicyPicker ctx={null} counts={counts} part="study" />;
       default:
-        return <PolicyPicker ctx={null} counts={counts} />;
+        return <PolicyPicker ctx={null} counts={counts} part="applies" />;
     }
   };
   return (
@@ -222,19 +254,43 @@ function ZipInputs() {
   );
 }
 
-/** The project's inputs for one side of Compare places (the side in context), read as at the Tract level. */
-export function ProjectInputs({ t, rec }: { t: TractProps; rec: Recommendation | null }) {
-  return <PlaceInputs level="tract" t={t} rec={rec} />;
+/** The project's inputs for one side of Compare places (the side in context), at its level: a tract on its typical
+ *  lot, or (Parcel) the lot picked in the tract (ZIP code: ZipInputs). */
+export function ProjectInputs({ t, rec, level = 'tract' }: { t: TractProps; rec: Recommendation | null; level?: Exclude<Level, 'zip'> }) {
+  return <PlaceInputs level={level} t={t} rec={rec} />;
+}
+
+/** At the bottom of Test a project: the right panel shows the results only for the inputs confirmed here
+ *  (lib/project/confirm). */
+function ConfirmBar() {
+  const { confirmed, ever } = useConfirmed();
+  return (
+    <div className="sticky bottom-0 -mx-3 border-t border-stone-200/80 bg-white/95 px-3 pb-1 pt-2.5 backdrop-blur" data-confirm-bar>
+      <button type="button" onClick={confirmNow} disabled={confirmed} className="w-full rounded-lg bg-violet-600 px-2 py-1.5 text-small font-semibold text-white hover:bg-violet-700 disabled:opacity-50">
+        {confirmed ? 'Results up to date' : ever ? 'Confirm changes' : 'Confirm and test'}
+      </button>
+      <p className="mt-1 text-caption leading-snug text-slate-600">{confirmed ? 'The results on the right match these inputs.' : 'The right panel shows the place until you confirm.'}</p>
+    </div>
+  );
 }
 
 export default function LevelInputs({ t, rec }: { t: TractProps | null; rec: Recommendation | null }) {
   const level = useZipView((s) => s.area);
   const mode = useBrowse((s) => s.mode);
+  const zip = useZipView((s) => s.zip);
+  const hasLot = useSide().project((s) => (t ? !!s.sites[t.GEOID]?.lot : false));
+  // Confirm once there is something to test: a lot (Parcel), a tract, a ZIP code.
+  const ready = level === 'zip' ? !!zip : level === 'parcel' ? hasLot : !!t;
   if (mode === 'browse')
     return (
       <div className="space-y-2 border-t border-stone-200/80 pt-3 text-small leading-snug text-slate-700" data-browse-note>
         <p>{level === 'parcel' ? 'Pick a lot.' : level === 'zip' ? 'Pick a ZIP code.' : 'Pick a neighborhood.'} See what it needs most, then test the best fit.</p>
       </div>
     );
-  return level === 'zip' ? <ZipInputs /> : <PlaceInputs level={level} t={t} rec={rec} />;
+  return (
+    <>
+      {level === 'zip' ? <ZipInputs /> : <PlaceInputs level={level} t={t} rec={rec} />}
+      {ready && <ConfirmBar />}
+    </>
+  );
 }

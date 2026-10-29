@@ -24,7 +24,8 @@ const Row = ({ k, children, title }: { k: string; children: ReactNode; title?: s
   </div>
 );
 
-export default function LotCard({ lot, izo }: { lot: SiteLot; izo: boolean | null | undefined }) {
+/** `zoning` false: the district row is left out (LotZoning shows the zoning beside it). */
+export default function LotCard({ lot, izo, zoning = true }: { lot: SiteLot; izo: boolean | null | undefined; zoning?: boolean }) {
   const m = useLotManifest();
   const hours = lotSunHours(lot, m);
   const std = lot.district ? STANDARD_BY_CODE.get(lot.district) : undefined;
@@ -35,16 +36,18 @@ export default function LotCard({ lot, izo }: { lot: SiteLot; izo: boolean | nul
       <Row k="Lot area" title="The county assessment's lot area, or the lot outline's own area where the assessment has none">
         {lotSize(lot.sqft)}
       </Row>
-      <Row k="Zoning" title="The district at the lot's center on the City's zoning map; confirm with the Zoning Administrator">
-        {lot.district ? `${lot.district} · ${districtName(lot.district)}${std ? '' : ' (no standards here)'}` : 'not read'}
-      </Row>
+      {zoning && (
+        <Row k="Zoning" title="The district at the lot's center on the City's zoning map; confirm with the Zoning Administrator">
+          {lot.district ? `${lot.district} · ${districtName(lot.district)}${std ? '' : ' (no standards here)'}` : 'not read'}
+        </Row>
+      )}
       {lot.frontageFt != null && lot.depthFt != null && (
         <Row k="Shape" title="The short and long sides of the lot's smallest enclosing rectangle, scaled to its area: a rough reading">
           about {lot.frontageFt} × {lot.depthFt} ft
         </Row>
       )}
       <Row k="Homes today">{lot.existing == null ? 'not recorded' : lot.existing}</Row>
-      {izo != null && <Row k="Inclusionary overlay">{izo ? 'yes, at the pin' : 'no'}</Row>}
+      {zoning && izo != null && <Row k="Inclusionary overlay">{izo ? 'yes, at the pin' : 'no'}</Row>}
       {hours && hours.some((h) => h != null) && (
         <Row k="Direct sun" title="Hours of direct sun on the lot (roof, yard and trees together) on June 21, September 22 and December 21, from the 2015 lidar surface">
           {['Jun', 'Sep', 'Dec'].map((d, i) => (hours[i] == null ? null : `${d} ${hours[i]!.toFixed(1)} h`)).filter(Boolean).join(' · ')}

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { activeFactorIds, focusTracts, scoring, tractById } from './data';
+import { activeFactorIds, scoring, tractById } from './data';
 import type { Pin, Scenario, Weights } from './types';
 
 /** Top-level sections: Explore (data browser) and Analysis (Match, Compare tracts, Compare scenarios). */
@@ -247,15 +247,9 @@ export const useApp = create<AppState>((set, get) => ({
     set({ ui });
   },
   setMode: (mode) => {
-    const s = get();
     const patch: Partial<AppState> = { mode };
     if (mode !== 'explore') patch.lastAnalysis = mode;
-    if (mode === 'tracts' && !s.compareId) {
-      const others = focusTracts.filter((t) => t.GEOID !== s.selectedId);
-      patch.compareId = others[0]?.GEOID ?? null;
-      if (!s.selectedId) patch.selectedId = others[1]?.GEOID ?? null;
-    }
-    if (mode === 'scenarios' && !s.selectedId) patch.selectedId = focusTracts[0]?.GEOID ?? null;
+    // No example place is picked for you: every view opens with nothing selected until you click or search.
     set(patch);
   },
   select: (id) => {

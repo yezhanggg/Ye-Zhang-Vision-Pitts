@@ -1,27 +1,38 @@
-// Parcels as Explore's open boundary (online only): the county's lot outlines in view from close zoom, vacant lots
-// tinted, and a card with the clicked lot's facts (lot number, use, area, zoning, shape, homes today, sun). While Sun
-// and shadow is on, its By parcel view draws the lots instead (it opens on that view). Another boundary turned on
-// closes Parcels. Loaded on demand; writes the lots into the store the Explore map reads (lib/explore/parcelShadowStore).
-import { useCallback, useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+// Parcels as Explore's open boundary (online only): the county's lot outlines in view from close zoom, and a click
+// picks a lot, whose facts and zoning fill the right panel (components/explore/ParcelSummary). The lots follow the
+// Data layers: the land-use map colors each lot by its own use, the zoning map shows through outlines only, and
+// otherwise vacant lots are tinted. While Sun and shadow is on, its By parcel view draws the lots instead (it opens
+// on that view) and its picked lot fills the panel. Another boundary turned on closes Parcels. Loaded on demand;
+// writes the lots into the store the Explore map reads (lib/explore/parcelShadowStore).
+import { useCallback, useEffect, useMemo } from 'react';
+import { useLandUseLayer } from '../../lib/explore/landUseMap';
 import { useParcelShadow } from '../../lib/explore/parcelShadowStore';
 import { useSunShadow } from '../../lib/explore/sunShadowStore';
+import { useZoningLayer } from '../../lib/explore/zoning';
 import { lotByRow } from '../../lib/parcel/lots';
 import { usePlaceLots } from '../../lib/parcel/usePlaceLots';
-import type { SiteLot } from '../../lib/project/store';
 import { useApp } from '../../lib/store';
-import LotCard from '../place/levels/LotCard';
 
 const BOUNDARIES = ['tracts', 'bg', 'zcta', 'muni'] as const;
+const openPanel = () => useApp.getState().set({ browsePanel: true });
 
 export default function ParcelsBoundary() {
   const on = useParcelShadow((s) => !!s.boundary);
+  const picked = useParcelShadow((s) => s.picked ?? null);
   const sunOn = useSunShadow((s) => s.on);
-  const [picked, setPicked] = useState<SiteLot | null>(null);
+  const landOn = useLandUseLayer((s) => s.on);
+  const zoningOn = useZoningLayer((s) => s.on);
   const onPick = useCallback((chunk: string, row: number) => {
-    void lotByRow(chunk, row).then((l) => setPicked((p) => (l && p && p.chunk === l.chunk && p.row === l.row ? null : l)));
+    void lotByRow(chunk, row).then((l) => {
+      const p = useParcelShadow.getState().picked;
+      // A second click on the picked lot clears it.
+      useParcelShadow.setState({ picked: l && p && p.chunk === l.chunk && p.row === l.row ? null : l });
+      if (l) openPanel();
+    });
   }, []);
-  const lots = usePlaceLots(on && !sunOn, picked ? { chunk: picked.chunk, row: picked.row } : null, onPick, 'explore');
+  // Held steady between renders: a new object each time would redraw the lots, which re-renders the map, and so on.
+  const at = useMemo(() => (picked ? { chunk: picked.chunk, row: picked.row } : null), [picked]);
+  const lots = usePlaceLots(on && !sunOn, at, onPick, 'explore', landOn ? 'use' : zoningOn ? 'outline' : 'vacant');
 
   // The lots go to the Explore map while Sun and shadow is off (its By parcel view owns them while it is on).
   useEffect(() => {
@@ -37,30 +48,19 @@ export default function ParcelsBoundary() {
       }),
     [],
   );
-  // Sun and shadow turned on with Parcels open shows sun by lot.
+  // Sun and shadow turned on with Parcels open shows sun by lot; a lot picked there opens the panel too.
   useEffect(() => {
     if (on && sunOn) useSunShadow.setState({ view: 'parcel' });
   }, [on, sunOn]);
-  useEffect(() => {
-    if (!on) setPicked(null);
-  }, [on]);
-
-  if (!on || sunOn) return null;
-  return (
-    <div className="pointer-events-auto absolute bottom-3 left-3 z-20 rounded-xl bg-white/95 p-3 shadow-lg ring-1 ring-black/5 backdrop-blur" style={{ width: 320, left: 384 }} data-parcels-card>
-      <div className="flex items-center justify-between gap-2">
-        <div className="text-small font-semibold text-slate-900">{picked ? 'Lot' : 'Parcels'}</div>
-        <button type="button" onClick={() => (picked ? setPicked(null) : useParcelShadow.setState({ boundary: false }))} className="rounded-md p-0.5 text-slate-500 hover:text-slate-800" aria-label={picked ? 'Clear the lot' : 'Close Parcels'}>
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-      {picked ? (
-        <div className="mt-2">
-          <LotCard lot={picked} izo={null} />
-        </div>
-      ) : (
-        <p className="mt-1 text-small text-slate-600">{lots.minZoom == null ? 'The lot files are not on this copy of the site.' : lots.zoomOk ? 'Click a lot for its facts. Vacant lots are tinted.' : 'Zoom in to see lots.'}</p>
-      )}
-    </div>
+  useEffect(
+    () =>
+      useParcelShadow.subscribe((s, prev) => {
+        if (s.boundary && s.selected && s.selected !== prev.selected && useSunShadow.getState().on) openPanel();
+      }),
+    [],
   );
+  useEffect(() => {
+    if (!on) useParcelShadow.setState({ picked: null });
+  }, [on]);
+  return null;
 }

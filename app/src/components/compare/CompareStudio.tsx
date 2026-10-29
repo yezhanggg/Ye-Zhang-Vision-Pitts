@@ -4,10 +4,12 @@
 // the comparison in the middle: at a glance, what each place would get, why they differ and the project
 // in each place. Side A uses the Place tab's settings; side B
 // shares them or, with "Separate settings", keeps its own (lib/compare/store, lib/project/side). So it reads two
-// places under one set of settings, two places under two, or one place under two.
+// places under one set of settings, two places under two, or one place under two. Both sides are read at one level, as
+// on the Place tab (CompareLevel): a real lot picked on each map (Parcel), a tract (Tract), or a ZIP code picked above
+// each map (ZIP code; the tract sections below the project are left out there).
 // Loaded on demand: the offline single file keeps CompareTractsView, and so do phones, which have no room for three
 // columns.
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import { rankedTracts, scoring, tractById, tractLabel, typologyById } from '../../lib/data';
 import { compareTakeaway, fLabel, stabilityFor, tLabel, useAllResults } from '../../lib/derived';
@@ -19,11 +21,16 @@ import { compareMessage, compareState, factorDeltasSafe } from '../../lib/analys
 import { rationale } from '../../lib/analysis/rationale';
 import { setSeparate, useCompare, useCompareRead } from '../../lib/compare/store';
 import { amiWords } from '../../lib/equity/measures';
+import { zipName, zipPlaces } from '../../lib/equity/zip';
+import { lotName, lotSize } from '../../lib/explore/parcelShadow';
 import { buildCompareReport, type CompareReportInput } from '../../lib/export/builders/compare';
 import { compareCsvRows, COMPARE_COLUMNS, followScreen } from '../../lib/compare/report';
 import { downloadCsv, exportFilename, toCsv } from '../../lib/export/csv';
 import { getMap, registerMap } from '../../lib/export/mapRegistry';
-import { mapSnapshot, printReport } from '../../lib/export/report';
+import { mapSnapshot, printReport, type Report } from '../../lib/export/report';
+import { pickLot } from '../../lib/parcel/pick';
+import type { PlaceArea } from '../../lib/place/zipView';
+import type { SiteLot } from '../../lib/project/store';
 import { hasPlaceData, hud as hudTable, placeById } from '../../lib/place/data';
 import { fmtDollars } from '../../lib/place/format';
 import { isSeniorAge, LEVEL_LABEL, type PlanLevel } from '../../lib/place/plan';
@@ -45,10 +52,12 @@ import ChatPill from '../ChatPill';
 import TractSearch from '../TractSearch';
 import PanelTitle from '../analysis/PanelTitle';
 import ExportMenu from '../export/ExportMenu';
-import { ProjectInputs } from '../place/levels/LevelInputs';
+import { ProjectInputs, ZipInputs, ZipPicker } from '../place/levels/LevelInputs';
 import { Chevron, Dot, Segmented } from '../primitives';
 import { GLANCE_GRID, GROUPS, Measure, PlaceHead, SectionHead, Value, WhyParagraphs, getsCells, glanceFlag, glanceRows, type GetsCells, type SideInfo } from './CompareBlocks';
+import { CompareLevelSwitch, frameBoth, LotLegendBar, searchAtParcel, SideLot, useSideLots, useZipLayers } from './CompareLevel';
 import CompareResults from './CompareResults';
+import { RESULTS_SUB, sideName, type Tag } from './levelWords';
 import SuggestLegendBar from './SuggestLegendBar';
 
 const TYPOLOGY_INDEX = new Map(scoring.typologies.map((t, i) => [t.id, i]));
@@ -172,14 +181,22 @@ function Gets({ A, B, levelA, levelB }: { A: SideInfo; B: SideInfo; levelA: Plan
 
 // ------------------------------------------------------------------------------------------------------ the inputs
 
-/** One side's inputs: the Place tab's project groups (type, units, capital, open space, policies) for its place. */
-function SideInputs({ side, info }: { side: Side; info: SideInfo }) {
+/** One side's inputs: the Place tab's project groups (type, units, capital, open space, policies) for its place, at
+ *  the level: its tract (on the lot picked there, at Parcel) or its ZIP code. */
+function SideInputs({ side, info, level, zip }: { side: Side; info: SideInfo; level: PlaceArea; zip: string | null }) {
+  const wait = (text: string) => <p className="text-caption text-slate-600">{text}</p>;
   return (
     <SideContext.Provider value={side}>
-      {info.t && info.p && hudTable ? (
-        <ProjectInputs key={info.t.GEOID} t={info.t} rec={info.rec} />
+      {level === 'zip' ? (
+        zip && hudTable ? (
+          <ZipInputs key={zip} zip={zip} />
+        ) : (
+          wait(`Pick a ZIP code for ${info.tag} above the map to test a project there.`)
+        )
+      ) : info.t && info.p && hudTable ? (
+        <ProjectInputs key={`${level}:${info.t.GEOID}`} t={info.t} rec={info.rec} level={level} />
       ) : (
-        <p className="text-caption text-slate-600">Pick place {info.tag} above the map to test a project there.</p>
+        wait(level === 'parcel' ? `Click a lot on ${info.tag}’s map to test a project there.` : `Pick place ${info.tag} above the map to test a project there.`)
       )}
     </SideContext.Provider>
   );
@@ -226,6 +243,33 @@ function Studio({ active }: { active: boolean }) {
   const seniorB = separate ? isSeniorAge(planB.age) : seniorA;
   const sideB: Side = separate ? SIDE_B : SIDE_A;
 
+  // The level both sides are read at, each side's ZIP code, and the lot picked in each side's tract (at Parcel).
+  const level = useCompare((s) => s.level);
+  const zipA = useCompare((s) => s.zipA);
+  const zipB = useCompare((s) => s.zipB);
+  const parcel = level === 'parcel';
+  const atZip = level === 'zip';
+  const lotA = SIDE_A.project((s) => (a ? s.sites[a]?.lot : undefined));
+  const lotBShared = SIDE_A.project((s) => (b ? s.sites[b]?.lot : undefined));
+  const lotBOwn = SIDE_B.project((s) => (b ? s.sites[b]?.lot : undefined));
+  const lotB = separate ? lotBOwn : lotBShared;
+  /** Why the last lot clicked could not go on a side. */
+  const [lotNote, setLotNote] = useState<Record<Tag, string | null>>({ A: null, B: null });
+  const onNote = useCallback((tag: Tag, note: string | null) => setLotNote((n) => (n[tag] === note ? n : { ...n, [tag]: note })), []);
+  const lotsA = useSideLots('A', parcel, lotA, onNote);
+  const lotsB = useSideLots('B', parcel, lotB, onNote);
+  const pickZipA = useCallback((z: string | null) => useCompare.setState({ zipA: z }), []);
+  const pickZipB = useCallback((z: string | null) => useCompare.setState({ zipB: z }), []);
+  // On a level change (and on opening at Parcel or ZIP code), each map moves to where that level's picking happens.
+  const seenLevel = useRef<PlaceArea | null>(null);
+  useEffect(() => {
+    const first = seenLevel.current === null;
+    seenLevel.current = level;
+    if (first && level === 'tract') return;
+    setLotNote({ A: null, B: null });
+    return frameBoth(level);
+  }, [level]);
+
   // Both sides order types with the Place tab's weights (Balanced unless the link sets them); the screens and the income level decide the set.
   const weights = useApp((s) => s.weights);
   const results = useAllResults(weights);
@@ -235,6 +279,8 @@ function Studio({ active }: { active: boolean }) {
   const sugB = useMemo(() => (separate ? suggestionsFor(levelB, seniorB, policyB, fitOrders, demand) : sugA), [separate, levelB, seniorB, policyB, fitOrders, demand, sugA]);
   const mapA = useMemo(() => paintOf(sugA), [sugA]);
   const mapB = useMemo(() => (sugB === sugA ? mapA : paintOf(sugB)), [sugA, sugB, mapA]);
+  const zipLayersA = useZipLayers(atZip, zipA, mapA.paint, pickZipA);
+  const zipLayersB = useZipLayers(atZip, zipB, mapB.paint, pickZipB);
 
   const ta = a ? (tractById.get(a) ?? null) : null;
   const tb = b ? (tractById.get(b) ?? null) : null;
@@ -318,18 +364,49 @@ function Studio({ active }: { active: boolean }) {
     );
   };
   const leadColor = (rec: Recommendation | null) => (rec?.types[0] ? (typologyById.get(rec.types[0].typology)?.color ?? null) : null);
+  /** The chip on a side's map: its tract (Tract), its lot (Parcel) or its ZIP code (ZIP code). */
+  const chipFor = (info: SideInfo, lot: SiteLot | undefined, zip: string | null, policy: PolicyState, income: PlanLevel) => {
+    const chip = (title: string, sub: ReactNode) => <MapChip tag={info.tag} color={info.color} title={title} sub={sub} />;
+    if (atZip) return chip(zip ? zipName(zip) : `Place ${info.tag}`, zip ? zipPlaces(zip, (g) => tractLabel(tractById.get(g)), 2) : 'Pick a ZIP code above the map');
+    if (parcel) return chip(lot ? lotName(lot.label) : info.t ? tractLabel(info.t) : `Place ${info.tag}`, lot ? [info.t ? tractLabel(info.t) : null, lotSize(lot.sqft), lot.district].filter(Boolean).join(' · ') : 'Zoom in and click a lot');
+    return chip(info.t ? tractLabel(info.t) : `Place ${info.tag}`, chipSub(info.t, info.rec, policy, income));
+  };
 
   // Export: the comparison report (PDF via print) and the At-a-glance rows as CSV. With separate settings each side's
-  // settings ride on its name line; the report's header names side A's.
+  // settings ride on its name line; the report's header names side A's. At Parcel the project rows name each lot; at
+  // ZIP code the report holds the project rows and the maps only (the tract tables are not shown there).
+  const nameA = sideName(level, 'A', ta ? tractLabel(ta) : null, lotA, zipA);
+  const nameB = sideName(level, 'B', tb ? tractLabel(tb) : null, lotB, zipB);
+  const exportReady = atZip ? !!zipA && !!zipB : !!ta && !!tb;
+  /** The project table's note, for the level. */
+  const levelNote = (r: Report): Report => (level === 'tract' ? r : { ...r, blocks: r.blocks.map((x) => (x.kind === 'table' && x.note?.startsWith('Each side’s project') ? { ...x, note: `${RESULTS_SUB[level].replace(/; recomputed.*$/, '')}, as on screen. Example cost inputs are labeled on the Place tab.` } : x)) });
+  const zipExport = (): { report: Report; csv: Pick<CompareReportInput, 'a' | 'b' | 'glance' | 'fits' | 'ami'> } | null => {
+    if (!zipA || !zipB) return null;
+    const words = separate ? `A ${settingsWords(policyA, levelA)}; B ${settingsWords(policyB, levelB)}` : settingsWords(policyA, levelA);
+    const places = (z: string) => zipPlaces(z, (g) => tractLabel(tractById.get(g)), 3);
+    const report: Report = {
+      title: `Comparison report: ${nameA} and ${nameB}`,
+      subtitle: `ZIP codes · ${words}`,
+      blocks: [
+        { kind: 'kv', rows: [['Place A', `${nameA} (${places(zipA)})`], ['Place B', `${nameB} (${places(zipB)})`], ['Settings', words]] },
+        // "1." here becomes "2." once the project section goes in front (lib/compare/report followScreen).
+        { kind: 'heading', text: '1. Maps' },
+        { kind: 'callout', text: 'You decide: site, scale, sponsor and financing are yours; this report shows the evidence and the arithmetic.' },
+      ],
+      sources: ['ZIP code profiles: tract values weighted by 2020 housing units (city part of edge ZIP codes)'],
+      filename: exportFilename('comparison', `${nameA} vs ${nameB}`, 'pdf'),
+    };
+    return { report, csv: { a: { name: nameA, geoid: zipA, rec: null }, b: { name: nameB, geoid: zipB, rec: null }, glance: [], fits: null, ami: 0 } };
+  };
   const exportInput = (): CompareReportInput | null => {
     if (!ta || !tb) return null;
     const g = glanceRows(A.p, B.p, hudTable, levelA, ta.GEOID, tb.GEOID);
     const subsidyShort = (x: number) => (x >= 0.75 ? 'fully eligible' : x >= 0.25 ? 'partly eligible' : 'not eligible');
     const val = (x: number | null, f: string) => (x == null ? 'no data' : f === 'subsidy_eligible' ? subsidyShort(x) : pctShort(x));
-    const sub = (name: string, policy: PolicyState, level: PlanLevel) => (separate ? `${name} · ${settingsWords(policy, level)}` : name);
+    const sub = (name: string, policy: PolicyState, level: PlanLevel, lot: SiteLot | undefined) => [parcel && lot ? `${lotName(lot.label)}, ${lotSize(lot.sqft)}` : null, name, separate ? settingsWords(policy, level) : null].filter(Boolean).join(' · ');
     return {
-      a: { name: tractLabel(ta), sub: sub(ta.name, policyA, levelA), geoid: ta.GEOID, rec: recA },
-      b: { name: tractLabel(tb), sub: sub(tb.name, policyB, levelB), geoid: tb.GEOID, rec: recB },
+      a: { name: tractLabel(ta), sub: sub(ta.name, policyA, levelA, lotA), geoid: ta.GEOID, rec: recA },
+      b: { name: tractLabel(tb), sub: sub(tb.name, policyB, levelB, lotB), geoid: tb.GEOID, rec: recB },
       focus: recA?.stance ?? 'anti_displacement',
       level: levelA,
       glance: g.rows,
@@ -349,31 +426,43 @@ function Studio({ active }: { active: boolean }) {
       typeLabel: (k) => typologyById.get(k)?.label ?? k,
     };
   };
-  const exportSlug = ta && tb ? `${tractLabel(ta)} vs ${tractLabel(tb)}` : '';
+  const exportSlug = atZip ? `${nameA} vs ${nameB}` : ta && tb ? `${tractLabel(ta)} vs ${tractLabel(tb)}` : '';
   const exportMenu = (
     <ExportMenu
       items={[
         {
           label: 'Report (PDF)',
-          hint: ta && tb ? 'The project in each place, the tables and both maps' : 'Choose two places first',
-          disabled: !ta || !tb,
+          hint: !exportReady ? (atZip ? 'Choose two ZIP codes first' : 'Choose two places first') : atZip ? 'The project in each ZIP code and both maps' : 'The project in each place, the tables and both maps',
+          disabled: !exportReady,
           onSelect: async () => {
+            const crop = { top: 0, bottom: 0, left: 0, right: 0 };
+            if (atZip) {
+              const z = zipExport();
+              if (!z) return;
+              const mA = await mapSnapshot(getMap('compare-a'), { crop });
+              const mB = await mapSnapshot(getMap('compare-b'), { crop });
+              const maps = [mA ? { kind: 'image' as const, src: mA, caption: `A · ${nameA}` } : null, mB ? { kind: 'image' as const, src: mB, caption: `B · ${nameB}` } : null].filter((x) => x !== null);
+              const blocks = z.report.blocks.flatMap((x) => (x.kind === 'heading' && x.text === '1. Maps' ? (maps.length ? [x, ...maps] : []) : [x]));
+              printReport(levelNote(followScreen({ ...z.report, blocks }, useCompareRead.getState(), nameA, nameB)));
+              return;
+            }
             const input = exportInput();
             if (!input) return;
-            const crop = { top: 0, bottom: 0, left: 0, right: 0 };
             const mA = await mapSnapshot(getMap('compare-a'), { crop });
             const mB = await mapSnapshot(getMap('compare-b'), { crop });
             const report = swapStance(buildCompareReport({ ...input, maps: { a: mA, b: mB }, filename: exportFilename('comparison', exportSlug, 'pdf') }), STANCE_LABEL[input.focus], separate ? `A ${screensWords(policyA)}, B ${screensWords(policyB)}` : screensWords(policyA));
-            printReport(followScreen(report, useCompareRead.getState(), input.a.name, input.b.name));
+            printReport(levelNote(followScreen(report, useCompareRead.getState(), parcel ? nameA : input.a.name, parcel ? nameB : input.b.name)));
           },
         },
         {
           label: 'Data (CSV)',
-          hint: ta && tb ? 'Project and At-a-glance rows, with sources and years' : 'Choose two places first',
-          disabled: !ta || !tb,
+          hint: !exportReady ? (atZip ? 'Choose two ZIP codes first' : 'Choose two places first') : atZip ? 'Project rows for each ZIP code' : 'Project and At-a-glance rows, with sources and years',
+          disabled: !exportReady,
           onSelect: () => {
-            const input = exportInput();
-            if (!input) return;
+            const got = atZip ? (zipExport()?.csv ?? null) : exportInput();
+            if (!got) return;
+            // At Parcel the name columns carry each lot with its tract (the geoid columns stay the tracts').
+            const input = parcel ? { ...got, a: { ...got.a, name: nameA }, b: { ...got.b, name: nameB } } : got;
             downloadCsv(exportFilename('comparison', exportSlug, 'csv'), toCsv(compareCsvRows(input, useCompareRead.getState()), COMPARE_COLUMNS));
           },
         },
@@ -389,10 +478,13 @@ function Studio({ active }: { active: boolean }) {
     const zoom = Math.min(...[...sync.maps].map((m) => m.getZoom()));
     for (const m of sync.maps) if (Math.abs(m.getZoom() - zoom) > 0.01) m.easeTo({ zoom, duration: 600 });
   }, [mapSync, sync]);
-  const mapFor = (info: SideInfo, paint: MapPaint, sug: Map<string, Recommendation>, onSelect: (id: string) => void, policy: PolicyState, level: PlanLevel) => (
+  // At Parcel and ZIP code the tracts are not picked on the map (as on the Place tab): the lots or the ZIP outlines are.
+  const mapFor = (info: SideInfo, paint: MapPaint, sug: Map<string, Recommendation>, onSelect: (id: string) => void, overlays: ReturnType<typeof useZipLayers>, chip: ReactNode) => (
     <MapView
       paint={paint}
-      selectedId={info.t?.GEOID ?? null}
+      selectedId={parcel || atZip ? null : (info.t?.GEOID ?? null)}
+      baseTracts={!parcel && !atZip}
+      overlays={overlays}
       buildingColor={leadColor(info.rec)}
       lite={lite}
       terrain={layers.terrain}
@@ -401,12 +493,52 @@ function Studio({ active }: { active: boolean }) {
       padding={MAP_PAD}
       onSelect={onSelect}
       tooltip={(id) => <SuggestTip id={id} rec={sug.get(id)} />}
-      overlay={<MapChip tag={info.tag} color={info.color} title={info.t ? tractLabel(info.t) : `Place ${info.tag}`} sub={chipSub(info.t, info.rec, policy, level)} />}
+      overlay={chip}
       pin={pin}
       sync={sync}
       onMapReady={registerMap(info.tag === 'A' ? 'compare-a' : 'compare-b')}
     />
   );
+
+  // Each strip at the level: its search (a ZIP code picker at ZIP code; at Parcel an address picks its lot), its map's
+  // layers and chip, and its key.
+  const searchFor = (tag: Tag) => {
+    const isA = tag === 'A';
+    if (atZip)
+      return (
+        <div className="flex h-10 items-center gap-2">
+          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-caption font-bold text-white" style={{ background: isA ? COLOR_A : COLOR_B }}>
+            {tag}
+          </span>
+          <div className="min-w-0 flex-1">
+            <ZipPicker zip={isA ? zipA : zipB} onChange={isA ? pickZipA : pickZipB} label={`ZIP code for place ${tag}`} />
+          </div>
+        </div>
+      );
+    const onChange = (id: string) => {
+      set(isA ? { selectedId: id } : { compareId: id });
+      if (parcel) searchAtParcel(tag, id, onNote);
+    };
+    return <TractSearch dense value={isA ? a : b} onChange={onChange} tag={tag} tagColor={isA ? COLOR_A : COLOR_B} showQuickPicks={false} exclude={separate ? undefined : isA ? b : a} label={`Place ${tag}`} />;
+  };
+  const legendFor = (tag: Tag) => {
+    const isA = tag === 'A';
+    if (parcel) return <LotLegendBar zoomOk={(isA ? lotsA : lotsB).zoomOk} />;
+    const policy = isA ? policyA : policyB, income = isA ? levelA : levelB;
+    return <SuggestLegendBar focus={screensWords(policy)} level={LEVEL_LABEL[income]} counts={(isA ? mapA : mapB).counts} noneLabel={noneLabel(income)} />;
+  };
+  /** B under A's settings: what it reads, or what it still needs. */
+  const sharedNote = atZip ? (zipB ? 'B tests A’s project across its ZIP code.' : 'Pick a ZIP code for B above.') : parcel ? (lotB ? 'B tests A’s project on the lot picked on its map.' : null) : tb ? 'B tests A’s project; each place is read on a lot of the size the project needs there.' : 'Pick place B above.';
+  /** Swap the places (lots and ZIP codes too); each side keeps its settings. */
+  const swap = () => {
+    if (parcel && separate) {
+      if (lotB) pickLot(lotB, { side: SIDE_A });
+      if (lotA) pickLot(lotA, { side: SIDE_B });
+    }
+    useCompare.setState({ zipA: zipB, zipB: zipA });
+    setLotNote({ A: null, B: null });
+    set({ selectedId: b, compareId: a });
+  };
 
   return (
     <MotionConfig reducedMotion={!active || lite ? 'always' : 'user'}>
@@ -418,19 +550,20 @@ function Studio({ active }: { active: boolean }) {
         <Strip
           info={A}
           tour="compare-places"
-          search={<TractSearch dense value={a} onChange={(id) => set({ selectedId: id })} tag="A" tagColor={COLOR_A} showQuickPicks={false} exclude={separate ? undefined : b} label="Place A" />}
-          map={mapFor(A, mapA.paint, sugA, (id) => set({ selectedId: id }), policyA, levelA)}
-          legend={<SuggestLegendBar focus={screensWords(policyA)} level={LEVEL_LABEL[levelA]} counts={mapA.counts} noneLabel={noneLabel(levelA)} />}
+          search={searchFor('A')}
+          map={mapFor(A, mapA.paint, sugA, (id) => set({ selectedId: id }), parcel ? lotsA.overlays : zipLayersA, chipFor(A, lotA, zipA, policyA, levelA))}
+          legend={legendFor('A')}
         >
           <p className="text-caption leading-snug text-slate-500">A uses the Place tab’s settings{separate ? '' : ', and so does B'}. Changes here apply at once.</p>
-          <SideInputs key="A" side={SIDE_A} info={A} />
+          {parcel && <SideLot tag="A" lot={lotA} note={lotNote.A} />}
+          <SideInputs key="A" side={SIDE_A} info={A} level={level} zip={zipA} />
         </Strip>
 
         <div className="scroll-quiet min-h-0 shrink-0 overflow-y-auto rounded-xl bg-white px-4 pb-12 ring-1 ring-stone-200/80" style={{ width: 'clamp(440px, 36vw, 600px)', paddingTop: 44 }} aria-label="Comparison">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <div className="font-display text-body font-bold text-slate-900">Comparison</div>
             <div className="flex items-center gap-1.5">
-              <button type="button" onClick={() => set({ selectedId: b, compareId: a })} title="Swap A and B" aria-label="Swap A and B" className="flex items-center gap-1.5 rounded-lg bg-white px-2 py-1 text-caption text-slate-600 ring-1 ring-stone-300 hover:bg-stone-50 hover:text-slate-900">
+              <button type="button" onClick={swap} title="Swap A and B" aria-label="Swap A and B" className="flex items-center gap-1.5 rounded-lg bg-white px-2 py-1 text-caption text-slate-600 ring-1 ring-stone-300 hover:bg-stone-50 hover:text-slate-900">
                 <SwapIcon />
                 Swap
               </button>
@@ -443,6 +576,7 @@ function Studio({ active }: { active: boolean }) {
               {exportMenu}
             </div>
           </div>
+          <CompareLevelSwitch />
           <p className="mb-3 text-caption leading-snug text-slate-600">
             {separate ? (
               <>
@@ -459,33 +593,37 @@ function Studio({ active }: { active: boolean }) {
               <>Both places under {settingsWords(policyA, levelA)}. Change the places and settings under each map.</>
             )}
           </p>
-          {message && (
+          {message && !atZip && (
             <p className="mb-3 rounded-xl bg-amber-50 px-3 py-2 text-small text-amber-900 ring-1 ring-amber-200" role="status">
               {message}
             </p>
           )}
 
-          {(ta || tb) && <CompareResults A={A} B={B} sideA={SIDE_A} sideB={sideB} />}
+          {(ta || tb || level !== 'tract') && <CompareResults A={A} B={B} sideA={SIDE_A} sideB={sideB} level={level} zipA={zipA} zipB={zipB} />}
 
-          {(ta || tb) && (
+          {/* The sections below read census tracts: at ZIP code they are left out; at Parcel they read each lot's tract. */}
+          {atZip && <p className="mt-6 border-t border-stone-200/80 pt-5 text-caption leading-snug text-slate-500">At a glance, what each place would get and why they differ read census tracts: switch to Tract to see them.</p>}
+
+          {!atZip && (ta || tb) && (
             <section className="mt-6 border-t border-stone-200/80 pt-5" aria-label="At a glance" data-tour="compare-glance">
-              <SectionHead n={2} title="At a glance" sub={same ? 'The same place on both sides: the values match.' : 'Real values for each place, same definitions on both sides.'} />
+              <SectionHead n={2} title="At a glance" sub={same ? 'The same place on both sides: the values match.' : parcel ? 'Real values for the tract each lot is in, same definitions on both sides.' : 'Real values for each place, same definitions on both sides.'} />
               <Glance A={A} B={B} levelA={levelA} levelB={levelB} />
             </section>
           )}
 
-          {(ta || tb) && (
+          {!atZip && (ta || tb) && (
             <section className="mt-6 border-t border-stone-200/80 pt-5" aria-label="What each place would get">
               <SectionHead n={3} title="What each place would get" sub={separate ? 'The types that pass each side’s own screens at its own income level.' : `The types that pass ${screensWords(policyA)} at ${LEVEL_LABEL[levelA]}.`} />
               <Gets A={A} B={B} levelA={levelA} levelB={levelB} />
             </section>
           )}
 
-          <section className={cx('flex flex-col', (ta || tb) && 'mt-6 border-t border-stone-200/80 pt-5')} aria-label="Why they differ">
+          {!atZip && (
+          <section className={cx('flex flex-col', (ta || tb || parcel) && 'mt-6 border-t border-stone-200/80 pt-5')} aria-label="Why they differ">
             <SectionHead
               n={4}
               title="Why they differ"
-              sub="The rules behind each suggestion, read side by side."
+              sub={parcel ? 'The rules behind each suggestion for the tract each lot is in, read side by side.' : 'The rules behind each suggestion, read side by side.'}
               right={
                 pair ? (
                   <button type="button" onClick={() => setDetail(!detail)} aria-expanded={detail} className="inline-flex items-center gap-0.5 pt-0.5 text-caption text-slate-600 underline decoration-slate-300 underline-offset-2 hover:text-slate-900 hover:decoration-slate-500">
@@ -506,9 +644,10 @@ function Studio({ active }: { active: boolean }) {
               }
             />
           </section>
+          )}
 
           <AnimatePresence initial={false}>
-            {detail && pair && (
+            {detail && pair && !atZip && (
               <motion.section key="detail" aria-label="Scoring detail" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
                 <div className="mt-6 space-y-6 border-t border-stone-200/80 pt-5">
                   <SideRanking tag="A" color={COLOR_A} t={ta} r={ra} ra={raA} s={sa} idPrefix="ra" />
@@ -550,9 +689,9 @@ function Studio({ active }: { active: boolean }) {
         <Strip
           top={chatH}
           info={B}
-          search={<TractSearch dense value={b} onChange={(id) => set({ compareId: id })} tag="B" tagColor={COLOR_B} showQuickPicks={false} exclude={separate ? undefined : a} label="Place B" />}
-          map={mapFor(B, mapB.paint, sugB, (id) => set({ compareId: id }), policyB, levelB)}
-          legend={<SuggestLegendBar focus={screensWords(policyB)} level={LEVEL_LABEL[levelB]} counts={mapB.counts} noneLabel={noneLabel(levelB)} />}
+          search={searchFor('B')}
+          map={mapFor(B, mapB.paint, sugB, (id) => set({ compareId: id }), parcel ? lotsB.overlays : zipLayersB, chipFor(B, lotB, zipB, policyB, levelB))}
+          legend={legendFor('B')}
         >
           <div className="space-y-1.5">
             <div className="text-caption font-semibold uppercase tracking-wide text-slate-600">B’s settings</div>
@@ -568,13 +707,8 @@ function Studio({ active }: { active: boolean }) {
             />
             <p className="text-caption leading-snug text-slate-500">{separate ? 'B keeps its own screens, residents, income and project, starting from a copy of A. It can be the same place as A. Tax credit entries stay shared; B’s financing picks its credit.' : 'B is read under A’s screens, income and project. Its own lets B differ in anything.'}</p>
           </div>
-          {separate ? (
-            <SideInputs key="B" side={SIDE_B} info={B} />
-          ) : tb ? (
-            <p className="text-caption leading-snug text-slate-600">B tests A’s project; each place is read on a lot of the size the project needs there.</p>
-          ) : (
-            <p className="text-caption text-slate-600">Pick place B above.</p>
-          )}
+          {parcel && <SideLot tag="B" lot={lotB} note={lotNote.B} />}
+          {separate ? <SideInputs key="B" side={SIDE_B} info={B} level={level} zip={zipB} /> : sharedNote && <p className="text-caption leading-snug text-slate-600">{sharedNote}</p>}
         </Strip>
       </div>
     </MotionConfig>

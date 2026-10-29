@@ -36,6 +36,7 @@ const ON_DEMAND = [
   'components/place/levels/',
   'components/explore/ParcelsSwitch.tsx',
   'components/explore/ParcelsBoundary.tsx',
+  'components/explore/ParcelSummary.tsx',
   'lib/parcel/',
   'lib/review/',
   'lib/policylab/',

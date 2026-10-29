@@ -58,14 +58,15 @@ export default function DataPanel() {
         ) : undefined
       }
     >
-      {/* Sun and shadow, like the variables, shows once a boundary (or Parcels) is open. */}
-      {(open || parcels) && (
-        <div className="mb-2">
-          <SunShadowSwitch />
-        </div>
-      )}
+      {/* The map layers: sun and shadow (once a boundary or Parcels is open), zoning, land use (by area, or by lot under Parcels), canopy. */}
+      <div role="group" aria-label="Map layers" className="mb-2 space-y-1.5">
+        {(open || parcels) && <SunShadowSwitch />}
+        <ZoningMapSwitch />
+        <LandUseMapSwitch ready={open || parcels} />
+        {import.meta.env.MODE !== 'export' && <CanopySwitch id="data-canopy-map" />}
+      </div>
       {!open ? (
-        parcels ? null : <p className="rounded-xl bg-stone-100 px-3 py-2 text-small text-slate-700 ring-1 ring-stone-200">{EXPLORE_UI.dataClosed}</p>
+        parcels ? <p className="text-caption text-slate-600">Census figures are by area, not by lot: open a boundary to map one.</p> : <p className="rounded-xl bg-stone-100 px-3 py-2 text-small text-slate-700 ring-1 ring-stone-200">{EXPLORE_UI.dataClosed}</p>
       ) : (
         <>
           <div className="space-y-1.5">
@@ -87,21 +88,6 @@ export default function DataPanel() {
                   }
                   right={contains ? <Dot color="#7c3aed" size={8} /> : undefined}
                 >
-                  {g.id === 'zoning' && (
-                    <div className="mb-1.5">
-                      <ZoningMapSwitch id="data-zoning-map" />
-                    </div>
-                  )}
-                  {import.meta.env.MODE !== 'export' && g.id === 'canopy' && (
-                    <div className="mb-1.5">
-                      <CanopySwitch id="data-canopy-map" />
-                    </div>
-                  )}
-                  {g.id === 'land' && (
-                    <div className="mb-1.5">
-                      <LandUseMapSwitch id="data-landuse-map" />
-                    </div>
-                  )}
                   <div role="radiogroup" aria-label={g.label} className="space-y-0.5">
                     {vars.map((v) => (
                       <VarRow key={v.id} v={v} on={v.id === browse.variable} onPick={() => setBrowse({ variable: v.id })} />

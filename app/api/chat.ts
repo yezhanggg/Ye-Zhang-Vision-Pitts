@@ -60,10 +60,24 @@ export function pickProvider(env: Record<string, string | undefined>): Provider 
   return deepseek ?? anthropic;
 }
 
+/** What the tool is and how it works, so the chat can answer questions about VisionPitts itself (Ye, 2026-10-29: "ask
+ *  anything related to this tool"). Sent with the system text (cached), and its figures count as facts. */
+export const TOOL_GUIDE = `VISIONPITTS GUIDE
+What it is: a free tool, public data only, that shows which housing type fits which Pittsburgh neighborhood, for whom, whether a project works on a real lot, and which policy would change the answer. Live online, with an offline single-file copy. Not a City document: a reading of the zoning code and public data, not a zoning determination or a feasibility study.
+Explore: a map of Pittsburgh or all of Allegheny County. Boundary picks census tracts, block groups, ZIP codes, municipalities, or Parcels (county lots, shown from close zoom; click a lot for its facts and zoning, then "Test a project on this lot"). Data colors the map by a census figure (ACS 2020–2024) and holds map layers: sun and shadow (2015 lidar), zoning districts (City zoning map), the land-use map (county assessments 2026, by area or by lot) and tree canopy (2020). Click a place to see its facts next to the city and the county.
+Analysis, Place: three levels. Parcel reads a real county lot, Tract a typical lot in the neighborhood, ZIP code its tracts. Browse shows what a place needs: renters by income, rents, who rents, zoning, and the best fit. Test a project has numbered groups on the left: Project (development type, units, stories, income level, unit mix), Capital (can be turned off to check only zoning, the lot and the area), Open space (can be turned off), Policies (what applies here) and I want to study. Press "Confirm and test" at the bottom; the right panel shows results only for confirmed inputs, otherwise the lot or place. Results: a verdict (Works, Works with changes, Doesn't work as is), tiles for zoning, units by right, capital and tax credits, a review of findings with fixes and Apply buttons, fit with the area, the capital stack, the PHFA tax credit score and sun. Find places ranks tracts for a project. Export gives a PDF and a CSV.
+Analysis, Compare places: two places side by side at Parcel, Tract or ZIP code, with the same or separate settings.
+Analysis, Policy lab: one test building tested in all 128 city tracts. Switches: up to 3 homes on house lots, no parking minimums, an affordable set-aside citywide, a height bonus for affordable homes, a $50k gap subsidy per affordable home, and frequent bus on every line; More options has packages, each policy's details, your values and assumptions. The map: green works by right, yellow could work (with a zoning hearing, breaks even but under the developer's bar, or the money works where the zoning is not read), red does not work, grey no data or left out. The right panel gives the answer, what each policy does, the tract clicked and more numbers.
+Money model: a simple pro forma. Examples: building cost 300 dollars a sq ft, land at the lot's sq ft times 20 dollars, a developer's bar of 1.5 times the equity put in. The loan is paid off over 30 years (35 with tax credits) and sized so year-one income covers the payment 1.15 times. Tax credit deals are judged on the gap left and 15 years of cash flow, not a sale; only units at 60% AMI or below earn credits, and deals under 12 units are too small for tax credits.
+Zoning: the City of Pittsburgh's zoning code (Title Nine). The inclusionary overlay asks 10% of projects of 20 or more units at 50% AMI.
+Data: Census ACS; HUD CHAS 2018–22; HUD Fair Market Rents, Small Area FMR and income limits FY2026; asking rents 2025–26 as area figures; FEMA flood zones; transit schedules (GTFS); City zoning (WPRDC); county lot records (lot facts only: no owners, values or sales); PHFA's tax credit plan.
+AI: it only explains numbers the tool computed; rules and arithmetic make every call, and numbers in answers are checked. The chat keeps no history between visits. The Second opinion uses Claude.
+Made by Ye Zhang, University of Pennsylvania, for the AI for Housing Hackathon (Track 3). Contact: yezhang1@upenn.edu, or LinkedIn.`;
+
 export const SYSTEM = `You are the assistant inside VisionPitts, a housing data map of Pittsburgh and Allegheny County, Pennsylvania.
 You answer questions from residents, planners and community staff in plain language.
 
-Scope: Pittsburgh and Allegheny County housing, neighborhoods, affordability, rents, zoning, transit, flooding, demographics, housing policy and programs, and the data in this tool. If a question is about anything else, reply with exactly this one sentence and nothing more: "${DECLINE}"
+Scope: Pittsburgh and Allegheny County housing, neighborhoods, affordability, rents, zoning, transit, flooding, demographics, housing policy and programs, the data in this tool, and anything about VisionPitts itself: what each view and button does, how to use it, its methods, sources, definitions, limits and who made it (answer those from the VISIONPITTS GUIDE below). If a question is about anything else, reply with exactly this one sentence and nothing more: "${DECLINE}"
 
 Rules:
 1. Answer from the FACTS given at the start of the conversation first. They come from the tool's own data. When they cover the question, use only them.
@@ -72,7 +86,9 @@ Rules:
 4. Describe the data, not the people: no stereotypes, no judgments about residents, no advice on where to live, invest or build.
 5. "Asking rent" figures come from licensed listings and lean toward market-rate units. Say so only when you quote an asking rent. "Median gross rent" is a census figure and needs no such note.
 6. Plain text only: no markdown, no asterisks, no headings. At most 120 words.
-7. Begin with one or two plain sentences that answer the question. When asked to describe the surroundings, name the nearest places and say what stands out about them and about the selected place. Add short lines that start with "• " only to compare figures, five lines at most. Do not repeat the facts line by line.`;
+7. Begin with one or two plain sentences that answer the question. When asked to describe the surroundings, name the nearest places and say what stands out about them and about the selected place. Add short lines that start with "• " only to compare figures, five lines at most. Do not repeat the facts line by line.
+
+${TOOL_GUIDE}`;
 
 /** The Second opinion's provider: Claude only (Haiku unless REVIEW_MODEL overrides it). */
 export function reviewProvider(env: Record<string, string | undefined>): Provider | null {
@@ -105,7 +121,7 @@ const OFF_TOPIC = [
   /\b(homework|solve for x|derivative|integral|equation)\b/,
   /\b(capital of|president of|who won|world cup|super bowl|olympics)\b/,
 ];
-const IN_SCOPE = /\b(pittsburgh|allegheny|pennsylvania|pa\b|pgh|neighbou?rhood|tract|block group|municipalit|borough|township|housing|house|home|homes|rent|rents|renter|renting|lease|landlord|tenant|evict|afford|income|mortgage|property|zoning|zone|density|units?|building|develop|transit|bus|port authority|prt|commute|flood|river|demograph|population|census|acs|poverty|vacan|displace|gentrif|equity|lihtc|subsid|voucher|section 8|hud|fmr|policy|program|tax|assess|market|visionpitts|map|data|score|match)/;
+const IN_SCOPE = /\b(pittsburgh|allegheny|pennsylvania|pa\b|pgh|neighbou?rhood|tract|block group|municipalit|borough|township|housing|house|home|homes|rent|rents|renter|renting|lease|landlord|tenant|evict|afford|income|mortgage|property|zoning|zone|density|units?|building|develop|transit|bus|port authority|prt|commute|flood|river|demograph|population|census|acs|poverty|vacan|displace|gentrif|equity|lihtc|subsid|voucher|section 8|hud|fmr|policy|program|tax|assess|market|visionpitts|map|data|score|match|tool|view|explore|place|compare|lab|parcel|confirm|button|panel|layer|export|chat)/;
 /** True only for a question that is clearly about something outside the tool's scope. */
 export function offTopic(question: string, facts = ''): boolean {
   const q = question.toLowerCase();
@@ -227,7 +243,7 @@ export default async function handler(req: { method?: string; body?: unknown }, 
   const cacheKey = JSON.stringify([provider.id, provider.model, payload.mode, messages]);
   const hit = warm.get(cacheKey);
   if (hit) return res.status(200).json({ ...hit, cached: true, usage: { input: 0, cached: 0, output: 0 } });
-  const sources = [payload.facts, payload.question, ...(payload.history ?? []).map((t) => t.text)];
+  const sources = [payload.facts, TOOL_GUIDE, payload.question, ...(payload.history ?? []).map((t) => t.text)];
   const first = await complete(provider, messages, system, maxTokens);
   if (!first.ok) return res.status(200).json({ ok: false, reason: `${provider.id}_${first.status}` });
   const usage: Usage = { ...first.usage };

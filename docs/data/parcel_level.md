@@ -133,3 +133,7 @@ Ye chose to publish real lots on 2026-10-27, and the README's privacy line names
 - **Inclusionary overlay at the pin:** a reading on the City's simplified outline, so a pin within a few feet of its edge can read either way.
 - **Lot sun:** the whole lot seen from above (roof, yard and trees together), from the 2015 surface.
 - **ZIP counts:** the ZIP level counts a tract as in the inclusionary overlay only from 1% of its area. Smaller shares are slivers where the two maps meet.
+
+## Explore: Parcels (2026-10-29)
+
+Under Boundary, **Parcels** draws the county lots from close zoom. Clicking a lot fills the right panel with its facts and zoning (the same card as Place's Site and zoning) and a **Test a project on this lot** button that opens it in Place at the Parcel level. With Parcels open the Data layers work by lot: the **land-use map** colors each lot by its own assessed use (grey: other or no record), the **zoning map** shows through lot outlines, **sun and shadow** reads by lot, and the **canopy map** draws over them. Census figures are counted by area, so they need a boundary.

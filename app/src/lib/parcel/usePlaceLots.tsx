@@ -1,13 +1,15 @@
 // The lots on the Place map at the Parcel level: the county's lot outlines for the chunks in view, from the lots'
-// minimum zoom, vacant lots tinted so open land stands out, the picked lot outlined. A click picks a lot. Phones get
+// minimum zoom, vacant lots tinted so open land stands out (or, in Explore, each lot colored by its use under the
+// land-use map, or outlines only over the zoning map), the picked lot outlined. A click picks a lot. Phones get
 // none (a dense chunk is several megabytes); the address box still finds a lot there. Online only: loaded on demand.
 import { useEffect, useMemo, useState } from 'react';
-import type { Map as MLMap } from 'maplibre-gl';
+import type { ExpressionSpecification, Map as MLMap } from 'maplibre-gl';
 import type { OverlayLayer } from '../../components/MapView';
 import { chunksToLoad, lotName, lotSize, useLabel, type LotCollection, type ParcelManifest } from '../explore/parcelShadow';
 import { onMap } from '../export/mapRegistry';
 import { isPhone } from '../viewport';
 import { loadLotManifest, loadShapes } from './lots';
+import { LAND_CLASSES } from '../explore/landUseMap';
 
 const LAYER = 'pl-lots-';
 /** Chunks drawn at once: the view's nearest. */
@@ -16,6 +18,11 @@ const MAX_NEEDED = 4;
 const EARLY = 0.6;
 const VACANT_FILL = '#f59e0b';
 const LINE: OverlayLayer['line'] = { color: '#475569', width: 0.6, opacity: 0.55 };
+/** The lot files' use classes on the land-use map's colors; other and unrecorded uses in grey. */
+const USE_COLOR: Record<string, string> = { residential: LAND_CLASSES[0].color, commercial: LAND_CLASSES[1].color, industrial: LAND_CLASSES[2].color, institutional: LAND_CLASSES[3].color, vacant: LAND_CLASSES[4].color };
+
+/** How lots are filled: vacant lots tinted, each lot by its use, or no fill (another map shows through). */
+export type LotPaint = 'vacant' | 'use' | 'outline';
 
 export interface PlaceLots {
   overlays: OverlayLayer[] | undefined;
@@ -25,7 +32,7 @@ export interface PlaceLots {
   zoomOk: boolean;
 }
 
-export function usePlaceLots(on: boolean, picked: { chunk: string; row: number } | null, onPick: (chunk: string, row: number) => void, mapKey = 'place'): PlaceLots {
+export function usePlaceLots(on: boolean, picked: { chunk: string; row: number } | null, onPick: (chunk: string, row: number) => void, mapKey = 'place', paint: LotPaint = 'vacant'): PlaceLots {
   const [manifest, setManifest] = useState<ParcelManifest | null>(null);
   const [ready, setReady] = useState<[string, LotCollection][]>([]);
   const [zoomOk, setZoomOk] = useState(false);
@@ -77,6 +84,13 @@ export function usePlaceLots(on: boolean, picked: { chunk: string; row: number }
   const overlays = useMemo(() => {
     if (!on || !manifest) return undefined;
     const vacant = manifest.uses.indexOf('vacant');
+    const byUse = ['match', ['get', 'u'], ...manifest.uses.flatMap((u, i) => (USE_COLOR[u] ? [i, USE_COLOR[u]] : [])), '#d6d3d1'] as unknown as ExpressionSpecification;
+    const fill: OverlayLayer['fill'] =
+      paint === 'use'
+        ? { expr: byUse, opacity: 0.8 }
+        : paint === 'outline'
+          ? { color: '#ffffff', opacity: 0.02 }
+          : { expr: ['case', ['==', ['get', 'u'], vacant], VACANT_FILL, '#ffffff'], opacity: ['case', ['==', ['get', 'u'], vacant], 0.35, 0.02] };
     return ready.map(([key, fc]): OverlayLayer => ({
       id: LAYER + key,
       data: fc as unknown as OverlayLayer['data'],
@@ -84,7 +98,7 @@ export function usePlaceLots(on: boolean, picked: { chunk: string; row: number }
       minzoom: manifest.minZoom,
       selection: 'outline',
       interactive: true,
-      fill: { expr: ['case', ['==', ['get', 'u'], vacant], VACANT_FILL, '#ffffff'], opacity: ['case', ['==', ['get', 'u'], vacant], 0.35, 0.02] },
+      fill,
       line: LINE,
       selectedId: picked && picked.chunk === key ? String(picked.row) : null,
       onSelect: (id) => onPick(key, Number(id)),
@@ -100,7 +114,7 @@ export function usePlaceLots(on: boolean, picked: { chunk: string; row: number }
         ) : null;
       },
     }));
-  }, [on, manifest, ready, picked, onPick]);
+  }, [on, manifest, ready, picked, onPick, paint]);
 
   return { overlays, minZoom: manifest?.minZoom ?? null, zoomOk };
 }

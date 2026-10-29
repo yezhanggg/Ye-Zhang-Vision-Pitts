@@ -1,4 +1,5 @@
-// The right panel at the Parcel level: the site picked (its lot, the address, its tract), then the project's answers
+// The right panel at the Parcel level: the site picked (its lot, the address, its tract), the lot and its zoning
+// (LotZoning, in Browse and Test), then the place in Browse, or in Test the project's answers once confirmed
 // at a glance and in cards (place/levels/ProjectResults: zoning and restrictions, the capital stack, the tax credit
 // score, what you are studying, sun), and one line on the neighborhood with a way back to the Tract level.
 // Online only: loaded on demand.
@@ -23,6 +24,10 @@ import { signalShare } from '../project/summary';
 import { useProjectModel } from '../project/useProjectModel';
 import { setLevel } from './LevelSwitch';
 import { useLotDefaults } from './useReview';
+import ConfirmGate from './ConfirmGate';
+import LotZoning from './LotZoning';
+import { useConfirmed } from '../../../lib/project/confirm';
+import { inIzoAt } from '../../../lib/zoning/atPin';
 
 export default function SiteDetail({ t, place, hud, c, fitOrder, actions }: { t: TractProps; place: PlaceMeasures; hud: HudTable; c: Composed; fitOrder?: Typology[]; actions: ReactNode }) {
   const side = useSide();
@@ -41,6 +46,8 @@ export default function SiteDetail({ t, place, hud, c, fitOrder, actions }: { t:
   const address = pin && !/^Lot |^Dropped pin$/.test(pin.label) ? pin.label : null;
   const ctx: PolicyContext | null = m ? { label: tractLabel(t), place, cap: m.cap, homes: m.mix.homes, branch: m.branch, qctOrDda: m.qctOrDda, qct: m.base.qct, score: m.sheet.score, draftSheet: m.sheet.sheet.status === 'draft', pinIzo } : null;
   const lead = c.rec.lead ? capitalize(TYPOLOGY_LABEL[c.rec.lead]) : null;
+  const { confirmed } = useConfirmed();
+  const foldSite = !browse && confirmed;
   const close = () => {
     clearLot(t.GEOID);
     useApp.getState().set({ pin: null });
@@ -67,7 +74,18 @@ export default function SiteDetail({ t, place, hud, c, fitOrder, actions }: { t:
       </div>
       <div className="space-y-3 p-5">
         {!lot && <p className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-small leading-snug text-amber-900 ring-1 ring-amber-200">Click a lot on the map or search an address.</p>}
-        {browse && lot ? <Overview scope="parcel" geoid={t.GEOID} zip={null} place={place} demand={m?.tract ?? null} hud={hud} lot={lot} fitOrder={fitOrder} /> : m && <ProjectResults scope="parcel" t={t} place={place} hud={hud} m={m} lot={lot} devType={devType} c={c} ctx={ctx} policy={policy} sheet={sheet} exportable name={lot ? `${lotName(lot.label)} in ${tractLabel(t)}` : tractLabel(t)} />}
+        {/* The site first, in Browse and in Test: the lot and its zoning (folded once the results show). */}
+        {lot && <LotZoning key={`${lot.chunk}:${lot.row}:${foldSite}`} lot={lot} izo={pinIzo ?? inIzoAt(lot.point[0], lot.point[1])} fold={foldSite} />}
+        {browse && lot ? (
+          <Overview scope="parcel" geoid={t.GEOID} zip={null} place={place} demand={m?.tract ?? null} hud={hud} lot={lot} fitOrder={fitOrder} />
+        ) : (
+          m &&
+          lot && (
+            <ConfirmGate>
+              <ProjectResults scope="parcel" t={t} place={place} hud={hud} m={m} lot={lot} devType={devType} c={c} ctx={ctx} policy={policy} sheet={sheet} exportable name={`${lotName(lot.label)} in ${tractLabel(t)}`} />
+            </ConfirmGate>
+          )
+        )}
         <section className="rounded-2xl bg-white px-4 py-3 ring-1 ring-stone-200" data-neighborhood>
           <div className="flex items-baseline justify-between gap-2">
             <h3 className="text-small font-semibold text-slate-900">The neighborhood</h3>

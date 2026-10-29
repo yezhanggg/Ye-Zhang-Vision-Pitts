@@ -30,7 +30,7 @@ A violet edge marks each policy moved from today, and each group counts its chan
 |---|---|---|
 | Does the test project work? | Works by right; works with a hearing; breaks even but under the bar; short by the gap a unit (under $50k, $50–150k, $150–250k, over $250k); not allowed; zoning not read; left out by your values; no rent on file. Tracts whose class changed from today are outlined. | The test project, every money policy, your values, and the house-lot idea for a duplex, triplex or fourplex |
 | What changed from today | Now works (by right or with a hearing), better off, no change, worse off, stops working, not allowed, zoning not read, left out | The same |
-| Homes allowed by right | The count, or its change from today once a zoning policy moves it | More homes on house lots, minimum lot sizes |
+| Homes allowed by right | The count, or its change from today once a zoning policy moves it | Homes on house lots, minimum lot sizes |
 | Need (six measures) | Rent gap and cost burden at an income level, jobs, school, transit, services: data, which no policy changes | Nothing |
 
 When you move a policy the current map does not show, the map switches to one that does. For example, minimum lot sizes switch it to homes allowed by right, and parking switches it back. A line under the menu says what the map shows. Clicking a tract picks it without leaving the city view. On a phone, the controls and the results take turns ("See the results"), so the map stays in view.
@@ -92,11 +92,11 @@ It **works** at the bar for the developer's return: 1.5× equity by default, cha
 
 | Policy | Today | Options | Status | How it enters |
 |---|---|---|---|---|
-| More homes on house lots | 1 (R1), 2 (R2) or 3 (R3) homes; no ADU anywhere (no ADU overlay mapped) | + ADU, up to 3, up to 4 | Idea to test | Homes by right on lived-in house lots at or above the minimum lot size: + ADU adds a unit beside a single home (or today's gain where larger); up to 3 or 4 lets each lot hold that many. Up to 3 or 4 also allows a duplex, triplex or fourplex by right on house lots. |
+| Homes on house lots | 1 (R1), 2 (R2) or 3 (R3) homes; no ADU anywhere (no ADU overlay mapped) | + ADU, up to 3, up to 4 | Idea to test | Homes by right on lived-in house lots at or above the minimum lot size: + ADU adds a unit beside a single home (or today's gain where larger); up to 3 or 4 lets each lot hold that many. Up to 3 or 4 also allows a duplex, triplex or fourplex by right on house lots. |
 | Minimum lot sizes | Today's (Bill 2025-1579, May 2025) | Before May 2025: 8,000 / 5,000 / 3,200 / 1,800 sq ft (the old very-high 1,200 is an assumption) | In force | Homes by right on vacant and house lots |
 | Parking minimums | Kept: 1 space a home for 2 or more homes (§914.02) | None within ½ mile of frequent transit; none | Removal proposed 2024–25; near transit is an idea | Required spaces × the parking cost, added to land. Townhomes need none. Senior housing needs a parking study, not costed. |
 | Inclusionary requirement | IZ-O (tracts more than half inside): 10% at 50% AMI from 20 units (§907.04.A) | Off, IZ-O, citywide; 5–30%; any size; 30/50/60/80% AMI | In force | Market test projects of the minimum size or more set homes aside, from the largest size first |
-| Affordable-housing bonus | Off | 10/15/20% at 50% AMI earns 2/4/6 performance points, 15 ft a point (30/60/90 ft) | Proposed (Bill 2025-1545) | Where no set-aside is required. 10-ft floors and units in proportion, taken only where the taller building does better. An upper bound: the lot and the market must carry the height. Offered from the requirement's minimum size (an assumption). |
+| Height bonus | Off | 10/15/20% at 50% AMI earns 2/4/6 performance points, 15 ft a point (30/60/90 ft) | Proposed (Bill 2025-1545) | Where no set-aside is required. 10-ft floors and units in proportion, taken only where the taller building does better. An upper bound: the lot and the market must carry the height. Offered from the requirement's minimum size (an assumption). |
 | Tax abatement | Off | $1,500 or $3,000 a home a year | Idea to test (like LERTA) | Off the operating cost every year |
 | Gap subsidy | None | $25k, $50k, $100k a home with an income limit | Idea to test | Other subsidy in the stack |
 | PHFA plan | Adopted 2025/2026 | 2027/2028 draft | In force | The 9% credit cap (tax credit projects only) |
@@ -111,6 +111,10 @@ It **works** at the bar for the developer's return: 1.5× equity by default, cha
 - the bar for the developer's return: 1.25×, 1.5× or 2×;
 - building cost: $250, $300 or $350 a sq ft;
 - a parking space: $5k surface, $15k mixed or $30k garage.
+
+**Simple first (2026-10-29).** The left panel opens with six on/off switches (up to 3 homes on house lots, no parking minimums, set-aside citywide, the 20% height bonus, a $50k gap subsidy, frequent bus on every line; off is today's rule) and the test building's type and financing. Everything else (packages, each policy's levels, your values, assumptions, size) is under **More options**.
+
+**Controls, kept short (2026-10-29).** Each policy shows a status tag (In force, Proposed, Idea, Your value) and a few words on today's rule; the (i) holds the full rule, its source and how the lab uses it. Packages carry a one-line summary.
 
 ## The results
 

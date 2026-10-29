@@ -28,6 +28,7 @@ import Overview from './Overview';
 import { useBrowse } from './browse';
 import ZipDemand from '../project/ZipDemand';
 import { mixWords } from '../project/summary';
+import ConfirmGate from './ConfirmGate';
 import { setLevel } from './LevelSwitch';
 
 const B = ({ children }: { children: ReactNode }) => <b className="font-semibold text-slate-900">{children}</b>;
@@ -109,7 +110,11 @@ export default function ZipDetail({ suggestions, hud, level }: { suggestions: Ma
         </div>
       </div>
       <div className="space-y-3 p-5">
-        {browse && hud ? <Overview scope="zip" geoid={null} zip={zip} place={null} demand={demandZip(zip)} hud={hud} suggestions={suggestions} /> : m && hud && <ProjectResults scope="zip" t={null} place={null} hud={hud} m={m} devType={devType} zip={zip} name={zipName(zip)} />}
+        {browse && hud ? <Overview scope="zip" geoid={null} zip={zip} place={null} demand={demandZip(zip)} hud={hud} suggestions={suggestions} /> : m && hud && (
+          <ConfirmGate>
+            <ProjectResults scope="zip" t={null} place={null} hud={hud} m={m} devType={devType} zip={zip} name={zipName(zip)} />
+          </ConfirmGate>
+        )}
         <section className={CARD}>
           <H n={1}>Types suggested in its tracts</H>
           <p className="mt-1 text-small leading-snug text-slate-800">{main.length ? `${tallyWords.join(' · ')}, at ${levelWord}.` : 'No city tract has most of its homes in this ZIP.'}</p>

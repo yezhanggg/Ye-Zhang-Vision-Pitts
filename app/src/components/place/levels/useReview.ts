@@ -60,7 +60,7 @@ export function checkInputFor(m: ProjectModel, devType: DevType, site: SiteIn, i
     efficiency: m.args.inputs.efficiency,
     inIzo,
     floodPct,
-    openShare: m.base.project.openShare,
+    openShare: m.base.project.openOff ? 0 : m.base.project.openShare,
   };
 }
 
@@ -174,8 +174,11 @@ export function projectRead({ scope, m, devType, place, hud, lot, zip, over }: P
   const check = checkZoning(checkInputFor(m, devType, siteIn, scope === 'zip' ? false : inIzo, flood));
   // The capital run on the same site: its land follows the lot (capitalLot reads it the same way for the inputs).
   const run = runCapital(capitalContext(m, devType, siteIn.lotSqft > 0 ? siteIn.lotSqft : null), over);
-  const credits = isHousing(devType) && m.mix.homes > 0 && run.credits;
+  // Capital turned off on the left: no money, credit or size-for-credits checks; zoning, the lot and the area only.
+  const money = !m.base.project.capitalOff;
+  const credits = money && isHousing(devType) && m.mix.homes > 0 && run.credits;
   const review = reviewProject({
+    noMoney: !money,
     scope,
     devType,
     level: m.base.level,
@@ -190,11 +193,11 @@ export function projectRead({ scope, m, devType, place, hud, lot, zip, over }: P
     place: scope === 'zip' ? null : (place ?? m.base.place),
     demand: scope === 'zip' ? m.base.mixFrom : m.tract,
     hud,
-    capital: isHousing(devType) && m.mix.homes > 0 ? run : null,
+    capital: money && isHousing(devType) && m.mix.homes > 0 ? run : null,
     dscrNeed: m.args.inputs.dscr,
     displacement: scope === 'zip' ? null : ((place ?? m.base.place).displacement?.score ?? null),
     typical,
-    score: scope === 'zip' || m.branch === 'market' ? null : scoreFor(m),
+    score: !money || scope === 'zip' || m.branch === 'market' ? null : scoreFor(m),
     alt: credits && Math.min(m.mix.homes, check.maxUnits ?? Infinity, check.fit?.units ?? Infinity) < MIN_CREDIT_UNITS ? marketAlt(m, hud, siteIn, check, scope === 'zip' ? false : inIzo, flood, over) : null,
   });
   return { scope, site: siteIn, check, run, review, typical };

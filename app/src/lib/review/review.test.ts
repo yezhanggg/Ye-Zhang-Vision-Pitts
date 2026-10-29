@@ -94,6 +94,14 @@ describe('the project review', () => {
     expect(r.fixes.find((f) => f.key === 'rent')?.label).toContain(`$${Math.round(need).toLocaleString('en-US')}`);
   });
 
+  it('with Capital turned off, the money is not checked: no money findings or fixes, and the line says so', () => {
+    const thin = runCapital({ ...ctx, grossRent: 40 * 1000 * 12 });
+    const r = reviewProject(input({ devType: 'market', market: true, level: 'market', counts: counts('mkt', [0, 16, 16, 8]), capital: thin, noMoney: true }));
+    expect(r.findings.some((f) => f.area === 'money')).toBe(false);
+    expect(r.fixes.some((f) => f.key === 'rent')).toBe(false);
+    if (r.verdict === 'works') expect(r.line).toContain('money not checked');
+  });
+
   it('the verdict: works when nothing warns, changes on a warning, no on a stop', () => {
     expect(reviewProject(input({ units: 400, site: { units: 400 } })).verdict).toBe('no');
     const unknown = reviewProject(input({ site: { district: 'UC-MU' } }));

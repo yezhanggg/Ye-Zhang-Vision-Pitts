@@ -35,6 +35,7 @@ import type { ProjectModel } from '../project/useProjectModel';
 import CapitalCard, { capitalTile } from './CapitalCard';
 import { lotSunHours, useLotManifest } from './lotSun';
 import { StudyCard } from './Policies';
+import { confirmNow } from '../../../lib/project/confirm';
 import { applyFix, useProjectRead, type ProjectRead } from './useReview';
 
 export type Look = 'good' | 'warn' | 'bad' | 'plain';
@@ -125,15 +126,16 @@ export function takeaways(read: ProjectRead, m: ProjectModel, devType: DevType, 
   };
 }
 
-export function Takeaway4({ t }: { t: Takeaways }) {
+/** `money` false (Capital turned off on the left): the zoning and size tiles only. */
+export function Takeaway4({ t, money = true }: { t: Takeaways; money?: boolean }) {
   return (
     <div className="grid grid-cols-2 gap-2">
       <Tile label="Zoning" value={t.zoning.value} sub={t.zoning.sub} look={t.zoning.look} />
       <Tile label={t.size.label} value={t.size.value} sub={t.size.sub} look={t.size.look}>
         {t.size.share != null && <Bar share={t.size.share} color={t.size.look === 'bad' ? '#e11d48' : '#059669'} />}
       </Tile>
-      <Tile label="Capital" value={t.capital.value} sub={t.capital.sub} look={t.capital.look} />
-      <Tile label={t.fourth.label} value={t.fourth.value} sub={t.fourth.sub} look={t.fourth.look} />
+      {money && <Tile label="Capital" value={t.capital.value} sub={t.capital.sub} look={t.capital.look} />}
+      {money && <Tile label={t.fourth.label} value={t.fourth.value} sub={t.fourth.sub} look={t.fourth.look} />}
     </div>
   );
 }
@@ -422,6 +424,9 @@ export default function ProjectResults({ scope, t, place, hud, m, devType, lot, 
   const housing = isHousing(devType);
   const units = m.mix.homes;
   const tested = housing && units > 0;
+  // Capital or Open space turned off on the left: their cards and tiles are left out.
+  const money = !m.base.project.capitalOff;
+  const open = !m.base.project.openOff;
   const tk = takeaways(read, m, devType, scope);
   const facts = useMemo(() => reviewFacts(`${DEV_TYPE_LABEL[devType]}, ${units} units, ${name} (${scope === 'parcel' ? 'a lot' : scope === 'tract' ? 'a census tract, typical lot' : 'a ZIP code, typical lot'})`, inputWords(m, devType, read), review), [devType, units, name, scope, m, read, review]);
   useEffect(() => {
@@ -435,13 +440,18 @@ export default function ProjectResults({ scope, t, place, hud, m, devType, lot, 
   return (
     <div className="space-y-3" data-project-results={scope} data-parcel-results>
       <VerdictLine review={review} />
-      <Takeaway4 t={tk} />
-      <ReviewCard review={review} facts={facts} onApply={(i) => review.fixes[i]?.action && applyFix(side, m, devType, review.fixes[i].action!)} />
+      <Takeaway4 t={tk} money={money} />
+      <ReviewCard review={review} facts={facts} onApply={(i) => {
+          if (!review.fixes[i]?.action) return;
+          applyFix(side, m, devType, review.fixes[i].action!);
+          // An Apply is a choice made on the right: it confirms the inputs it sets (lib/project/confirm).
+          confirmNow();
+        }} />
       {tested && <FitCard m={m} scope={scope} hud={hud} />}
-      {tested && <CapitalCard run={run} />}
-      {housing && m.branch !== 'market' && t && place && scope !== 'zip' && <CreditMeter m={m} t={t} place={place} />}
+      {money && tested && <CapitalCard run={run} />}
+      {money && housing && m.branch !== 'market' && t && place && scope !== 'zip' && <CreditMeter m={m} t={t} place={place} />}
       {c && policy && sheet != null && <StudyCard composed={c} ctx={ctx ?? null} policy={policy} sheet={sheet} />}
-      {lot && housing && <SunCard lot={lot} fit={check.fit} />}
+      {open && lot && housing && <SunCard lot={lot} fit={check.fit} />}
     </div>
   );
 }

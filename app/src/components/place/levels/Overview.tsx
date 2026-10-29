@@ -28,7 +28,7 @@ import { usePolicy } from '../../../lib/policy/store';
 import { setDevType, type DevType } from '../../../lib/project/devType';
 import { SIDE_A } from '../../../lib/project/side';
 import type { SiteLot } from '../../../lib/project/store';
-import { districtName, homesByRight, STANDARD_BY_CODE, storiesOf, tractCapacity } from '../../../lib/zoning/capacity';
+import { homesByRight, STANDARD_BY_CODE, storiesOf, tractCapacity } from '../../../lib/zoning/capacity';
 import { statusFor } from '../project/TryLot';
 import { useBrowse } from './browse';
 
@@ -201,48 +201,36 @@ export default function Overview({ scope, geoid, zip, place, demand, hud, lot, f
     useBrowse.getState().set('test');
   };
   const typeWord = lead ? capitalize(TYPOLOGY_LABEL[lead]) : lot ? 'Nothing fits this lot by right' : 'No type passes the rules here';
+  // At the Parcel level the lot and its zoning come first (LotZoning, above this panel); the best fit moves to the end.
+  const bestFit = (
+    <section className="rounded-xl bg-emerald-50 px-3 py-2.5 ring-1 ring-emerald-200" data-best-fit>
+      <div className={SUB}>
+        {lot ? 'Best fit on this lot' : 'Best fit here'} · {LEVEL_LABEL[level]}
+      </div>
+      <div className="mt-0.5 text-lead font-semibold leading-tight text-emerald-700">{typeWord}</div>
+      <p className="mt-0.5 text-small leading-snug text-slate-800">
+        {level === 'market' ? 'At market rate' : `For renters ${LEVEL_LABEL[level]}`}
+        {lead ? `; about ${size} unit${size === 1 ? '' : 's'}` : ''}
+        {mix ? `, split ${mix.filter((l) => l.homes > 0).map((l) => `${l.homes} ${l.group === 'small' ? 'studio/1-bed' : l.group === 'two' ? '2-bed' : '3+ bed'}`).join(', ')}` : ''}.
+        {lot && fit.lead && lead !== fit.lead ? ` The tract's best fit (${TYPOLOGY_LABEL[fit.lead]}) isn't allowed by right here.` : ''}
+      </p>
+      {need !== level && (
+        <p className="mt-0.5 text-small leading-snug text-slate-800">
+          Most cost-burdened here: renters {LEVEL_LABEL[need]}.{' '}
+          <button type="button" onClick={() => usePlan.getState().setPlan({ level: need })} className="font-medium text-violet-700 underline hover:text-violet-900">
+            Read at {LEVEL_LABEL[need]}
+          </button>
+        </p>
+      )}
+      {fit.tally && fit.tally.length > 1 && <p className="mt-0.5 text-caption leading-snug text-slate-600">Across its tracts: {fit.tally.map(([k, n]) => `${k === 'none' ? 'no suggestion' : TYPOLOGY_LABEL[k as Typology]} ${n}`).join(' · ')}.</p>}
+      <button type="button" onClick={test} className="mt-2 w-full rounded-lg bg-violet-600 px-2 py-1.5 text-small font-semibold text-white hover:bg-violet-700">
+        Test this project
+      </button>
+    </section>
+  );
   return (
     <div className="space-y-3" data-overview={scope}>
-      <section className="rounded-xl bg-emerald-50 px-3 py-2.5 ring-1 ring-emerald-200" data-best-fit>
-        <div className={SUB}>
-          {lot ? 'Best fit on this lot' : 'Best fit here'} · {LEVEL_LABEL[level]}
-        </div>
-        <div className="mt-0.5 text-lead font-semibold leading-tight text-emerald-700">{typeWord}</div>
-        <p className="mt-0.5 text-small leading-snug text-slate-800">
-          {level === 'market' ? 'At market rate' : `For renters ${LEVEL_LABEL[level]}`}
-          {lead ? `; about ${size} unit${size === 1 ? '' : 's'}` : ''}
-          {mix ? `, split ${mix.filter((l) => l.homes > 0).map((l) => `${l.homes} ${l.group === 'small' ? 'studio/1-bed' : l.group === 'two' ? '2-bed' : '3+ bed'}`).join(', ')}` : ''}.
-          {lot && fit.lead && lead !== fit.lead ? ` The tract's best fit (${TYPOLOGY_LABEL[fit.lead]}) isn't allowed by right here.` : ''}
-        </p>
-        {need !== level && (
-          <p className="mt-0.5 text-small leading-snug text-slate-800">
-            Most cost-burdened here: renters {LEVEL_LABEL[need]}.{' '}
-            <button type="button" onClick={() => usePlan.getState().setPlan({ level: need })} className="font-medium text-violet-700 underline hover:text-violet-900">
-              Read at {LEVEL_LABEL[need]}
-            </button>
-          </p>
-        )}
-        {fit.tally && fit.tally.length > 1 && <p className="mt-0.5 text-caption leading-snug text-slate-600">Across its tracts: {fit.tally.map(([k, n]) => `${k === 'none' ? 'no suggestion' : TYPOLOGY_LABEL[k as Typology]} ${n}`).join(' · ')}.</p>}
-        <button type="button" onClick={test} className="mt-2 w-full rounded-lg bg-violet-600 px-2 py-1.5 text-small font-semibold text-white hover:bg-violet-700">
-          Test this project
-        </button>
-      </section>
-
-      {lot && (
-        <section className={CARD} data-overview-lot>
-          <h3 className="text-small font-semibold text-slate-900">This lot</h3>
-          <p className="mt-0.5 text-small leading-snug text-slate-800">
-            {std ? (
-              <>
-                {lot.district} ({districtName(lot.district!)}), {n0(lot.sqft)} sq ft: <b className="font-semibold">{onLot?.below_min ? 'under the minimum lot size' : `up to ${onLot?.homes ?? 0} unit${onLot?.homes === 1 ? '' : 's'} by right`}</b>, {storiesOf(std) ?? '—'} stories ({std.max_height_ft} ft).
-                {fit.lead && ` ${capitalize(TYPOLOGY_LABEL[fit.lead])}: ${statusFor(lot.district!, fit.lead).word}.`}
-              </>
-            ) : (
-              `${lot.district ?? 'No district'} is not computed here; check with the Zoning Administrator.`
-            )}
-          </p>
-        </section>
-      )}
+      {!lot && bestFit}
 
       {bands.length > 0 && (
         <section className={CARD} data-overview-income>
@@ -334,6 +322,7 @@ export default function Overview({ scope, geoid, zip, place, demand, hud, lot, f
           </p>
         </section>
       )}
+      {lot && bestFit}
       <p className="px-1 text-caption leading-snug text-slate-500">Sources: HUD CHAS 2018–22, ACS {ACS}, asking rents 2025–26, HUD FY2026 limits.</p>
     </div>
   );

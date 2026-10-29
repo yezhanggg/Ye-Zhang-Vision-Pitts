@@ -233,6 +233,16 @@ const onWeb = () => {
   }
 };
 
+/** True when this page load is a reload or a back/forward restore, not a link being opened. */
+function reopened(): boolean {
+  try {
+    const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+    return nav?.type === 'reload' || nav?.type === 'back_forward';
+  } catch {
+    return false;
+  }
+}
+
 /** Restore state from the URL (a page path on the web, or the hash). Returns true when the URL carried any state. */
 export function readHash(): boolean {
   let h = '';
@@ -243,6 +253,23 @@ export function readHash(): boolean {
   }
   if (!h) return false;
   const patch = parseHash(h);
+  if (reopened()) {
+    // A reload (or a tab the browser restores) is a fresh visit: the page stays, nothing is selected.
+    delete patch.selectedId;
+    delete patch.compareId;
+    delete patch.pin;
+    if (patch.browse) {
+      patch.browse = { ...patch.browse, selected: null };
+      patch.browsePanel = !!patch.browse.variable;
+    }
+    // And the address bar drops the old selection with it.
+    if (window.location.hash) {
+      const q = new URLSearchParams(h);
+      for (const k of ['t', 'b', 'p', 'u']) q.delete(k);
+      const rest = q.toString().replace(/%2C/gi, ',').replace(/%3A/gi, ':');
+      history.replaceState(null, '', window.location.pathname + window.location.search + (rest ? `#${rest}` : ''));
+    }
+  }
   useApp.setState(patch);
   return Object.keys(patch).length > 0;
 }

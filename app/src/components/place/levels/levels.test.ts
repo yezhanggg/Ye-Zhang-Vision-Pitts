@@ -6,9 +6,9 @@ describe('the three levels', () => {
     expect(LEVELS.map((l) => l.label)).toEqual(['Parcel', 'Tract', 'ZIP code']);
   });
 
-  it('every level asks for the same project, capital, open space and policies; the Parcel level adds the lot', () => {
-    expect(inputsFor('parcel', true)).toEqual(['site', 'project', 'money', 'open', 'policy']);
-    for (const level of ['tract', 'zip'] as const) expect(inputsFor(level, true)).toEqual(['project', 'money', 'open', 'policy']);
+  it('every level asks for the same project, capital, open space and policies; the lot shows on the right', () => {
+    expect(inputsFor('parcel', true)).toEqual(['project', 'money', 'open', 'policy', 'study']);
+    for (const level of ['tract', 'zip'] as const) expect(inputsFor(level, true)).toEqual(['project', 'money', 'open', 'policy', 'study']);
   });
 
   it('before a site is picked, the Parcel level offers Find places', () => {

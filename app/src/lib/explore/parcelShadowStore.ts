@@ -3,6 +3,7 @@
 // to the Explore map, so the offline single file holds next to nothing of it. Not part of the link.
 import { create } from 'zustand';
 import type { OverlayLayer } from '../../components/MapView';
+import type { SiteLot } from '../project/store';
 
 export interface ParcelState {
   /** The parcel files are on this copy of the site (they are large and published separately). */
@@ -20,6 +21,8 @@ export interface ParcelState {
   selected: { chunk: string; row: number } | null;
   /** Parcels is the open boundary (online only, components/explore/ParcelsBoundary). */
   boundary?: boolean;
+  /** The lot clicked under Parcels, read in full: the right panel shows its facts and zoning (ParcelSummary). */
+  picked?: SiteLot | null;
 }
 
 export const NO_CHUNKS: ReadonlySet<string> = new Set();

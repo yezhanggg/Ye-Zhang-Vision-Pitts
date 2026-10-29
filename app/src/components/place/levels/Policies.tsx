@@ -1,4 +1,4 @@
-// Policies at every level of the Place tab, in two parts (Ye, 2026-10-27). "Applies here" is read from the place's
+// Policies at every level of the Place tab, as two numbered groups (Ye, 2026-10-27 and 10-29). "Policies" (what applies here) is read from the place's
 // data and shown on its own: rules the site must meet and programs it is eligible for. "I want to study" is the
 // person's list of incentives, programs and screens to weigh; each one picked shows its result on the right
 // (StudyCard). Online only: loaded on demand.
@@ -28,7 +28,6 @@ const STATUS_CLASS: Record<PolicyStatus, string> = {
   assumption: 'bg-stone-100 text-slate-600 ring-stone-200',
 };
 const Badge = ({ status }: { status: PolicyStatus }) => <span className={cx('shrink-0 rounded px-1 py-px text-[10px] font-semibold ring-1', STATUS_CLASS[status])}>{STATUS_WORD[status]}</span>;
-const SUB = 'text-caption font-semibold uppercase tracking-wide text-slate-500';
 
 /** What each rule read from the data means for a site, in a few words. */
 const AUTO: { id: Policy['id']; kind: 'required' | 'eligible'; words: string }[] = [
@@ -63,7 +62,8 @@ function AutoRow({ kind, label, words, state }: { kind: 'required' | 'eligible';
 }
 
 /** The left panel's policies group. `ctx` reads one place; `counts` reads a ZIP code's tracts. */
-export function PolicyPicker({ ctx, counts }: { ctx: PolicyContext | null; counts?: ZipPolicyCount | null }) {
+/** `part`: Policies shows what applies here; I want to study, the list to weigh. */
+export function PolicyPicker({ ctx, counts, part }: { ctx: PolicyContext | null; counts?: ZipPolicyCount | null; part: 'applies' | 'study' }) {
   const side = useSide();
   const pol = side.policy();
   const sheet = side.lihtc((e) => e.sheet);
@@ -79,10 +79,8 @@ export function PolicyPicker({ ctx, counts }: { ctx: PolicyContext | null; count
     else side.policy.setState((s) => ({ on: { ...s.on, [id]: v } }));
   };
   return (
-    <div className="space-y-3" data-policy-picker>
-      <div>
-        <div className={SUB}>Applies here</div>
-        {auto.length ? (
+    <div className="space-y-3" data-policy-picker={part}>
+      {part === 'applies' && (auto.length ? (
           <ul className="divide-y divide-stone-100">
             {auto.map((a) => (
               <AutoRow key={a.id} kind={a.kind} label={POLICY(a.id).label} words={a.words} state={a.state} />
@@ -90,10 +88,8 @@ export function PolicyPicker({ ctx, counts }: { ctx: PolicyContext | null; count
           </ul>
         ) : (
           <p className="pt-1 text-small text-slate-600">{ctx || counts ? 'No special rule or program applies here.' : 'Pick a place to see what applies.'}</p>
-        )}
-      </div>
-      <div>
-        <div className={SUB}>I want to study</div>
+        ))}
+      {part === 'study' && (
         <ul className="divide-y divide-stone-100">
           {STUDY.filter((id) => id !== 'phfa_draft' || DRAFT_SHEET).map((id) => {
             const p = POLICY(id);
@@ -114,7 +110,7 @@ export function PolicyPicker({ ctx, counts }: { ctx: PolicyContext | null; count
             );
           })}
         </ul>
-      </div>
+      )}
     </div>
   );
 }
@@ -147,7 +143,7 @@ export function StudyCard({ composed, ctx, policy, sheet }: { composed: Composed
           ))}
         </ul>
       ) : (
-        <p className="mt-1 text-small text-slate-600">Nothing picked. Choose incentives or screens under Policies on the left.</p>
+        <p className="mt-1 text-small text-slate-600">Nothing picked. Choose incentives or screens under I want to study on the left.</p>
       )}
     </section>
   );

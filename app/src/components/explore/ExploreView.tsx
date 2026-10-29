@@ -38,6 +38,8 @@ import { useSunShadow } from '../../lib/explore/sunShadowStore';
 // The sun-and-shadow control and its map layer load when the switch is first turned on; the offline single file leaves them out.
 const SunDock = import.meta.env.MODE === 'export' ? null : lazy(() => import('./SunDock'));
 const ParcelsBoundary = import.meta.env.MODE === 'export' ? null : lazy(() => import('./ParcelsBoundary'));
+// Parcels open: the right panel shows the clicked lot's facts and zoning.
+const ParcelSummary = import.meta.env.MODE === 'export' ? null : lazy(() => import('./ParcelSummary'));
 const ChatPill = import.meta.env.MODE === 'export' ? null : lazy(() => import('../ChatPill'));
 
 /** The built-in tract layers are hidden in Explore; this keeps their paint effect inert. */
@@ -106,6 +108,7 @@ export default function ExploreView() {
   // Sun and shadow, By parcel: lots come ready-made from the lazy half; while they are on screen they take the hover and the clicks.
   const lotLayers = useParcelShadow((s) => s.overlays);
   const lotsOn = useParcelShadow((s) => s.active);
+  const parcels = useParcelShadow((s) => !!s.boundary);
   // The legend is pinned to the bottom-left corner; the Explore panel keeps clear of it (and folds away on its own).
   const [legendH, setLegendH] = useState(0);
   const legendRo = useRef<ResizeObserver | null>(null);
@@ -192,7 +195,7 @@ export default function ExploreView() {
   }, [open, layerId, level, cityOnly, browseGeo.data, cityGeo.data, selected, fillPaint, browseIndex, variable, values, setBrowse, zoningOn, landOn, landPaint, lotLayers, lotsOn]);
 
   const chat = useMemo<ChatScope>(() => ({ level, cityOnly, fc: browseGeo.data, selected: selected?.geoid ?? null, variable, values, weights }), [level, cityOnly, browseGeo.data, selected, variable, values, weights]);
-  const panelKey = selected ? `place:${selected.level}:${selected.geoid}:${variable?.id ?? ''}` : variable ? `var:${variable.id}` : 'overview';
+  const panelKey = parcels ? 'lots' : selected ? `place:${selected.level}:${selected.geoid}:${variable?.id ?? ''}` : variable ? `var:${variable.id}` : 'overview';
   const tourActive = useTour((s) => s.active);
   const noticeClosed = useTour((s) => s.noticeClosed);
   const tourCue = useTour((s) => s.cue);
@@ -269,8 +272,12 @@ export default function ExploreView() {
           )}
           <PanelFrame inline tourId="summary" open={panelOpen} onToggle={(o) => set({ browsePanel: o })} title={EXPLORE_UI.summaryTab}>
             <AnimatePresence mode="wait" initial={false}>
-              <motion.div key={panelKey} className={selected || variable ? undefined : 'h-full'} initial={lite ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={lite ? undefined : { opacity: 0, y: -6 }} transition={{ duration: 0.16 }}>
-                {selected ? <PlaceCard selected={selected} fc={browseGeo.data} variable={variable} values={loaded} /> : variable && loaded ? <VariableSummary variable={variable} level={level} values={loaded} fc={browseGeo.data} /> : <EmptySummary />}
+              <motion.div key={panelKey} className={selected || variable || parcels ? undefined : 'h-full'} initial={lite ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={lite ? undefined : { opacity: 0, y: -6 }} transition={{ duration: 0.16 }}>
+                {parcels && ParcelSummary ? (
+                  <Suspense fallback={null}>
+                    <ParcelSummary />
+                  </Suspense>
+                ) : selected ? <PlaceCard selected={selected} fc={browseGeo.data} variable={variable} values={loaded} /> : variable && loaded ? <VariableSummary variable={variable} level={level} values={loaded} fc={browseGeo.data} /> : <EmptySummary />}
               </motion.div>
             </AnimatePresence>
           </PanelFrame>
@@ -296,7 +303,7 @@ export default function ExploreView() {
         )}
       </AnimatePresence>
       <AnimatePresence>
-        {phase === 'done' && (sunOn || (variable && values) || zoningOn || (landOn && open)) && (
+        {phase === 'done' && (sunOn || (variable && values) || zoningOn || (landOn && (open || parcels))) && (
           <motion.div key="legend" ref={legendRef} initial={lite ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className={cx('absolute bottom-3 left-3 z-20 flex flex-col items-start gap-2 max-sm:bottom-[8.5rem] max-sm:right-3', panelOpen && 'max-sm:hidden')}>
             {sunOn && SunDock && (
               <Suspense fallback={null}>
@@ -305,7 +312,7 @@ export default function ExploreView() {
             )}
             <div className="flex max-w-full items-end gap-2 max-sm:overflow-x-auto">
               {variable && values && !lotsOn && <DataLegend variable={variable} level={level} values={values} breaks={breaks} ext={ext} hoverId={hoverId} />}
-              {landOn && open && <LandUseLegend classes={landClasses} hoverId={hoverId} />}
+              {landOn && (open || parcels) && <LandUseLegend classes={landClasses} hoverId={hoverId} lots={parcels} />}
               {zoningOn && <ZoningLegend hoverCode={zoningHover} />}
             </div>
           </motion.div>

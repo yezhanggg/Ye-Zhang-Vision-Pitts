@@ -6,7 +6,8 @@ import { tractById, tractLabel } from '../../../lib/data';
 import { cx } from '../../../lib/format';
 import { EXAMPLES, LEVER_LABEL, moved, resultClass, VERDICT_WORD, type LeverEffect, type Scenario, type Summary, type TractOutcome, type Verdict } from '../../../lib/policylab/lab';
 import { useSecondOpinion } from '../../../lib/review/ai';
-import { answer, CARD, EVIDENCE, n0, plural, RESULT_TEXT, RESULT_WORD, SUB, usdK } from './ui';
+import { useApp } from '../../../lib/store';
+import { answer, CARD, EVIDENCE, n0, plural, RESULT_TEXT, RESULT_WORD, usdK } from './ui';
 
 const VERDICT_CLASS: Record<Verdict, string> = { works: 'bg-emerald-50 text-emerald-800 ring-emerald-200', tradeoff: 'bg-amber-50 text-amber-900 ring-amber-200', none: 'bg-stone-100 text-slate-500 ring-stone-200', backfires: 'bg-rose-50 text-rose-700 ring-rose-200', overlap: 'bg-stone-100 text-slate-500 ring-stone-200' };
 const VERDICT_TIP: Record<Verdict, string> = { works: 'Gains only', tradeoff: 'Some gains, some losses', none: 'Nothing changes', backfires: 'Losses only', overlap: 'Your other choices already do this' };
@@ -104,21 +105,44 @@ function Effects({ fx, iz }: { fx: LeverEffect[]; iz: boolean }) {
   );
 }
 
+/** One side of the tract's comparison: the result in big words, then the gap or the return. */
+function Side({ label, x, accent }: { label: string; x: TractOutcome | undefined; accent: string }) {
+  const k = x ? resultClass(x) : null;
+  return (
+    <div className="rounded-xl bg-stone-50 px-3 py-2.5" style={{ boxShadow: `inset 0 3px 0 ${accent}` }}>
+      <div className="text-caption font-semibold uppercase tracking-wide" style={{ color: accent }}>
+        {label}
+      </div>
+      <div className="mt-1 text-lead font-semibold leading-tight" style={{ color: k ? RESULT_TEXT[k] : '#64748b' }}>
+        {k ? RESULT_WORD[k] : '—'}
+      </div>
+      <div className="tnum mt-1 text-small text-slate-700">{!x ? '' : x.gap == null ? (x.multiple != null ? `Return ${x.multiple.toFixed(2)}×` : '') : x.gap === 0 ? `No gap${x.multiple != null ? ` · return ${x.multiple.toFixed(2)}×` : ''}` : `Short ${usdK(x.gap)} a unit`}</div>
+    </div>
+  );
+}
+
+/** The tract clicked on the map: today against your rules, side by side, then the details. */
 function TractCard({ t, was0 }: { t: TractOutcome; was0: TractOutcome | undefined }) {
-  const z = (x: TractOutcome) => (x.zoning.status === 'unknown' ? 'not read here' : x.zoning.lots ? `by right on ${n0(x.zoning.lots)} of ${n0(x.zoning.of)} lots` : x.zoning.hearing ? `hearing needed, ${n0(x.zoning.hearing)} lots` : 'no lot');
+  const z = (x: TractOutcome) => (x.zoning.status === 'unknown' ? 'not read here' : x.zoning.lots ? `by right on ${n0(x.zoning.lots)} of ${n0(x.zoning.of)} lots` : x.zoning.hearing ? `hearing needed, ${n0(x.zoning.hearing)} lots` : 'not allowed');
   const rows: [string, (x: TractOutcome) => ReactNode][] = [
-    ['Result', (x) => <b className="font-semibold" style={{ color: RESULT_TEXT[resultClass(x)] }}>{RESULT_WORD[resultClass(x)]}</b>],
-    ['Return', (x) => (x.multiple != null ? `${x.multiple.toFixed(2)}×` : x.status === 'nodata' || x.gap !== 0 ? '—' : 'no gap')],
-    ['Gap a unit', (x) => (x.gap == null ? '—' : x.gap === 0 ? 'none' : usdK(x.gap))],
     ['Units', (x) => `${x.units}${x.affordable ? `, ${x.affordable} income-limited` : ''}${x.bonus ? ' (bonus)' : ''}`],
     ['Zoning', z],
     ['Homes by right', (x) => n0(x.capacity)],
-    ['Frequent transit', (x) => (x.transitMi == null ? '—' : `${x.transitMi.toFixed(2)} mi`)],
   ];
   return (
-    <section className={CARD} data-lab-tract>
-      <div className={SUB}>{tractLabel(tractById.get(t.geoid))}</div>
-      <div className="mt-1 text-caption text-slate-700" style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr', columnGap: 10, rowGap: 3 }}>
+    <section className="rounded-2xl bg-white px-4 py-3 ring-2 ring-violet-200" data-lab-tract>
+      <div className="flex items-start justify-between gap-2">
+        <h3 className="font-display text-lead font-bold text-slate-900">{tractLabel(tractById.get(t.geoid))}</h3>
+        <button type="button" onClick={() => useApp.getState().select(null)} className="rounded-md px-1 text-slate-500 hover:text-slate-900" aria-label="Clear the tract">
+          ×
+        </button>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <Side label="Today" x={was0} accent="#64748b" />
+        <Side label="Your rules" x={t} accent="#7c3aed" />
+      </div>
+      <p className="mt-2 text-small leading-snug text-slate-800">{t.why}.{t.highRisk ? ' High displacement risk here.' : ''}</p>
+      <div className="mt-2 text-caption text-slate-700" style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr', columnGap: 10, rowGap: 3 }}>
         <span />
         <span className="font-semibold text-slate-500">Today</span>
         <span className="font-semibold text-violet-700">Your rules</span>
@@ -130,9 +154,6 @@ function TractCard({ t, was0 }: { t: TractOutcome; was0: TractOutcome | undefine
           </Fragment>
         ))}
       </div>
-      <p className="mt-1.5 text-caption leading-snug text-slate-600">
-        Your rules: {t.why}. {t.highRisk ? 'High displacement risk here.' : ''}
-      </p>
     </section>
   );
 }
@@ -189,13 +210,13 @@ function Opinion({ facts }: { facts: string }) {
   );
 }
 
-export default function LabResults({ s, today, yours, fx, range, picked, pickedToday, facts, children }: { s: Scenario; today: Summary; yours: Summary; fx: LeverEffect[]; range: { cheaper: number; dearer: number }; picked: TractOutcome | undefined; pickedToday: TractOutcome | undefined; facts: string; children?: ReactNode }) {
+export default function LabResults({ s, today, yours, fx, range, picked, pickedToday, facts }: { s: Scenario; today: Summary; yours: Summary; fx: LeverEffect[]; range: { cheaper: number; dearer: number }; picked: TractOutcome | undefined; pickedToday: TractOutcome | undefined; facts: string }) {
   return (
     <div className="space-y-3 p-5" aria-label="Results">
+      {/* The tract clicked comes first: today against your rules, big. */}
+      {picked ? <TractCard t={picked} was0={pickedToday} /> : <p className="px-1 text-caption leading-snug text-slate-500">Click a tract on the map to compare it today and under your rules.</p>}
       <Answer s={s} today={today} yours={yours} range={range} />
-      {children}
       <Effects fx={fx} iz={moved(s, 'iz') || moved(s, 'bonus')} />
-      {picked ? <TractCard t={picked} was0={pickedToday} /> : <p className="px-1 text-caption leading-snug text-slate-500">Click a tract on the map for its numbers.</p>}
       <Outcomes today={today} yours={yours} />
       <Kinds />
       <Opinion facts={facts} />

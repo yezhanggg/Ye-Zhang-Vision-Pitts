@@ -49,6 +49,7 @@ import PlanAnswer from './PlanAnswer';
 import SuggestionLegend, { FLOOD_FILL } from './SuggestionLegend';
 import { useZipOverlays } from './ZipPanel';
 import ProjectResults from './levels/ProjectResults';
+import ConfirmGate from './levels/ConfirmGate';
 import Overview from './levels/Overview';
 import { useBrowse } from './levels/browse';
 import { Explainer } from '../primitives';
@@ -187,7 +188,11 @@ function StudioDetail({ t, c, fitOrder, words, onClose }: { t: TractProps; c: Co
       <DetailHeader t={t} onClose={onClose} actions={<StudioExport t={t} place={place} hud={hud} c={c} words={words} />} />
       <div className="space-y-3 p-5">
         {browse ? <Overview scope="tract" geoid={t.GEOID} zip={null} place={place} demand={m?.tract ?? null} hud={hud} fitOrder={fitOrder} /> : <SuggestedHere c={c} words={words} />}
-        {!browse && m && <ProjectResults scope="tract" t={t} place={place} hud={hud} m={m} devType={devType} c={c} ctx={ctx} policy={policy} sheet={sheet} exportable name={tractLabel(t)} />}
+        {!browse && m && (
+          <ConfirmGate>
+            <ProjectResults scope="tract" t={t} place={place} hud={hud} m={m} devType={devType} c={c} ctx={ctx} policy={policy} sheet={sheet} exportable name={tractLabel(t)} />
+          </ConfirmGate>
+        )}
         <TestSite t={t} />
         <Explainer title="The evidence behind the suggestion">
           <div className="space-y-3">

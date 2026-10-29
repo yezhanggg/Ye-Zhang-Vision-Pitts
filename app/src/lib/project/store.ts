@@ -58,6 +58,10 @@ export interface ProjectState {
   openType: 'private' | 'shared' | 'public';
   /** The kind of development at the Parcel level (lib/project/devType); unset: read from the planning inputs. */
   devType?: 'market' | 'affordable' | 'senior' | 'mixed' | 'commercial';
+  /** Capital turned off on the left: the money is not checked, only zoning, the lot and the area. */
+  capitalOff?: boolean;
+  /** Open space turned off: none is set aside on the lot. */
+  openOff?: boolean;
   /** Commercial floor area, sq ft (mixed use: the ground floor; commercial: the building). Zoning check only. */
   commercialSf?: number | null;
   /** The Parcel level's Capital inputs the person changed, by key (lib/project/capital); the rest are suggested. */
@@ -108,6 +112,8 @@ export function parseProject(raw: string | null): ProjectState {
       openShare: typeof s.openShare === 'number' && s.openShare >= 0 && s.openShare < 1 ? s.openShare : DEFAULT_PROJECT.openShare,
       openType: s.openType === 'private' || s.openType === 'public' ? s.openType : 'shared',
       ...(['market', 'affordable', 'senior', 'mixed', 'commercial'].includes(s.devType as string) ? { devType: s.devType } : {}),
+      ...(s.capitalOff === true ? { capitalOff: true } : {}),
+      ...(s.openOff === true ? { openOff: true } : {}),
       ...(typeof s.commercialSf === 'number' && Number.isFinite(s.commercialSf) && s.commercialSf >= 0 ? { commercialSf: s.commercialSf } : {}),
       ...(s.capital && typeof s.capital === 'object' ? { capital: Object.fromEntries(Object.entries(s.capital).filter(([, v]) => typeof v === 'number' && Number.isFinite(v))) } : {}),
       ...(s.suggested && typeof s.suggested === 'object' && typeof s.suggested.lot === 'string' ? { suggested: { lot: s.suggested.lot, units: typeof s.suggested.units === 'number' ? s.suggested.units : null, stories: typeof s.suggested.stories === 'number' ? s.suggested.stories : null } } : {}),
@@ -117,9 +123,12 @@ export function parseProject(raw: string | null): ProjectState {
   }
 }
 
+/** The inputs carry over between visits; the lots picked (and the units suggested for them) do not, so every visit
+ *  opens with no lot selected. */
 function load(): ProjectState {
   try {
-    return parseProject(typeof localStorage === 'undefined' ? null : localStorage.getItem(KEY));
+    const { suggested: _lot, ...p } = parseProject(typeof localStorage === 'undefined' ? null : localStorage.getItem(KEY));
+    return { ...p, sites: {} };
   } catch {
     return DEFAULT_PROJECT;
   }

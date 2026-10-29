@@ -123,11 +123,11 @@ const BONUS_AMI: Ami = 50;
 
 /** Ready-made sets of policies to start from. Each starts from today's rules. */
 export const PACKAGES: { id: string; label: string; line: string; set: Partial<Policies>; project?: TestProject }[] = [
-  { id: 'today', label: "Today's rules", line: 'The rules in force in October 2026.', set: {} },
-  { id: 'middle', label: 'Missing middle', line: 'Tests a triplex: up to 3 homes on house lots; no parking minimums near frequent transit.', set: { houseLots: 'three', parking: 'transit' }, project: { type: 'triplex', devType: 'market', units: 3, stories: 3 } },
-  { id: 'affordable', label: 'More affordable homes', line: 'The 10% set-aside citywide, a $50k gap subsidy and a $1,500 tax abatement.', set: { izWhere: 'citywide', subsidy: 50000, abatement: 1500 } },
-  { id: 'transit', label: 'Build near transit', line: 'Frequent bus on every line, no parking minimums near it, the 20% height bonus; build only within ½ mile.', set: { frequentBus: true, parking: 'transit', bonus: 0.2, transitMi: 0.5 } },
-  { id: 'proposed', label: 'On the table', line: 'The proposals before the City: the height bonus (Bill 2025-1545) and no parking minimums.', set: { bonus: 0.2, parking: 'remove' } },
+  { id: 'today', label: "Today's rules", line: 'In force now', set: {} },
+  { id: 'middle', label: 'Missing middle', line: 'Triplexes, less parking', set: { houseLots: 'three', parking: 'transit' }, project: { type: 'triplex', devType: 'market', units: 3, stories: 3 } },
+  { id: 'affordable', label: 'More affordable homes', line: 'Set-aside, subsidy, tax break', set: { izWhere: 'citywide', subsidy: 50000, abatement: 1500 } },
+  { id: 'transit', label: 'Build near transit', line: 'Frequent bus, height bonus', set: { frequentBus: true, parking: 'transit', bonus: 0.2, transitMi: 0.5 } },
+  { id: 'proposed', label: 'On the table', line: 'Bills before the City', set: { bonus: 0.2, parking: 'remove' } },
 ];
 
 /** works / fails: allowed by right, and the money works or not; hearing: allowed only with a zoning hearing (money read
@@ -541,11 +541,11 @@ export function changeClass(today: TractOutcome, yours: TractOutcome): ChangeCla
 // ------------------------------------------------------------------------------------------------ each policy's part
 export type LeverId = 'houseLots' | 'lots' | 'parking' | 'iz' | 'bonus' | 'abatement' | 'subsidy' | 'plan' | 'frequentBus' | 'screens';
 export const LEVER_LABEL: Record<LeverId, string> = {
-  houseLots: 'More homes on house lots',
+  houseLots: 'Homes on house lots',
   lots: 'Minimum lot sizes',
   parking: 'Parking minimums',
   iz: 'Inclusionary requirement',
-  bonus: 'Affordable-housing bonus',
+  bonus: 'Height bonus',
   abatement: 'Tax abatement',
   subsidy: 'Gap subsidy',
   plan: 'PHFA plan',

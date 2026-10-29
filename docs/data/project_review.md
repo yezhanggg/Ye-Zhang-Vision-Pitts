@@ -110,3 +110,16 @@ Above the inputs, **Browse | Test a project** switches every level between testi
 6. **Zoning:** the tract's vacant lots and the homes they allow by right; on a lot, what that lot allows.
 
 "Test this project" carries the type, income level, size and stories into the inputs and switches to Test a project.
+
+## Turning parts off (2026-10-29)
+
+On the left, at Parcel, Tract and ZIP code and on each side of Compare, **Capital** and **Open space** have an on/off switch (stored with the project as `capitalOff` / `openOff`).
+- **Capital off:** the review skips the money, tax credit and size-for-credits checks; the verdict reads on zoning, the lot and the area only ("money not checked"). The Capital and Tax credits tiles, the capital card and the score meter are left out; in Compare a side reads "Off", and with both off the money rows and stacks are left out.
+- **Open space off:** none is set aside on the lot (the fit check reads 0%), and the open space and sun card is left out.
+
+**I want to study** is its own numbered group after **Policies** (what applies here): the fifth group at Tract and ZIP code, the sixth at Parcel.
+
+## Site on the right, and Confirm (2026-10-29)
+
+- **Site:** at the Parcel level the lot is no longer a group in the left panel. The right panel opens with **Site and zoning** (`components/place/levels/LotZoning.tsx`) in Browse and in Test: the county's lot facts (use, area, shape, homes today, sun) and what Title Nine allows there (district, units by right on this lot, housing allowed by right and with approval, minimum lot, height, setbacks, FAR and coverage where set, the inclusionary overlay). In Browse, "Best fit on this lot" moves to the end of the panel.
+- **Confirm:** Test a project waits for **Confirm and test** at the bottom of the left panel (`lib/project/confirm.ts`). The inputs still change at once, but the right panel shows the results only for the inputs last confirmed; before that, or after any change, it shows the place (at the Parcel level, the lot and its zoning, open) and a line saying to confirm. An **Apply** on a suggested fix confirms the inputs it sets. Tax credit sheet entries are left out of the check. Session only. Compare places still applies its inputs at once.

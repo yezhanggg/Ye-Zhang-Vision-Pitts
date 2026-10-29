@@ -56,17 +56,6 @@ export function BoundaryPanel() {
           </Suspense>
         )}
       </div>
-      <ZoningSwitch />
-    </div>
-  );
-}
-
-/** The two ground maps drawn over whichever boundary is open: city zoning districts, and each area's main land use. */
-function ZoningSwitch() {
-  return (
-    <div role="group" aria-label="Map layers" className="space-y-1.5 border-t border-stone-200/80 pt-2">
-      <ZoningMapSwitch />
-      <LandUseMapSwitch />
     </div>
   );
 }
@@ -76,10 +65,11 @@ export function ZoningMapSwitch({ id = 'layer-zoning' }: { id?: string }) {
   return <Switch id={id} on={on} disabled={!hasZoning} label="Zoning districts" caption={hasZoning ? 'City of Pittsburgh zoning map (WPRDC), colored by district family' : 'Zoning map not built yet'} onChange={setZoningMap} />;
 }
 
-export function LandUseMapSwitch({ id = 'layer-landuse' }: { id?: string }) {
+/** Colors the open boundary's shapes, so it waits for one (`ready`). */
+export function LandUseMapSwitch({ id = 'layer-landuse', ready = true }: { id?: string; ready?: boolean }) {
   const on = useLandUseLayer((s) => s.on);
   const set = useLandUseLayer((s) => s.set);
-  return <Switch id={id} on={on} label="Land-use map" caption="Each area colored by its main land use (county property assessments, 2026)" onChange={set} />;
+  return <Switch id={id} on={on && ready} disabled={!ready} label="Land-use map" caption={ready ? 'Each area, or each lot under Parcels, colored by its land use (county assessments, 2026)' : 'Open a boundary or Parcels to color it by land use'} onChange={set} />;
 }
 
 /** Shadows through the day, cast from the 2015 lidar surface; opens its own control over the map. Listed first under Data (it needs no boundary). Flat map only, so it trades places with Terrain. */

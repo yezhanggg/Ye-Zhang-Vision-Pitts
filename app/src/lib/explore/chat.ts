@@ -389,7 +389,13 @@ export const MIN_THINK_MS = 5000;
 /** A refusal (offline file, service down) still waits this long, so the box does not flicker. */
 export const MIN_FAIL_MS = 900;
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, Math.max(0, ms)));
-const saved = loadChat(browserStorage());
+/** Every visit starts a fresh conversation: nothing is read back, and a thread kept by an older version is removed. */
+const saved: SavedChat = { messages: [], folded: null };
+try {
+  browserStorage()?.removeItem(CHAT_STORAGE_KEY);
+} catch {
+  /* blocked storage: nothing was kept */
+}
 /** Ids go on from the highest one kept, so a new message never shares an id with a rehydrated one. */
 let seq = saved.messages.reduce((mx, m) => Math.max(mx, m.id), 0);
 seq += seq % 2;
@@ -443,15 +449,3 @@ export const useChat = create<ChatState>((set, get) => ({
   },
 }));
 
-// Every change to the conversation (or the fold) is written back, so a reload opens the same thread.
-{
-  const storage = browserStorage();
-  if (storage) {
-    let last: { messages: ChatMessage[]; folded: boolean | null } = { messages: useChat.getState().messages, folded: useChat.getState().folded };
-    useChat.subscribe((s) => {
-      if (s.messages === last.messages && s.folded === last.folded) return;
-      last = { messages: s.messages, folded: s.folded };
-      saveChat(storage, { messages: canonicalMessages(s.messages), folded: s.folded });
-    });
-  }
-}

@@ -131,3 +131,15 @@ describe('the Second opinion (mode review)', () => {
     expect(clean({ question: 'q', facts: FACTS, mode: 'other' })?.mode).toBe('chat');
   });
 });
+
+describe('questions about the tool itself', () => {
+  it('the system text carries the guide, and its figures count as facts', async () => {
+    const { SYSTEM, TOOL_GUIDE, checkNumbers } = await import('./chat');
+    expect(SYSTEM).toContain('VISIONPITTS GUIDE');
+    expect(checkNumbers('Tax credit deals need 12 units or more and units at 60% AMI.', [TOOL_GUIDE]).ok).toBe(true);
+  });
+  it('a how-to question is never declined by the pre-check', async () => {
+    const { offTopic } = await import('./chat');
+    expect(offTopic('how do I use the Confirm button in Place?', '')).toBe(false);
+  });
+});

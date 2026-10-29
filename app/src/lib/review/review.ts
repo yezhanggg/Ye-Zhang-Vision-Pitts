@@ -81,6 +81,8 @@ export interface TypicalLot {
 
 export interface ReviewInput {
   scope: Scope;
+  /** Capital turned off: the money, the tax credits and the size tax credit deals need are not checked. */
+  noMoney?: boolean;
   devType: DevType;
   level: PlanLevel;
   counts: Counts;
@@ -392,10 +394,12 @@ export function reviewProject(i: ReviewInput): Review {
   const fixes: Fix[] = [];
   zoningFindings(i, findings, fixes);
   overlayFindings(i, findings, fixes);
-  moneyFindings(i, findings, fixes);
-  creditFindings(i, findings, fixes);
+  if (!i.noMoney) {
+    moneyFindings(i, findings, fixes);
+    creditFindings(i, findings, fixes);
+  }
   fitFindings(i, findings, fixes);
-  smallFindings(i, findings, fixes);
+  if (!i.noMoney) smallFindings(i, findings, fixes);
   const stops = findings.filter((f) => f.tone === 'stop');
   const warns = findings.filter((f) => f.tone === 'warn');
   const unknownZoning = i.check.verdict === 'unknown';
@@ -404,9 +408,11 @@ export function reviewProject(i: ReviewInput): Review {
   const lead = (stops.length ? stops : warns).slice().sort((a, b) => AREA_RANK.indexOf(a.area) - AREA_RANK.indexOf(b.area) || Number(b.key === 'small') - Number(a.key === 'small'))[0];
   const line =
     verdict === 'works'
-      ? 'Zoning, the area and the money all check out on these inputs.'
+      ? i.noMoney
+        ? 'Zoning and the area check out on these inputs (money not checked).'
+        : 'Zoning, the area and the money all check out on these inputs.'
       : verdict === 'unknown'
-        ? `${i.check.district ?? 'The district'} is not computed here; the area and money checks still run.`
+        ? `${i.check.district ?? 'The district'} is not computed here; the area${i.noMoney ? '' : ' and money'} checks still run.`
         : `${lead.title}: ${lead.text}`;
   // Fixes that address a stop come first, in the order they were found; one of each kind; at most three.
   const order = (f: Fix) => (f.action == null ? 2 : stops.some((s) => s.key === f.key || FIX_FOR[f.key]?.includes(s.key)) ? 0 : 1);
