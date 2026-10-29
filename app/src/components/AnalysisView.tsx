@@ -9,9 +9,11 @@ import EquityPolicyView from './equity/EquityPolicyView';
 // Compare places online: inputs on the left, both maps, results on the right. The offline single file has no room for
 // it and keeps CompareTractsView.
 const CompareStudio = import.meta.env.MODE === 'export' ? null : lazy(() => import('./compare/CompareStudio'));
-// Place online: the screens and policies in place of a focusing issue, every input flat behind Confirm. The offline
+// Place online: the screens and policies in place of a focusing issue, in three levels (Parcel, Tract, ZIP code). The offline
 // file keeps MatchView.
 const PlaceStudio = import.meta.env.MODE === 'export' ? null : lazy(() => import('./place/PlaceStudio'));
+// Equity & policy online: the Policy lab; the offline file keeps EquityPolicyView.
+const PolicyLab = import.meta.env.MODE === 'export' ? null : lazy(() => import('./equity/lab/PolicyLab'));
 
 /**
  * Keep the sub-views mounted: a view mounts the first time its mode is visited and Match plus the most recently
@@ -47,7 +49,13 @@ function View({ mode, active }: { mode: AnalysisMode; active: boolean }) {
     ) : (
       <CompareTractsView active={active} />
     );
-  return <EquityPolicyView active={active} />;
+  return PolicyLab ? (
+    <Suspense fallback={null}>
+      <PolicyLab active={active} />
+    </Suspense>
+  ) : (
+    <EquityPolicyView active={active} />
+  );
 }
 
 /**

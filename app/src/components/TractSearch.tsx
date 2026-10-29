@@ -23,6 +23,8 @@ interface Props {
   outsideText?: string;
   /** Compact 40 px field (Compare places toolbar). */
   dense?: boolean;
+  /** Show the "Pinned: …" line under the field (off on the online Place panel, which shows the site itself). */
+  pinned?: boolean;
 }
 
 const GROUP_TITLE: Record<string, string> = { neighborhood: 'Neighborhoods', tract: 'Census tracts', address: 'Addresses & places' };
@@ -74,7 +76,7 @@ export async function enterWith(q: string, resolve: (r: GeoResult) => Resolved, 
   return outside ?? { ok: false, reason: 'notfound' };
 }
 
-export default function TractSearch({ value, onChange, tag, tagColor = '#7c3aed', placeholder = UI.searchPlaceholder, showQuickPicks = true, exclude, label = 'Search', resolve, currentLabel, outsideText = UI.outsideCity, dense = false }: Props) {
+export default function TractSearch({ value, onChange, tag, tagColor = '#7c3aed', placeholder = UI.searchPlaceholder, showQuickPicks = true, exclude, label = 'Search', resolve, currentLabel, outsideText = UI.outsideCity, dense = false, pinned = true }: Props) {
   const pin = useApp((s) => s.pin);
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
@@ -266,7 +268,7 @@ export default function TractSearch({ value, onChange, tag, tagColor = '#7c3aed'
           </motion.p>
         )}
       </AnimatePresence>
-      {pin && !status && (
+      {pin && !status && pinned && (
         <p className="flex items-center gap-1.5 text-caption text-slate-600">
           <span className="inline-block h-2.5 w-2.5 rounded-full bg-violet-600" />
           Pinned: <span className="truncate font-medium text-slate-800">{pin.label}</span>
@@ -274,7 +276,7 @@ export default function TractSearch({ value, onChange, tag, tagColor = '#7c3aed'
       )}
       {showQuickPicks && focusTracts.length > 0 && (
         <div>
-          <div className="mb-1.5 text-caption text-slate-600">Or start with a demo neighborhood:</div>
+          <div className="mb-1.5 text-caption text-slate-600">Or try one of these places:</div>
           <div className="flex flex-wrap gap-1.5">
             {focusTracts.map((t) => (
               <button key={t.GEOID} onClick={() => onChange(t.GEOID)} disabled={t.GEOID === exclude} className={cx('rounded-full px-2.5 py-1 text-small font-medium ring-1 transition-colors disabled:opacity-40', t.GEOID === value ? 'bg-violet-600 text-white ring-violet-700' : 'bg-white text-slate-700 ring-stone-300 hover:bg-violet-50 hover:text-violet-800 hover:ring-violet-200')}>

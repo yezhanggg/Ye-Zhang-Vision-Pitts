@@ -47,7 +47,7 @@ import { ConfChip, Dot, Explainer, InfoTip, ObservedBadge, SectionTitle } from '
 // The project cards (mix, zoning, tax credit sheet, pencil) come with their own data, so they load on demand and stay out of the offline single file.
 const ProjectPanel = import.meta.env.MODE === 'export' ? null : lazy(() => import('./place/project/ProjectPanel'));
 const FinderCard = import.meta.env.MODE === 'export' ? null : lazy(() => import('./place/finder/FinderCard'));
-// Online the left panel is wider and its inputs wait for Confirm (place/PlaceRail); the offline file keeps the panel below.
+// Online the left panel is wider and set out by level (place/PlaceRail); the offline file keeps the panel below.
 const PlaceRail = import.meta.env.MODE === 'export' ? null : lazy(() => import('./place/PlaceRail'));
 
 /** Map hover card. `weights` (the Match view passes them) lets it tell "every factor is zero" from "no data". */
@@ -214,7 +214,7 @@ export function StartCard({ suggestions }: { suggestions: Map<string, Recommenda
   return (
     <div className="space-y-3 p-5">
       <div className="text-small font-semibold text-violet-700">Start here</div>
-      <p className="font-display text-lead font-semibold leading-snug text-slate-900">Pick a place: tap a neighborhood below or search above.</p>
+      <p className="font-display text-lead font-semibold leading-snug text-slate-900">Pick a place: tap a neighborhood below or search for one.</p>
       <div className="flex flex-wrap gap-1.5">
         {focusTracts.map((t) => (
           <button key={t.GEOID} onClick={() => select(t.GEOID)} className="rounded-full bg-white px-3 py-1 text-small font-medium text-slate-800 ring-1 ring-stone-300 hover:bg-violet-50 hover:text-violet-800 hover:ring-violet-200">
@@ -283,7 +283,6 @@ export function DetailHeader({ t, onClose, actions }: { t: TractProps; onClose?:
           <h2 className="truncate font-display text-title font-bold text-slate-900">{tractLabel(t)}</h2>
           <div className="text-small text-slate-600 tnum">
             {tractSubLabel(t)}
-            {t.focus && <span className="ml-2 rounded-full bg-violet-50 px-2 py-px text-caption font-semibold text-violet-700 ring-1 ring-violet-200">demo</span>}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">

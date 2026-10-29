@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { FACTS_ACK, LIMITS, buildMessages, checkNumbers, clean, pickProvider, tidy } from './chat';
+import { FACTS_ACK, LIMITS, REVIEW_MODEL, buildMessages, checkNumbers, clean, pickProvider, reviewProvider, tidy } from './chat';
 
 const FACTS = `SELECTED PLACE
 Hazelwood (Census Tract 5623), census tract
@@ -118,5 +118,16 @@ describe('handler', () => {
     expect(sent!.messages[0].content).toContain('I can only help with Pittsburgh housing and the data in VisionPitts.');
     expect(r.body).toMatchObject({ ok: true, checked: true });
     expect(String(r.body.text)).toContain('General background (not from VisionPitts data)');
+  });
+});
+
+describe('the Second opinion (mode review)', () => {
+  it('is Claude only, Haiku by default, and the mode survives cleaning', () => {
+    expect(reviewProvider({ DEEPSEEK_API_KEY: 'd' })).toBeNull();
+    expect(reviewProvider({ ANTHROPIC_API_KEY: 'k' })).toMatchObject({ id: 'anthropic', model: REVIEW_MODEL });
+    expect(REVIEW_MODEL).toBe('claude-haiku-5-5');
+    expect(reviewProvider({ ANTHROPIC_API_KEY: 'k', REVIEW_MODEL: 'claude-sonnet-5-5' })?.model).toBe('claude-sonnet-5-5');
+    expect(clean({ question: 'q', facts: FACTS, mode: 'review' })?.mode).toBe('review');
+    expect(clean({ question: 'q', facts: FACTS, mode: 'other' })?.mode).toBe('chat');
   });
 });

@@ -40,9 +40,10 @@ export interface RulesOut {
 const isStance = (s: string | null): s is Stance => !!s && (APP_STANCES as readonly string[]).includes(s);
 
 /** Labels lib/place/copy puts in front of its lines ("Under-served here: …"); the rest are the stance test and the refusals. */
-const LABELS = ['Under-served here', 'Main tenants the data shows', 'Price that serves them', 'Types that can deliver this (fit rules, a value judgment)', 'Types that can deliver this', 'Not served by this option', 'You decide'];
+const LABELS = ['Under-served here', 'Main tenants the data shows', 'Price that serves them', 'Types that can deliver this (fit rules, a value judgment)', 'Types that can deliver this', 'Not served by this option', 'You decide', 'Flood limit'];
 
-/** One library line → label + text. Lines with no known label are the stance test (a rule) or a "Not X, because …" line. */
+/** One library line → label + text. Lines with no known label are the stance test (a rule; online, the screens) or a
+ *  "Not X, because …" line (ADU included). */
 export function toRuleLine(line: string, i: number, stance: Stance, rec: Recommendation): RuleLine {
   for (const l of LABELS) {
     if (line.startsWith(`${l}: `)) {
@@ -54,8 +55,8 @@ export function toRuleLine(line: string, i: number, stance: Stance, rec: Recomme
       return { key, label: l, text };
     }
   }
-  if (/^Not [a-z0-9–]/.test(line)) return { key: `not${i}`, label: 'Not recommended', text: line };
-  return { key: `rule${i}`, label: `${STANCE_LABEL[stance]} rule`, text: line, tone: rec.stanceTest.passed === false ? 'warn' : 'plain' };
+  if (/^Not [\w–]/.test(line)) return { key: `not${i}`, label: 'Not recommended', text: line };
+  return { key: `rule${i}`, label: /screens/.test(line) ? 'Screens' : `${STANCE_LABEL[stance]} rule`, text: line, tone: rec.stanceTest.passed === false ? 'warn' : 'plain' };
 }
 
 /** Everything block G prints under the current stance (the first stance when the weights match none). */
@@ -116,7 +117,7 @@ export default function Rules({ rules }: { rules: RulesOut }) {
           <dd className={cx('mt-0.5 text-small leading-snug', TONE[l.tone ?? 'plain'])}>{l.text}</dd>
         </div>
       ))}
-      <div className="px-3 py-1.5 text-caption text-slate-500">Stance: {scoring.presets.find((p) => p.id === rules.stance)?.label ?? rules.stance} · rules in lib/place/recommend, thresholds in lib/place/thresholds, printed in each line.</div>
+      <div className="px-3 py-1.5 text-caption text-slate-500">Stance: {scoring.presets.find((p) => p.id === rules.stance)?.label ?? rules.stance} · each rule prints its threshold.</div>
     </dl>
   );
 }

@@ -37,6 +37,7 @@ import { useSunShadow } from '../../lib/explore/sunShadowStore';
 
 // The sun-and-shadow control and its map layer load when the switch is first turned on; the offline single file leaves them out.
 const SunDock = import.meta.env.MODE === 'export' ? null : lazy(() => import('./SunDock'));
+const ParcelsBoundary = import.meta.env.MODE === 'export' ? null : lazy(() => import('./ParcelsBoundary'));
 const ChatPill = import.meta.env.MODE === 'export' ? null : lazy(() => import('../ChatPill'));
 
 /** The built-in tract layers are hidden in Explore; this keeps their paint effect inert. */
@@ -274,6 +275,11 @@ export default function ExploreView() {
             </AnimatePresence>
           </PanelFrame>
         </RightColumn>
+      )}
+      {phase === 'done' && ParcelsBoundary && (
+        <Suspense fallback={null}>
+          <ParcelsBoundary />
+        </Suspense>
       )}
       <TourNotice show={showNotice} />
       <AnimatePresence>

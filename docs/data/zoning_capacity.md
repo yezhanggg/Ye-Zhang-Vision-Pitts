@@ -78,6 +78,12 @@ From 142,919 city lots (one per shape whose point is in a city tract; 142,437 wi
 - **More homes on lived-in lots:** residential lots in R2 or R3, at or above the minimum lot size, whose assessed use holds fewer homes than the district allows, and the homes that would add (a single-family house in R2: one more).
 - **Districts:** lots by zoning district.
 - **IZ-O share:** the share of the tract's area inside the City's inclusionary overlay layer.
+- **For the Policy lab** (docs/data/policy_lab.md), the same totals under the minimum lot sizes before May 2025 (`homes_old`, `below_min_old`). Also the homes that lived-in house lots (R1D, R1A, R2, R3, at or above the minimum lot size, homes known) would add under three ideas, each including today's gain:
+  - `adu`: an accessory unit beside a single home;
+  - `up3`: up to 3 homes a lot;
+  - `up4`: up to 4 homes a lot.
+
+  Each idea also has an `_old` version, under the old minimums. Citywide, these add 52,269, 120,263 and 190,089 homes over today's 10,530 gentle-density gain.
 
 Across the city: 16,273 vacant lots in computed districts allow 33,749 homes by right, and 4,365 vacant lots are under their district's minimum lot size. In R2 and R3, 10,295 lived-in lots hold fewer homes than allowed, worth 10,530 more homes. 17 tracts are mostly inside the IZ-O.
 

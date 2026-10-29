@@ -34,9 +34,11 @@ export interface ProjectBase {
   inIzo: boolean;
   rents: PencilArgs['marketRents'];
   depth: Depth | null;
+  /** The renters the suggested mix is split by when not the tract's (the ZIP level: the ZIP's). */
+  mixFrom: DemandUnit | null;
 }
 
-export function projectBase(geoid: string, place: PlaceMeasures, hud: HudTable, level: PlanLevel, project: ProjectState, entries: Entries): ProjectBase {
+export function projectBase(geoid: string, place: PlaceMeasures, hud: HudTable, level: PlanLevel, project: ProjectState, entries: Entries, mixFrom: DemandUnit | null = null): ProjectBase {
   const tract = demandTract(geoid);
   const zipId = tract?.zip ?? place.market?.zip ?? null;
   const zip = demandZip(zipId);
@@ -58,6 +60,7 @@ export function projectBase(geoid: string, place: PlaceMeasures, hud: HudTable, 
     inIzo: project.sites[geoid]?.pin?.izo ?? (cap?.izo_share ?? 0) > 0.5,
     rents: marketRents(place, hud).rents,
     depth: depthHomes(tract),
+    mixFrom,
   };
 }
 
@@ -96,7 +99,7 @@ export function branchFor(b: ProjectBase, mix: ProjectMix): { branch: Branch; ch
  * that size too; otherwise their own mix keeps its own count. `branch` null: the financing in force.
  */
 export function atSize(b: ProjectBase, homes: number | null, branch: Branch | null = null, scale = false): AtSize & { branch: Branch; chosen: boolean } {
-  let mix = projectMix(b.project, b.level, homes, b.tract, b.zip);
+  let mix = b.mixFrom ? projectMix(b.project, b.level, homes, null, b.mixFrom) : projectMix(b.project, b.level, homes, b.tract, b.zip);
   if (scale && mix.mode === 'mine' && homes != null) mix = { ...mix, counts: scaleCounts(mix.counts, homes), homes };
   const f = branch ? { branch, chosen: true } : branchFor(b, mix);
   const { inputs, kinds } = resolveInputs(b.project.pencil, f.branch, DEFAULTS, { plan: planOfSheet(b.entries.sheet), senior: b.entries.setup.occupancy === 'senior' });

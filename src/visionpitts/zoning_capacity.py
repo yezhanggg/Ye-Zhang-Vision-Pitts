@@ -39,7 +39,13 @@ IZO_URL = ("https://services1.arcgis.com/YZCmUqbcsUpOKfj7/arcgis/rest/services/I
 HOME_SQFT = 850        # floor area of an average home (assumption)
 EFFICIENCY = 0.85      # share of a building's floor area that is homes, not halls and stairs (assumption)
 STORY_FT = 10          # feet a story where a district caps height but not stories (RM-VH: 180 ft)
+# Minimum lot sizes before Council Bill 2025-1579 (in effect May 2025), by density suffix: very low 8,000, low 5,000,
+# moderate 3,200, high 1,800 (the Council release and the City's explainer). The very high figure is not published
+# ("eliminated"): 1,200 here is an assumption, the next step down. For the Policy lab's before/after only.
+OLD_MIN_LOT = {"VL": 8000, "L": 5000, "M": 3200, "H": 1800, "VH": 1200}
 EXISTING_HOMES = {"SINGLE FAMILY": 1, "ROWHOUSE": 1, "TOWNHOUSE": 1, "TWO FAMILY": 2, "THREE FAMILY": 3, "FOUR FAMILY": 4}
+# Homes a house lot holds by right today, by district family (the Policy lab's "more homes on house lots" starts here).
+HOUSE_CAP = {"R1D": 1, "R1A": 1, "R2": 2, "R3": 3}
 
 
 def load_standards(path: Path = STANDARDS) -> dict:
@@ -189,11 +195,48 @@ def tract_totals(lots: gpd.GeoDataFrame, cap: pd.DataFrame, standards: dict[str,
                                                      "homes": int(vac_c.loc[vac_c["sqft"].idxmax(), "homes"]),
                                                      "district": str(vac_c.loc[vac_c["sqft"].idxmax(), "district"])},
             },
-            "gentle": {"lots": int(len(more)), "homes": int((cap_now[more.index] - more["existing"]).sum())},
+            "gentle": {"lots": int(len(more)), "homes": int((cap_now[more.index] - more["existing"]).sum()), **house_lot_gains(rows)},
             "districts": {k: int(v) for k, v in districts.items() if isinstance(k, str)},
             "izo_share": izo_share,
         }
     return out
+
+
+def house_lot_gains(rows: pd.DataFrame) -> dict[str, int]:
+    """The Policy lab's house-lot ideas, on lived-in house lots (R1D, R1A, R2, R3) at or above the minimum lot size whose
+    homes are known: the homes added if each may add an accessory unit beside a single home (or today's gain where that
+    is larger), or may hold up to 3 or up to 4 homes."""
+    h = rows[(rows["use"] == "residential") & rows["family"].isin(HOUSE_CAP) & rows["existing"].notna() & (~rows["below_min"])]
+    cap, ex = h["family"].map(HOUSE_CAP), h["existing"]
+    today = (cap - ex).clip(lower=0)
+    adu = today.where(today > 0, (ex == 1).astype(int))
+    return {"adu": int(adu.sum()), "up3": int((cap.clip(lower=3) - ex).clip(lower=0).sum()), "up4": int((cap.clip(lower=4) - ex).clip(lower=0).sum())}
+
+
+def old_minimums(standards: dict[str, dict]) -> dict[str, dict]:
+    """The standards with the pre-May 2025 minimum lot sizes, for districts whose code ends in a density suffix."""
+    out = {}
+    for code, std in standards.items():
+        suffix = code.rsplit("-", 1)[-1] if "-" in code else None
+        out[code] = {**std, "min_lot_sqft": OLD_MIN_LOT[suffix]} if suffix in OLD_MIN_LOT else std
+    return out
+
+
+def add_old(totals: dict[str, dict], lots: gpd.GeoDataFrame, cap_old: pd.DataFrame, standards: dict[str, dict]) -> None:
+    """Add the homes by right on vacant lots and the gentle-density gain under the old minimums to each tract."""
+    df = lots.drop(columns="geometry").join(cap_old)
+    df["family"] = df["district"].map(lambda c: standards[c]["family"] if isinstance(c, str) and c in standards else None)
+    for g, rows in df.groupby("GEOID"):
+        if g not in totals:
+            continue
+        vac_c = rows[(rows["use"] == "vacant") & rows["computed"]]
+        gentle = rows[(rows["use"] == "residential") & rows["family"].isin(["R2", "R3"]) & rows["existing"].notna() & (~rows["below_min"])]
+        cap_now = gentle["family"].map({"R2": 2, "R3": 3})
+        more = gentle[cap_now > gentle["existing"]]
+        totals[g]["vacant"]["homes_old"] = int(vac_c["homes"].sum())
+        totals[g]["vacant"]["below_min_old"] = int(vac_c["below_min"].sum())
+        totals[g]["gentle"]["homes_old"] = int((cap_now[more.index] - more["existing"]).sum())
+        totals[g]["gentle"].update({f"{k}_old": v for k, v in house_lot_gains(rows).items()})
 
 
 # ------------------------------------------------------------------------------------------------ fixture and files

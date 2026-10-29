@@ -18,6 +18,8 @@ export interface ParcelState {
   loading: boolean;
   /** The clicked lot: its chunk and its row there. */
   selected: { chunk: string; row: number } | null;
+  /** Parcels is the open boundary (online only, components/explore/ParcelsBoundary). */
+  boundary?: boolean;
 }
 
 export const NO_CHUNKS: ReadonlySet<string> = new Set();

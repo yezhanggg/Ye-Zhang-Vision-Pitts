@@ -31,18 +31,25 @@ export function openHeadline(o: ReturnType<typeof useOpenSun>): Headline {
   };
 }
 
+/** The Tract level's headline: the tract's vacant lots against the sun yardstick (no building is tested there). */
+export function tractSunHeadline(o: ReturnType<typeof useOpenSun>): Headline {
+  const v = o.sun?.vacant;
+  return { value: v ? `${v.bre} of ${v.lots}` : 'no rated lots', sub: v ? 'vacant lots here meet the sun yardstick on Sep 22' : 'no rated vacant lots in this tract', tone: 'plain' };
+}
+
 const row = (label: string, g: SunGroup | undefined) => ({
   key: label,
   cells: g ? [label, g.lots.toLocaleString('en-US'), g.bre.toLocaleString('en-US'), g.winter2.toLocaleString('en-US')] : [label, '0', '—', '—'],
 });
 const hours = (label: string, g: SunGroup | undefined) => (g ? `${label} ${g.sun_h.jun} / ${g.sun_h.sep} / ${g.sun_h.dec} h, ${g.ceqr6.toLocaleString('en-US')} of ${g.lots.toLocaleString('en-US')} with 6+ h on Sep 22` : null);
 
-export default function OpenSun({ o }: { o: ReturnType<typeof useOpenSun> }) {
+export default function OpenSun({ o, scope = 'lot', lotSun = null }: { o: ReturnType<typeof useOpenSun>; /** 'tract': the tract's sun only (the Tract level); 'lot': the building and open space on the lot too. */ scope?: 'tract' | 'lot'; /** The picked lot's own hours of sun, in words. */ lotSun?: string | null }) {
   const t = o.sun;
   const c = SUN.city;
   return (
     <div className="space-y-2.5" data-open-sun>
-      {o.fit ? (
+      {lotSun && <p className="text-small leading-snug text-slate-800">This lot gets {lotSun} of direct sun (roof, yard and trees together, from the 2015 surface).</p>}
+      {scope === 'tract' ? null : o.fit ? (
         <p className={cx('rounded-lg px-2.5 py-1.5 text-small leading-snug ring-1', o.fit.fits ? 'bg-emerald-50 text-emerald-900 ring-emerald-200' : 'bg-rose-50 text-rose-900 ring-rose-200')}>
           {o.fit.fits ? 'Fits: ' : `Does not fit; about ${o.fit.homesThatFit} homes do at ${o.stories} stories, or add a story. `}
           {o.fit.formula}. {OPEN_TYPE_LABEL[o.type]}, {Math.round(o.share * 100)}% of the {o.lot.lotSqft.toLocaleString('en-US')} sq ft lot in {o.lot.district}. Home sizes and net-to-gross are the pencil's examples.

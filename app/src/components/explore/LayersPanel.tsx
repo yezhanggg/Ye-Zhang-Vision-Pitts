@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react';
 import { useApp } from '../../lib/store';
 import { BOUNDARY_ROWS, EXPLORE_UI, SETTING_ROWS } from '../../lib/explore/copy';
 import { cx } from '../../lib/format';
@@ -6,6 +7,9 @@ import { hasZoning, useZoningLayer } from '../../lib/explore/zoning';
 import { setZoningMap, useLandUseLayer } from '../../lib/explore/landUseMap';
 import { setSunShadow, sunShadowBlocked, useSunShadow } from '../../lib/explore/sunShadowStore';
 import { canopyBlocked, setCanopy, useCanopy } from '../../lib/explore/canopyStore';
+
+// Parcels as a boundary (online only: the offline file has no lot files).
+const ParcelsSwitch = import.meta.env.MODE === 'export' ? null : lazy(() => import('./ParcelsSwitch'));
 
 /** Accessible toggle: a button with aria-pressed, a small track and knob, label and caption. */
 export function Switch({ on, onChange, label, caption, id, disabled }: { on: boolean; onChange: (on: boolean) => void; label: string; caption?: string; id?: string; disabled?: boolean }) {
@@ -46,6 +50,11 @@ export function BoundaryPanel() {
         {BOUNDARY_ROWS.map((row) => (
           <Switch key={row.id} id={`layer-${row.id}`} on={!!layers[row.id]} label={row.label} caption={row.caption} onChange={(on) => setLayer(row.id, on)} />
         ))}
+        {ParcelsSwitch && (
+          <Suspense fallback={null}>
+            <ParcelsSwitch />
+          </Suspense>
+        )}
       </div>
       <ZoningSwitch />
     </div>

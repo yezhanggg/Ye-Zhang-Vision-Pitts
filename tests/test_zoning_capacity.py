@@ -98,3 +98,32 @@ def test_capacity_file_is_tract_totals_only():
     assert "PIN" not in text and "PARID" not in text
     for t in d["tracts"].values():
         assert set(t) == {"lots", "vacant", "gentle", "districts", "izo_share"}
+
+
+def test_old_minimums_only_raise_the_lot_size(std):
+    old = zc.old_minimums(std)
+    assert old["R1D-VL"]["min_lot_sqft"] == 8000 and old["R2-L"]["min_lot_sqft"] == 5000
+    assert old["R3-M"]["min_lot_sqft"] == 3200 and old["RM-H"]["min_lot_sqft"] == 1800
+    assert old["LNC"] is std["LNC"]  # no density suffix: unchanged
+    for code in std:
+        assert old[code]["min_lot_sqft"] >= std[code]["min_lot_sqft"]
+    # A 4,000 sq ft R2-L lot holds two homes today and none under the old 5,000 minimum.
+    assert zc.homes_by_right(std["R2-L"], 4000)["homes"] == 2
+    assert zc.homes_by_right(old["R2-L"], 4000)["homes"] == 0
+
+
+def test_house_lot_gains():
+    import pandas as pd
+
+    rows = pd.DataFrame({
+        "use": ["residential"] * 5 + ["vacant"],
+        "family": ["R1D", "R2", "R2", "R3", "R1A", "R1D"],
+        "existing": [1, 1, 2, 1, 1, None],
+        "below_min": [False, False, False, False, True, False],
+    })
+    g = zc.house_lot_gains(rows)
+    # R1D house: +1 ADU; R2 single: +1 (today's second home); R2 two-family: an ADU sits beside a single home only;
+    # R3 single: +2 today; the R1A lot under its minimum and the vacant lot are left out.
+    assert g["adu"] == 1 + 1 + 0 + 2
+    assert g["up3"] == 2 + 2 + 1 + 2
+    assert g["up4"] == 3 + 3 + 2 + 3

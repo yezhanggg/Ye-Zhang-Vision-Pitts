@@ -176,6 +176,15 @@ SOURCES: list[dict] = [
                 "of Oakland); the 10% set-aside of §907.04.A is applied to projects of 20 or more homes where most of the "
                 "tract is inside.",
          caveats="The overlay is tested by tract share, not by site: a site near its edge needs the City's map."),
+    dict(id="lot_facts", online=True, name="Lot facts for the Parcel level: county lots with their zoning district (WPRDC parcels, assessments and zoning)",
+         url="https://data.wprdc.org/dataset/allegheny-county-parcel-boundaries", vintage="parcels 2026-09; assessments 2026; zoning as published",
+         geography="lot",
+         method="Analysis > Place, Parcel level. For every city lot: the zoning district at its representative point (full-resolution "
+                "zoning map), LOTAREA else the shape's area, frontage and depth from its smallest rotated rectangle, and homes today "
+                "from the assessed use; written per map chunk beside the lot shapes (scripts/22_build_lot_facts.py, "
+                "docs/data/parcel_level.md). Lot facts only: no parcel ID, owner, address, value or sale.",
+         caveats="A lot split by a district line reads one side; frontage and depth are a rough rectangle reading; apartment "
+                 "buildings show no homes today. Information only, never scored."),
     dict(id="hud_mtsp", online=True, name="HUD FY2026 Multifamily Tax Subsidy Project (MTSP) income limits, Pittsburgh HMFA (HUD User API)",
          url="https://www.huduser.gov/portal/datasets/mtsp.html", vintage="FY2026", geography="HUD Metro FMR Area (Pittsburgh, PA)",
          method="Tax credit rents in the pencil on the Place page: 30% of the limit at 1.5 persons a bedroom (a studio counts one "

@@ -21,3 +21,13 @@ export function setSeparate(on: boolean) {
   }
   useCompare.setState({ separate: on });
 }
+
+/** Section 1 of the comparison ("The project in each place") in words, published by the screen so the PDF and the CSV
+ *  print what it shows: the one-line answer, then label / A / B rows (verdict, zoning, size, capital, tax credits,
+ *  the capital stack, the renters who qualify, and the checks that differ). */
+export interface ProjectRows {
+  answer: string | null;
+  rows: [string, string, string][];
+}
+
+export const useCompareRead = create<ProjectRows>(() => ({ answer: null, rows: [] }));

@@ -68,7 +68,7 @@ function OrderLine({ rec, before, scores }: { rec: Recommendation; before: Recom
 }
 
 /** Homes by income level and size: inputs in the left panel, or (without `onEdit`) the same grid read only. */
-function MixEditor({ mix, onEdit }: { mix: ProjectMix; onEdit?: (c: Counts) => void }) {
+function MixEditor({ mix, onEdit, head = 'Homes' }: { mix: ProjectMix; onEdit?: (c: Counts) => void; head?: string }) {
   const set = (l: MixLevel, b: number, v: number) => {
     const next = Object.fromEntries(MIX_LEVELS.map((x) => [x, [...mix.counts[x]]])) as Counts;
     next[l][b] = Math.max(0, Math.round(v));
@@ -79,7 +79,7 @@ function MixEditor({ mix, onEdit }: { mix: ProjectMix; onEdit?: (c: Counts) => v
       <table className="w-full text-small">
         <thead>
           <tr className="bg-stone-50 text-caption text-slate-600">
-            <th className="px-2 py-1 text-left font-medium">Homes</th>
+            <th className="px-2 py-1 text-left font-medium">{head}</th>
             {BEDROOM_LABEL.map((b) => (
               <th key={b} className="px-1 py-1 text-right font-medium">
                 {b}
@@ -311,7 +311,7 @@ export default function DemandMix({ model, place, hud, rec, fitOrder }: { model:
 }
 
 /** The unit mix's inputs, for the left panel: the renters' split, or homes typed by income level and size. */
-export function MixInputs({ mix }: { mix: ProjectMix }) {
+export function MixInputs({ mix, head }: { mix: ProjectMix; head?: string }) {
   const side = useSide();
   const setMine = (counts: Counts) => side.project.setState({ mode: 'mine', counts });
   const mine = mix.mode === 'mine';
@@ -327,7 +327,7 @@ export function MixInputs({ mix }: { mix: ProjectMix }) {
           </button>
         ))}
       </div>
-      {mine && <MixEditor mix={mix} onEdit={setMine} />}
+      {mine && <MixEditor mix={mix} onEdit={setMine} head={head} />}
     </div>
   );
 }

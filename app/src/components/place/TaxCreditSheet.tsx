@@ -2,7 +2,7 @@
 // (PHFA), filled in for the selected place. The place settles one line and informs others; the rest are entered by
 // the person planning the development. Both the adopted 2025/2026 sheet and the 2027/2028 draft can be read.
 // A result on the right panel (question 3 of the project card) that is also where its lines are entered: an entry here
-// applies at once (to the shared entries and the left panel's draft together), with no Confirm.
+// applies at once.
 // Loaded on demand and left out of the offline single file.
 import { useMemo, type ReactNode } from 'react';
 import { cx } from '../../lib/format';

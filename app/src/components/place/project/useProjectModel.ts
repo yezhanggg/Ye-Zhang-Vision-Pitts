@@ -43,8 +43,8 @@ export interface ProjectModel {
   sheet: SheetState;
 }
 
-export function projectModel(geoid: string, place: PlaceMeasures, hud: HudTable, level: PlanLevel, homes: number | null, project: ProjectState, entries: Entries): ProjectModel {
-  const b = projectBase(geoid, place, hud, level, project, entries);
+export function projectModel(geoid: string, place: PlaceMeasures, hud: HudTable, level: PlanLevel, homes: number | null, project: ProjectState, entries: Entries, mixFrom: DemandUnit | null = null): ProjectModel {
+  const b = projectBase(geoid, place, hud, level, project, entries, mixFrom);
   const { mix, args, result, kinds, branch, chosen } = atSize(b, homes);
   const facts = planFacts(mix.counts, project.stories, result.finance);
   const lt = b.tract?.lihtc;
@@ -74,8 +74,9 @@ export function projectModel(geoid: string, place: PlaceMeasures, hud: HudTable,
 }
 
 /** The model for a place, or null while the place or HUD table is missing. `side` (default: the one in context) says
- *  whose settings it reads: the shared ones, or Compare's side B. */
-export function useProjectModel(geoid: string | null | undefined, place: PlaceMeasures | null | undefined, hud: HudTable | null | undefined, side?: Side): ProjectModel | null {
+ *  whose settings it reads: the shared ones, or Compare's side B. `mixFrom`: the renters the suggested mix follows when
+ *  not the tract's (the ZIP level). */
+export function useProjectModel(geoid: string | null | undefined, place: PlaceMeasures | null | undefined, hud: HudTable | null | undefined, side?: Side, mixFrom: DemandUnit | null = null): ProjectModel | null {
   const ctx = useSide();
   const s = side ?? ctx;
   const level = s.plan((x) => x.level);
@@ -84,7 +85,7 @@ export function useProjectModel(geoid: string | null | undefined, place: PlaceMe
   const shared = s.lihtc();
   const senior = s.plan((x) => isSeniorAge(x.age));
   const entries = useMemo(() => entriesFor(s, shared, project, senior), [s, shared, project, senior]);
-  return useMemo(() => (geoid && place && hud ? projectModel(geoid, place, hud, level, homes, project, entries) : null), [geoid, place, hud, level, homes, project, entries]);
+  return useMemo(() => (geoid && place && hud ? projectModel(geoid, place, hud, level, homes, project, entries, mixFrom) : null), [geoid, place, hud, level, homes, project, entries, mixFrom]);
 }
 
 /** Pick the financing on the shared settings: the pencil's branch, and the tax credit sheet's credit when it is a credit. */

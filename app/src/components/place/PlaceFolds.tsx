@@ -65,6 +65,8 @@ export default function PlaceFolds({ t, place, hud, rec, level, fitOrder }: { t:
   const tr = place.transit;
   const f = place.flood;
   const suggested = new Set(rec.types.map((x) => x.typology));
+  // The suggested types first, in the answer's order (so the first is the headline type); the rest after, by weight.
+  const order = [...suggested, ...fitOrder.filter((k) => !suggested.has(k))];
   const lvl = level === 'market' ? '>80% AMI' : LEVEL_LABEL[level];
   const lines = rec.lines.map((l, i) => toRuleLine(l, i, rec.stance, rec)).filter((l) => l.label !== 'You decide');
 
@@ -105,11 +107,11 @@ export default function PlaceFolds({ t, place, hud, rec, level, fitOrder }: { t:
             </div>
           ))}
         </dl>
-        <SourceLine className="mt-1.5">Rules · lib/place/recommend with the thresholds in lib/place/thresholds, printed in each line · docs/assumptions.md §14.</SourceLine>
+        <SourceLine className="mt-1.5">Each rule prints its threshold. Method: assumptions §14.</SourceLine>
       </Fold>
-      <Fold title="Fit order" headline={fitOrder[0] ? `${typologyById.get(fitOrder[0])?.label ?? cap(TYPOLOGY_LABEL[fitOrder[0]])} first` : 'not available'}>
+      <Fold title="Fit order" headline={rec.types[0] ? `${typologyById.get(order[0])?.label ?? cap(TYPOLOGY_LABEL[order[0]])} first` : 'none suggested'}>
         <ol className="space-y-1">
-          {fitOrder.map((k, i) => (
+          {order.map((k, i) => (
             <li key={k} className="flex items-center gap-2 text-small text-slate-800">
               <span className="w-4 text-right text-caption text-slate-500 tnum">{i + 1}</span>
               <Dot color={typologyById.get(k)?.color ?? '#999'} size={9} />
@@ -118,7 +120,7 @@ export default function PlaceFolds({ t, place, hud, rec, level, fitOrder }: { t:
             </li>
           ))}
         </ol>
-        <SourceLine className="mt-1.5">The order only ranks types inside the suggested set; it never adds or removes one. Change it under Advanced settings.</SourceLine>
+        <SourceLine className="mt-1.5">Suggested types first, ordered by renter demand, the main household, then the weights; the rest by weight. Weights: Advanced settings, on the left.</SourceLine>
       </Fold>
     </div>
   );

@@ -9,7 +9,7 @@ import { Explainer, InfoTip } from '../../primitives';
 import { SourceLine, Table } from '../shared';
 import TryLot, { statusFor } from './TryLot';
 
-export default function BuildCapacity({ geoid, cap, rec, homes, homesExample }: { geoid: string; cap: TractCapacity; rec: Recommendation; homes: number; homesExample: boolean }) {
+export default function BuildCapacity({ geoid, cap, rec, homes, homesExample, scope = 'lot' }: { geoid: string; cap: TractCapacity; rec: Recommendation; homes: number; homesExample: boolean; /** 'tract': the tract's totals only, no lot (the Tract level); 'lot': the lot first, then the tract around it. */ scope?: 'tract' | 'lot' }) {
   const inIzo = (cap.izo_share ?? 0) > 0.5;
   const setAside = inclusionaryHomes(homes, inIzo);
   const lead = rec.lead;
@@ -19,6 +19,8 @@ export default function BuildCapacity({ geoid, cap, rec, homes, homesExample }: 
 
   return (
     <div className="space-y-2.5" data-build-capacity>
+      {scope === 'lot' && <TryLot geoid={geoid} cap={cap} lead={lead} homes={homes} homesExample={homesExample} />}
+      {scope === 'lot' && <div className="text-caption font-semibold uppercase tracking-wide text-slate-500">The tract around it</div>}
       <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-stone-200/70 ring-1 ring-stone-200/70">
         <div className="bg-white px-3 py-2">
           <div className="flex items-center gap-1 text-caption text-slate-600">
@@ -53,7 +55,6 @@ export default function BuildCapacity({ geoid, cap, rec, homes, homesExample }: 
       {!inIzo && (cap.izo_share ?? 0) > 0 && <p className="text-caption text-slate-600">{Math.round((cap.izo_share ?? 0) * 100)}% of the tract is in the inclusionary overlay; check whether the site is.</p>}
       {lead === 'adu' && <p className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-caption leading-snug text-amber-900 ring-1 ring-amber-200">{STANDARDS.adu.rule} {STANDARDS.adu.checked}</p>}
 
-      <TryLot geoid={geoid} cap={cap} lead={lead} homes={homes} homesExample={homesExample} />
 
       <Explainer title={`Zoning districts in this tract (${districts.length})`}>
         <Table

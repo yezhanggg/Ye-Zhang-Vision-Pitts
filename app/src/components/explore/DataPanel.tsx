@@ -7,6 +7,7 @@ import { cx } from '../../lib/format';
 import { RailSection } from '../Rail';
 import { Dot, Explainer } from '../primitives';
 import { CanopySwitch, LandUseMapSwitch, SunShadowSwitch, ZoningMapSwitch } from './LayersPanel';
+import { useParcelShadow } from '../../lib/explore/parcelShadowStore';
 
 function VarRow({ v, on, onPick }: { v: VariableDef; on: boolean; onPick: () => void }) {
   return (
@@ -28,6 +29,8 @@ export default function DataPanel() {
   const set = useApp((s) => s.set);
   const level = browse.level;
   const open = layers[LEVEL_LAYER[level]];
+  // Online, Parcels can be the open boundary instead (its data: sun and shadow by lot).
+  const parcels = import.meta.env.MODE !== 'export' && useParcelShadow((s) => !!s.boundary);
   // The Analysis layers exist for city tracts only, so they are listed with the tract boundary.
   const shown = groups.filter((g) => level === 'tract' || !isAnalysisGroup(g.id));
 
@@ -55,12 +58,14 @@ export default function DataPanel() {
         ) : undefined
       }
     >
-      {/* Sun and shadow covers the whole city and needs no boundary, so it comes before the variables. */}
-      <div className="mb-2">
-        <SunShadowSwitch />
-      </div>
+      {/* Sun and shadow, like the variables, shows once a boundary (or Parcels) is open. */}
+      {(open || parcels) && (
+        <div className="mb-2">
+          <SunShadowSwitch />
+        </div>
+      )}
       {!open ? (
-        <p className="rounded-xl bg-stone-100 px-3 py-2 text-small text-slate-700 ring-1 ring-stone-200">{EXPLORE_UI.dataClosed}</p>
+        parcels ? null : <p className="rounded-xl bg-stone-100 px-3 py-2 text-small text-slate-700 ring-1 ring-stone-200">{EXPLORE_UI.dataClosed}</p>
       ) : (
         <>
           <div className="space-y-1.5">

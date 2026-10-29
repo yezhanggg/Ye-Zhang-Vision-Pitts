@@ -53,7 +53,7 @@ function Overview() {
   return (
     <section>
       <h3 className="mb-1 text-body font-semibold text-slate-900">Test a project here</h3>
-      <p className="mb-2 text-small text-slate-600">Added October 2026 for developers and planners: one card below the suggestion for any city tract. Every input sits in one flat left panel, applied with Confirm: the project, the unit mix and income, a lot, the policies that apply here (binding rules, funding and incentives, and your screens, each with its document), open space and the pencil's inputs. The right panel shows five questions that answer in one line each and open for the detail; the third is the tax credit sheet, whose lines are entered on the sheet itself, and the fifth is open space and sun. Compare places shows the project in both places, with one set of settings or a separate one for each side. Online only: the offline file has no room for them.</p>
+      <p className="mb-2 text-small text-slate-600">Added October 2026 for developers and planners. Place works at three levels, picked at the top of the left panel; each asks only for its own inputs, in numbered groups applied at once, and the right panel answers them in the same order. Parcel tests one project on one real county lot (picked by address or on the map; its area, use, zoning, rough shape and sun fill in): whether zoning allows the type and size you set, a simple capital stack with seven years of operations and a sale, the tax credit score, open space and sun. Tract and ZIP code take the same inputs and read the project on a lot of the size it needs in a district there that allows it. Every answer starts with a verdict and a review that re-runs as you type: zoning, height, overlays, the fit with the area's renters and the money, with fixes to apply and an optional AI second opinion that only reads the findings. Compare places reads the project in both places the same way. Equity & policy is a Policy lab: pick a test building and Pittsburgh's housing policies (zoning, inclusionary and its bonus, tax breaks, a frequent bus) and see, tract by tract, where zoning allows it, whether it pencils and what each policy adds. Online only: the offline file has no room for them.</p>
       <div className="grid gap-2 sm:grid-cols-2">
         {TILES.map((t) => (
           <div key={t.title} className="rounded-xl bg-violet-50/60 p-3 ring-1 ring-violet-100">
@@ -78,7 +78,7 @@ function Method() {
       <Card title="Who needs it">
         <List
           items={[
-            `ACS ${DEMAND.acs}: renter households by size (B25009), age of householder (B25007) and income (B25118, B25119); renter homes by bedrooms (B25042), rent (B25068) and building size (B25032). Growth since ${DEMAND.growth_years[0]} from the ACS history files.`,
+            `ACS ${DEMAND.acs}: renter households by size (B25009), age of householder (B25007) and income (B25118, B25119); renter homes by bedrooms (B25042), rent (B25068) and building size (B25032). Change since ${DEMAND.growth_years[0] - 4}–${String(DEMAND.growth_years[0]).slice(2)} from the ACS history files: renter households, median rent, and the median income of all households.`,
             `A signal counts only past its mark from the city and beyond the tract's 90% margin of error (${margins}). The tract is read first, its ZIP code when the tract's margin is too wide.`,
             <>
               Which signals favor which type:{' '}
@@ -88,7 +88,7 @@ function Method() {
                   {TYPOLOGY_LABEL[t]}: {ws.map((w) => `${SIGNAL_LABEL[w.key].toLowerCase()} ${w.dir === 'up' ? 'above' : 'below'} the city`).join(' and ')}
                 </span>
               ))}
-              . More signals go first among the types the stance allows; then the household type CHAS counts most of; then the weights. Transit-first and Climate-resilient keep their own order.
+              . More signals go first among the types the rules allow; then the household type CHAS counts most of; then the published Balanced weights.
             </>,
             `Tax credit homes: HUD's property database (${DEMAND.lihtc.properties ?? ''} Allegheny County properties), property fields only.`,
             <>{doc('docs/data/demand.md', 'Method: docs/data/demand.md')} · assumptions §15</>,
@@ -172,14 +172,14 @@ const LIMITS = [
   `Zoning is a reading of the code, not a zoning determination: contextual setbacks, compatibility standards, slopes, parking and variances are not modeled, so homes on vacant lots are an upper bound.`,
   'ADUs need an Accessory Dwelling Unit Overlay District and none is mapped; the cards flag this rather than hide the type.',
   'The tax credit sheet is a self-score; PHFA scores every application, and the 2027/2028 plan was still a draft. Chance of award is not modeled.',
-  'Find places tests tracts, not parcels; market depth counts city tracts only, so places at the city edge read low.',
+  'Find places ranks tracts, then you pick a lot there; market depth counts city tracts only, so places at the city edge read low.',
   'The pencil is arithmetic on your inputs, not an underwriting: no construction loan, lease-up, multi-year pro forma, abatement or subsidy, and the example inputs are not facts about a site.',
-  'QCT and DDA status and the inclusionary overlay come from the tract, not the site.',
+  'QCT and DDA status come from the tract; the inclusionary overlay and the district are read at the lot, its frontage and depth from its rough rectangle (docs/data/parcel_level.md).',
 ];
 
 const NEXT = [
   'Decide whether zoning should demote ADUs while no ADU overlay exists.',
-  "Read a site's own lot (frontage, slope, district) instead of the tract's.",
+  'Read a lot’s slope and its neighbors (assembling touching lots).',
   'A year-by-year operating pro forma and construction financing.',
   'Re-read the tax credit sheet when PHFA adopts the 2027/2028 plan.',
   'Map tint for Find places (no room in the offline file for it yet).',

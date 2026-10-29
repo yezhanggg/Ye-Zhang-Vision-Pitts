@@ -12,14 +12,15 @@ import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import { rankedTracts, scoring, tractById, tractLabel, typologyById } from '../../lib/data';
 import { compareTakeaway, fLabel, stabilityFor, tLabel, useAllResults } from '../../lib/derived';
 import { TYPOLOGY_COLORS, type MapPaint } from '../../lib/paint';
-import { presetWeights, useApp } from '../../lib/store';
+import { useApp } from '../../lib/store';
 import { cx } from '../../lib/format';
 import { pctShort } from '../../lib/copy';
 import { compareMessage, compareState, factorDeltasSafe } from '../../lib/analysis/compare';
 import { rationale } from '../../lib/analysis/rationale';
-import { setSeparate, useCompare } from '../../lib/compare/store';
+import { setSeparate, useCompare, useCompareRead } from '../../lib/compare/store';
 import { amiWords } from '../../lib/equity/measures';
-import { buildCompareReport, GLANCE_COLUMNS, glanceCsvRows, type CompareReportInput } from '../../lib/export/builders/compare';
+import { buildCompareReport, type CompareReportInput } from '../../lib/export/builders/compare';
+import { compareCsvRows, COMPARE_COLUMNS, followScreen } from '../../lib/compare/report';
 import { downloadCsv, exportFilename, toCsv } from '../../lib/export/csv';
 import { getMap, registerMap } from '../../lib/export/mapRegistry';
 import { mapSnapshot, printReport } from '../../lib/export/report';
@@ -37,17 +38,17 @@ import { composeAll, screensWords } from '../../lib/policy/compose';
 import { usePolicy, type PolicyState } from '../../lib/policy/store';
 import { swapStance } from '../../lib/policy/report';
 import { useViewport } from '../../lib/viewport';
-import CompareTractsView, { COLOR_A, COLOR_B, MapChip, SCORING_CAVEAT, Side as SideRanking, SuggestTip, SwapIcon, wordsOnly } from '../CompareTractsView';
+import CompareTractsView, { COLOR_A, COLOR_B, MapChip, Side as SideRanking, SuggestTip, SwapIcon, wordsOnly } from '../CompareTractsView';
 import FactorDeltaBars from '../FactorDeltaBars';
 import MapView, { makeSyncGroup } from '../MapView';
 import ChatPill from '../ChatPill';
 import TractSearch from '../TractSearch';
 import PanelTitle from '../analysis/PanelTitle';
 import ExportMenu from '../export/ExportMenu';
-import { FlatInputsFor, type SectionId } from '../place/flat/FlatInputs';
+import { ProjectInputs } from '../place/levels/LevelInputs';
 import { Chevron, Dot, Segmented } from '../primitives';
 import { GLANCE_GRID, GROUPS, Measure, PlaceHead, SectionHead, Value, WhyParagraphs, getsCells, glanceFlag, glanceRows, type GetsCells, type SideInfo } from './CompareBlocks';
-import CompareProject from './CompareProject';
+import CompareResults from './CompareResults';
 import SuggestLegendBar from './SuggestLegendBar';
 
 const TYPOLOGY_INDEX = new Map(scoring.typologies.map((t, i) => [t.id, i]));
@@ -75,8 +76,14 @@ function paintOf(suggestions: Map<string, Recommendation>): { paint: MapPaint; c
 const noneLabel = (level: PlanLevel) => (level === 'market' ? 'the market test fails or cannot run' : 'no under-served renters at this level, or a screen rules it out');
 
 const settingsWords = (policy: PolicyState, level: PlanLevel) => `${screensWords(policy)} · ${LEVEL_LABEL[level]}`;
-/** The fit order's weights: the published equal-weights reference, as on the Place tab. */
-const FIT_WEIGHTS = presetWeights('balanced');
+
+/** The closing line of Why they differ: the type each side's rules suggest (the answer on the maps), then the factor
+ *  difference the scoring finds. The weighted top type is left out: it can name a type the rules rule out (an ADU). */
+function suggestedTakeaway(ta: { GEOID: string }, tb: { GEOID: string }, recA: Recommendation | null, recB: Recommendation | null, scored: string): string {
+  const lead = (r: Recommendation | null) => (r?.types[0] ? tLabel(r.types[0].typology) : 'no suggestion');
+  const A = tractLabel(tractById.get(ta.GEOID)), B = tractLabel(tractById.get(tb.GEOID));
+  return `Suggested: ${A}, ${lead(recA)}; ${B}, ${lead(recB)}.${scored.match(/ Biggest difference:.*$/)?.[0] ?? ''}`;
+}
 
 // ------------------------------------------------------------------------------------------------- results blocks
 
@@ -165,12 +172,12 @@ function Gets({ A, B, levelA, levelB }: { A: SideInfo; B: SideInfo; levelA: Plan
 
 // ------------------------------------------------------------------------------------------------------ the inputs
 
-/** One side's inputs: the Place tab's flat sections, for this side's place (or only some of them). */
-function SideInputs({ side, info, only }: { side: Side; info: SideInfo; only?: SectionId[] }) {
+/** One side's inputs: the Place tab's project groups (type, units, capital, open space, policies) for its place. */
+function SideInputs({ side, info }: { side: Side; info: SideInfo }) {
   return (
     <SideContext.Provider value={side}>
       {info.t && info.p && hudTable ? (
-        <FlatInputsFor key={info.t.GEOID} t={info.t} place={info.p} hud={hudTable} rec={info.rec} only={only} />
+        <ProjectInputs key={info.t.GEOID} t={info.t} rec={info.rec} />
       ) : (
         <p className="text-caption text-slate-600">Pick place {info.tag} above the map to test a project there.</p>
       )}
@@ -179,9 +186,9 @@ function SideInputs({ side, info, only }: { side: Side; info: SideInfo; only?: S
 }
 
 /** One place's strip: its search, its map on top, the map's legend, then the inputs for that place underneath. */
-function Strip({ info, search, map, legend, tour, children }: { info: SideInfo; search: ReactNode; map: ReactNode; legend: ReactNode; tour?: string; children: ReactNode }) {
+function Strip({ info, search, map, legend, tour, top = 0, children }: { info: SideInfo; search: ReactNode; map: ReactNode; legend: ReactNode; tour?: string; /** Room left above the strip for the open chat (B, under the chat pill). */ top?: number; children: ReactNode }) {
   return (
-    <section className="flex min-w-0 flex-1 flex-col gap-2" aria-label={`Place ${info.tag}`} data-tour={tour}>
+    <section className="flex min-w-0 flex-1 flex-col gap-2" style={{ marginTop: top, transition: 'margin-top 0.2s ease' }} aria-label={`Place ${info.tag}`} data-tour={tour}>
       {search}
       <div className="relative shrink-0 overflow-hidden rounded-xl ring-1 ring-black/5" style={{ height: '40%', minHeight: 220 }}>
         {map}
@@ -219,9 +226,9 @@ function Studio({ active }: { active: boolean }) {
   const seniorB = separate ? isSeniorAge(planB.age) : seniorA;
   const sideB: Side = separate ? SIDE_B : SIDE_A;
 
-  // Both sides order types with the same reference weights; the screens and the income level decide the set.
-  const weights = FIT_WEIGHTS;
-  const results = useAllResults(FIT_WEIGHTS);
+  // Both sides order types with the Place tab's weights (Balanced unless the link sets them); the screens and the income level decide the set.
+  const weights = useApp((s) => s.weights);
+  const results = useAllResults(weights);
   const fitOrders = useMemo(() => new Map([...results].map(([id, r]) => [id, r.ranking as Typology[]])), [results]);
   const demand = useDemandScores();
   const sugA = useMemo(() => suggestionsFor(levelA, seniorA, policyA, fitOrders, demand), [levelA, seniorA, policyA, fitOrders, demand]);
@@ -242,14 +249,16 @@ function Studio({ active }: { active: boolean }) {
   const message = same ? null : compareMessage(state, ta, tb);
   const pair = useMemo(() => (!same && state === 'ok' && ta && tb && ra && rb ? { ta, tb, ra, rb } : null), [same, state, ta, tb, ra, rb]);
   const ok = !!pair;
-  const topA = ra?.top ?? null;
-  const topB = rb?.top ?? null;
+  // The factor detail reads the type each side's rules suggest (the weighted top only when nothing is suggested), so it
+  // never names a type the answer does not.
+  const topA = recA?.types[0]?.typology ?? ra?.top ?? null;
+  const topB = recB?.types[0]?.typology ?? rb?.top ?? null;
   const [basisChoice, setBasisChoice] = useState<string | null>(null);
   const basis = ok && basisChoice && (basisChoice === topA || basisChoice === topB) ? basisChoice : (topA ?? topB);
   const rows = useMemo(() => (pair ? factorDeltasSafe(pair.ta, pair.tb, pair.ra, pair.rb, basis ?? undefined) : []), [pair, basis]);
   const takeaway = same
     ? 'The same place on both sides: its measures match, so what differs is what each set of settings suggests and how the project does.'
-    : wordsOnly(message ?? (pair ? compareTakeaway(pair.ta, pair.tb, pair.ra, pair.rb) : compareMessage('need_two', ta, tb)!));
+    : wordsOnly(message ?? (pair ? suggestedTakeaway(pair.ta, pair.tb, recA, recB, compareTakeaway(pair.ta, pair.tb, pair.ra, pair.rb)) : compareMessage('need_two', ta, tb)!));
   const why = useMemo(() => {
     if (!ta || !tb) return [];
     const A = { name: tractLabel(ta), p: placeById.get(ta.GEOID) ?? null, rec: recA };
@@ -261,6 +270,8 @@ function Studio({ active }: { active: boolean }) {
     return rowsA.map((r) => (r.topic === 'Who needs homes' ? { ...r, b: rowsB.find((x) => x.topic === r.topic)?.b ?? r.b, both: undefined } : r));
   }, [ta, tb, recA, recB, levelA, levelB]);
   const [detail, setDetail] = useState(false);
+  /** The open chat's height: B's strip, under the chat pill, moves down by it. */
+  const [chatH, setChatH] = useState(0);
   const sa = useMemo(() => (a && detail ? stabilityFor(a, weights) : null), [a, weights, detail]);
   const sb = useMemo(() => (b && detail ? stabilityFor(b, weights) : null), [b, weights, detail]);
   const basisLabel = tLabel(basis);
@@ -324,7 +335,7 @@ function Studio({ active }: { active: boolean }) {
       glance: g.rows,
       fits: g.fits ? { rent: g.fits.rent, formula: g.fits.formula } : null,
       ami: g.ami,
-      takeaway: ok ? `${SCORING_CAVEAT} ${takeaway}` : takeaway,
+      takeaway,
       why,
       basis: ok ? basisLabel : null,
       factors: pair
@@ -344,7 +355,7 @@ function Studio({ active }: { active: boolean }) {
       items={[
         {
           label: 'Report (PDF)',
-          hint: ta && tb ? 'Both places, the tables and both maps' : 'Choose two places first',
+          hint: ta && tb ? 'The project in each place, the tables and both maps' : 'Choose two places first',
           disabled: !ta || !tb,
           onSelect: async () => {
             const input = exportInput();
@@ -352,17 +363,18 @@ function Studio({ active }: { active: boolean }) {
             const crop = { top: 0, bottom: 0, left: 0, right: 0 };
             const mA = await mapSnapshot(getMap('compare-a'), { crop });
             const mB = await mapSnapshot(getMap('compare-b'), { crop });
-            printReport(swapStance(buildCompareReport({ ...input, maps: { a: mA, b: mB }, filename: exportFilename('comparison', exportSlug, 'pdf') }), STANCE_LABEL[input.focus], separate ? `A ${screensWords(policyA)}, B ${screensWords(policyB)}` : screensWords(policyA)));
+            const report = swapStance(buildCompareReport({ ...input, maps: { a: mA, b: mB }, filename: exportFilename('comparison', exportSlug, 'pdf') }), STANCE_LABEL[input.focus], separate ? `A ${screensWords(policyA)}, B ${screensWords(policyB)}` : screensWords(policyA));
+            printReport(followScreen(report, useCompareRead.getState(), input.a.name, input.b.name));
           },
         },
         {
           label: 'Data (CSV)',
-          hint: ta && tb ? 'At-a-glance rows, A and B columns' : 'Choose two places first',
+          hint: ta && tb ? 'Project and At-a-glance rows, with sources and years' : 'Choose two places first',
           disabled: !ta || !tb,
           onSelect: () => {
             const input = exportInput();
             if (!input) return;
-            downloadCsv(exportFilename('comparison', exportSlug, 'csv'), toCsv(glanceCsvRows(input), GLANCE_COLUMNS));
+            downloadCsv(exportFilename('comparison', exportSlug, 'csv'), toCsv(compareCsvRows(input, useCompareRead.getState()), COMPARE_COLUMNS));
           },
         },
       ]}
@@ -401,7 +413,7 @@ function Studio({ active }: { active: boolean }) {
       {/* 72 px on top: a clear gap under the Home / Explore-Analysis / chat buttons (inline, so no new CSS class). */}
       <div className="relative flex h-full gap-3 bg-[#fbfaf8] px-3 pb-3" style={{ paddingTop: 72 }}>
         <div className="absolute right-3 top-3 z-30">
-          <ChatPill />
+          <ChatPill onHeight={setChatH} />
         </div>
         <Strip
           info={A}
@@ -453,23 +465,25 @@ function Studio({ active }: { active: boolean }) {
             </p>
           )}
 
+          {(ta || tb) && <CompareResults A={A} B={B} sideA={SIDE_A} sideB={sideB} />}
+
           {(ta || tb) && (
-            <section aria-label="At a glance" data-tour="compare-glance">
-              <SectionHead n={1} title="At a glance" sub={same ? 'The same place on both sides: the values match.' : 'Real values for each place, same definitions on both sides.'} />
+            <section className="mt-6 border-t border-stone-200/80 pt-5" aria-label="At a glance" data-tour="compare-glance">
+              <SectionHead n={2} title="At a glance" sub={same ? 'The same place on both sides: the values match.' : 'Real values for each place, same definitions on both sides.'} />
               <Glance A={A} B={B} levelA={levelA} levelB={levelB} />
             </section>
           )}
 
           {(ta || tb) && (
             <section className="mt-6 border-t border-stone-200/80 pt-5" aria-label="What each place would get">
-              <SectionHead n={2} title="What each place would get" sub={separate ? 'The types that pass each side’s own screens at its own income level.' : `The types that pass ${screensWords(policyA)} at ${LEVEL_LABEL[levelA]}.`} />
+              <SectionHead n={3} title="What each place would get" sub={separate ? 'The types that pass each side’s own screens at its own income level.' : `The types that pass ${screensWords(policyA)} at ${LEVEL_LABEL[levelA]}.`} />
               <Gets A={A} B={B} levelA={levelA} levelB={levelB} />
             </section>
           )}
 
           <section className={cx('flex flex-col', (ta || tb) && 'mt-6 border-t border-stone-200/80 pt-5')} aria-label="Why they differ">
             <SectionHead
-              n={3}
+              n={4}
               title="Why they differ"
               sub="The rules behind each suggestion, read side by side."
               right={
@@ -487,7 +501,6 @@ function Studio({ active }: { active: boolean }) {
               rows={ta && tb ? why : []}
               closing={
                 <>
-                  {ok && <span className="text-slate-500">{SCORING_CAVEAT} </span>}
                   {takeaway}
                 </>
               }
@@ -532,10 +545,10 @@ function Studio({ active }: { active: boolean }) {
             )}
           </AnimatePresence>
 
-          {(ta || tb) && <CompareProject A={A} B={B} sideA={SIDE_A} sideB={sideB} stacked />}
         </div>
 
         <Strip
+          top={chatH}
           info={B}
           search={<TractSearch dense value={b} onChange={(id) => set({ compareId: id })} tag="B" tagColor={COLOR_B} showQuickPicks={false} exclude={separate ? undefined : a} label="Place B" />}
           map={mapFor(B, mapB.paint, sugB, (id) => set({ compareId: id }), policyB, levelB)}
@@ -553,12 +566,12 @@ function Studio({ active }: { active: boolean }) {
                 { value: 'separate', label: 'Its own' },
               ]}
             />
-            <p className="text-caption leading-snug text-slate-500">{separate ? 'B keeps its own screens, residents, income and project, starting from a copy of A. It can be the same place as A. Tax credit entries stay shared; B’s financing picks its credit.' : 'B is read under A’s screens, residents, income and project. Its own lot and open space are below; Its own lets B differ in anything.'}</p>
+            <p className="text-caption leading-snug text-slate-500">{separate ? 'B keeps its own screens, residents, income and project, starting from a copy of A. It can be the same place as A. Tax credit entries stay shared; B’s financing picks its credit.' : 'B is read under A’s screens, income and project. Its own lets B differ in anything.'}</p>
           </div>
           {separate ? (
             <SideInputs key="B" side={SIDE_B} info={B} />
-          ) : tb && B.p && hudTable ? (
-            <SideInputs key="B-site" side={SIDE_A} info={B} only={['build', 'open']} />
+          ) : tb ? (
+            <p className="text-caption leading-snug text-slate-600">B tests A’s project; each place is read on a lot of the size the project needs there.</p>
           ) : (
             <p className="text-caption text-slate-600">Pick place B above.</p>
           )}

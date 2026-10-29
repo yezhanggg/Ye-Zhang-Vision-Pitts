@@ -42,6 +42,11 @@ def main() -> None:
     izo = zc.izo_overlay(refresh=args.refresh)
     zc.write_izo(izo)
     totals = zc.tract_totals(lots, cap, standards, tracts, izo)
+    # The Policy lab's before/after: the same lots under the minimum lot sizes before May 2025.
+    zc.add_old(totals, lots, zc.lot_capacity(lots, zc.old_minimums(standards)), standards)
+    print(f"homes by right on vacant lots under the old minimums: {sum(v['vacant'].get('homes_old', 0) for v in totals.values()):,} "
+          f"(today {sum(v['vacant']['homes'] for v in totals.values()):,}); gentle {sum(v['gentle'].get('homes_old', 0) for v in totals.values()):,} "
+          f"(today {sum(v['gentle']['homes'] for v in totals.values()):,})")
     cases = zc.fixture_cases(standards)
 
     vac = lots["use"] == "vacant"
@@ -49,6 +54,8 @@ def main() -> None:
           f"under the minimum lot size: {int((vac & cap['below_min']).sum()):,}")
     print(f"lots in R2/R3 holding fewer homes than allowed: {sum(v['gentle']['lots'] for v in totals.values()):,} "
           f"(+{sum(v['gentle']['homes'] for v in totals.values()):,} homes)")
+    print(f"house lots: +{sum(v['gentle']['adu'] for v in totals.values()):,} with an ADU, +{sum(v['gentle']['up3'] for v in totals.values()):,} at up to 3, "
+          f"+{sum(v['gentle']['up4'] for v in totals.values()):,} at up to 4 homes")
     print(f"tracts mostly in the IZ-O: {sum(1 for v in totals.values() if (v['izo_share'] or 0) > 0.5)}")
     for c in cases:
         print(f"  {c['code']:7} {c['lot_sqft']:>6,} sq ft -> {c['homes']} homes{' (under the minimum lot size)' if c['below_min'] else ''}")

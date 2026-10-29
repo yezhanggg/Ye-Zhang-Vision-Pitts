@@ -7,7 +7,7 @@ import { zipById, zipRanked } from '../equity/zip';
 import { isNum } from './format';
 import { amiOf, type PlanLevel } from './plan';
 
-export type PlaceArea = 'tract' | 'zip';
+export type PlaceArea = 'parcel' | 'tract' | 'zip';
 
 interface ZipViewState {
   area: PlaceArea;

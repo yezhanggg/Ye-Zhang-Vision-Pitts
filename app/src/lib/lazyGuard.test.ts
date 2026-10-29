@@ -33,6 +33,13 @@ const ON_DEMAND = [
   'lib/project/',
   'lib/lihtc/',
   'data/lazy/',
+  'components/place/levels/',
+  'components/explore/ParcelsSwitch.tsx',
+  'components/explore/ParcelsBoundary.tsx',
+  'lib/parcel/',
+  'lib/review/',
+  'lib/policylab/',
+  'components/equity/lab/',
 ];
 const onDemand = (file: string) => ON_DEMAND.some((p) => file.slice(SRC.length + 1).startsWith(p));
 

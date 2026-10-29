@@ -51,6 +51,6 @@ nopush/
 # without them. Delete the next line to publish them with the site.
 app/public/data/shadow/fine/
 
-# Sun and shadow, By parcel view (lot shapes and their figures, about 55 MB; scripts/15_build_parcel_shadow.py). The
-# app shows the view only where these files are. Delete the next line to publish them with the site.
-app/public/data/parcel-shadow/
+# Lot files (app/public/data/parcel-shadow/, about 58 MB, scripts/15; app/public/data/parcel-lots/, about 4 MB,
+# scripts/22) are published with the site since 2026-10-27, for the Place page's Parcel level and Explore's By parcel
+# view (Ye: real lots, lot facts only, never owners or values).

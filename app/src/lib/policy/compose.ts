@@ -91,9 +91,13 @@ export function composeRec(p: PlaceMeasures, hud: HudTable, input: ComposeInput,
     types = types.filter((t) => t.typology !== 'adu');
     not.push({ typology: 'adu', because: 'an ADU needs an ADU overlay district (§912.08), and none is mapped in the city' });
   }
+  // Renter householders 65 and older (ACS B25007), so the line says how many residents the setting leaves out.
+  const ra = p?.renter_age;
+  const all = ra ? ra.reduce<number>((a, v) => a + (v ?? 0), 0) : 0;
+  const old = ra && all > 0 ? `; ${Math.round((((ra[5] ?? 0) + (ra[6] ?? 0)) / all) * 100)}% of renter households here are 65 or older` : '';
   if (!senior && types.some((t) => t.typology === 'senior')) {
     types = types.filter((t) => t.typology !== 'senior');
-    not.push({ typology: 'senior', because: 'senior housing is age-restricted to 62 and older, and your residents are general' });
+    not.push({ typology: 'senior', because: `it is for ages 62 and older and Residents is set to General${old}. Pick Senior under Residents (or Development type) to include it` });
   }
   let why: string | null = null;
   if (s.transit && transit.passed === false && types.length) {
@@ -103,7 +107,7 @@ export function composeRec(p: PlaceMeasures, hud: HudTable, input: ComposeInput,
   const lead = types[0]?.typology ?? null;
   if (!lead && !why && !fl?.blocked) {
     if (base.types.length && base.types.every((t) => t.typology === 'adu' || (!senior && t.typology === 'senior')))
-      why = base.types.every((t) => t.typology === 'adu') ? 'Only an ADU fits here, and no ADU overlay is mapped.' : 'Only senior housing fits here, and your residents are general.';
+      why = base.types.every((t) => t.typology === 'adu') ? 'Only an ADU fits here, and no ADU overlay is mapped.' : `Only senior housing fits here${old}. Pick Senior under Residents to include it.`;
   }
 
   const on = checks.filter((c) => c.on && c.id !== 'market');

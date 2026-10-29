@@ -329,6 +329,7 @@ export function buildPlaceReport(i: PlaceReportInput): Report {
   const name = placeName(t);
   const ans = answerRows(i);
   const blocks: ReportBlock[] = [
+    ...(placeExtra.at?.(t.GEOID)?.blocks ?? []),
     { kind: 'callout', text: ans.lead ? `Suggested: ${ans.lead} — ${ans.headline}.` : `No suggestion here under ${STANCE_LABEL[rec.stance]} at ${LEVEL_LABEL[plan.level]}.` },
     { kind: 'heading', text: 'Planning inputs' },
     { kind: 'kv', rows: inputRows(plan) },
@@ -340,7 +341,7 @@ export function buildPlaceReport(i: PlaceReportInput): Report {
   ];
   if (i.map) blocks.push({ kind: 'image', src: i.map, caption: `${name}: map colored by the suggested housing type under ${STANCE_LABEL[plan.focus]} at ${LEVEL_LABEL[plan.level]}.` });
   blocks.push({ kind: 'heading', text: 'Evidence' }, ...evidenceBlocks(t, place, hud));
-  blocks.push(...(placeExtra.at?.(t.GEOID)?.blocks ?? []), { kind: 'heading', text: 'You decide' }, { kind: 'callout', text: DECIDE });
+  blocks.push({ kind: 'heading', text: 'You decide' }, { kind: 'callout', text: DECIDE });
   return {
     title: `Place report: ${name}`,
     subtitle: `${t.name} · Pittsburgh · census tract ${t.GEOID}`,

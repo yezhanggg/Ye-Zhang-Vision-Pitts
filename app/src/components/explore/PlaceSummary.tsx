@@ -1,10 +1,17 @@
 // The "everything about this place" summary and the single-variable detail for the Explore right panel.
 // Every number is read from the bundled data or the browser-side scoring engine; charts are the primitives in
 // ../charts. Nothing here is scored: it describes.
-import { useMemo } from 'react';
+import { Suspense, lazy, useMemo } from 'react';
 import { FMR_2BR, askingRents, scoring, tractById } from '../../lib/data';
-import { stabilityFor, tLabel, useAllResults } from '../../lib/derived';
-import { matchPreset, useApp, type Level } from '../../lib/store';
+import { tLabel, useAllResults } from '../../lib/derived';
+import { useApp, type Level } from '../../lib/store';
+import { hud, placeFor } from '../../lib/place/data';
+import { LEVEL_LABEL as AMI } from '../../lib/place/plan';
+import { usePlan } from '../../lib/place/planStore';
+import { recommend } from '../../lib/place/recommend';
+import { planOptions } from '../../lib/place/suggest';
+import { STANCE_LABEL } from '../../lib/place/thresholds';
+import type { Typology } from '../../lib/place/types';
 import { CITY_GEOID, COUNTY_GEOID, LEVEL_LABEL, hasHistoryFor, plainDescription, referenceSeries, reference, rentAreaFor, rentAreas, variableById, xwDominant, history } from '../../lib/explore/catalog';
 import { useSeries } from '../../lib/explore/remote';
 import { estimates, fmtTick, fmtValue } from '../../lib/explore/bins';
@@ -12,13 +19,16 @@ import { EXPLORE_UI } from '../../lib/explore/copy';
 import { fmtAnalysis, isAnalysis } from '../../lib/explore/analysisVars';
 import { binOf, change, composition, histogram, rankOf, type Series } from '../../lib/explore/summary';
 import type { Estimate, Loaded, Unit, ValueMap, VariableDef } from '../../lib/explore/types';
-import { FACTOR_COPY, RENT_CAVEAT, directionWord, factorName, matchText, pctShort, stabilityWords } from '../../lib/copy';
+import { FACTOR_COPY, RENT_CAVEAT, directionWord, factorName, pctShort } from '../../lib/copy';
 import { fmtSignedPct } from '../../lib/format';
 import type { TractProps } from '../../lib/types';
 import { BarCompare, Donut, HistogramChart, LineChart, PARTS, RankBar, SERIES, StackedBar, StatTile, fmtK } from '../charts';
 import { Button, Explainer } from '../primitives';
 
 const C = EXPLORE_UI.charts;
+// Online the place card reads the Place tab's answer under your screens (lib/policy/compose, loaded on demand); the
+// offline single file reads the rules under the focusing issue, as its MatchView does.
+const OnlineAnswer = import.meta.env.MODE === 'export' ? null : lazy(() => import('../place/levels/ExploreAnswer'));
 const fmtFor = (unit: Unit) => (v: number) => fmtValue(v, unit);
 const tickFor = (unit: Unit) => (v: number) => (unit === 'usd' ? `$${fmtK(v)}` : fmtTick(v, unit));
 
@@ -148,32 +158,41 @@ export function RentLine({ level, geoid }: { level: Level; geoid: string }) {
   );
 }
 
-/** The matchmaker's read on a city tract under the current priorities: best match, factors, pressure, rents. */
+/** The Place answer for a tract: the suggested type, then the rest of the suggested set. */
+function AnswerCard({ types, words }: { types: Typology[]; words: string }) {
+  const top = scoring.typologies.find((k) => k.id === types[0]);
+  return top ? (
+    <div className="rounded-xl p-3 ring-1" style={{ background: `${top.color}14`, boxShadow: `inset 0 0 0 1px ${top.color}40` }}>
+      <div className="text-caption text-slate-600">Suggested here · {words}</div>
+      <div className="font-display text-title font-bold text-slate-900">{top.label}</div>
+      {types[1] && <div className="text-small text-slate-700">Also fits: {types.slice(1).map(tLabel).join(', ')}</div>}
+    </div>
+  ) : (
+    <div className="hatch rounded-xl px-3 py-2 text-small text-slate-700">No type suggested here · {words}</div>
+  );
+}
+
+/** The Place answer on a city tract (the same as Analysis > Place), its factors, pressure and rents. */
 function AnalysisBlock({ t }: { t: TractProps }) {
   const weights = useApp((s) => s.weights);
   const setMode = useApp((s) => s.setMode);
   const set = useApp((s) => s.set);
+  const plan = usePlan();
   const results = useAllResults(weights);
-  const r = results.get(t.GEOID);
-  const stability = useMemo(() => stabilityFor(t.GEOID, weights), [t.GEOID, weights]);
-  const preset = scoring.presets.find((p) => p.id === matchPreset(weights))?.label ?? 'custom mix';
-  const top = r?.top ? scoring.typologies.find((k) => k.id === r.top) : null;
+  const fit = results.get(t.GEOID)?.ranking as Typology[] | undefined;
+  const pl = placeFor(t.GEOID);
   const p = t.market_pressure;
   const word = p == null ? null : p > 0.25 ? 'much stronger' : p > 0.08 ? 'stronger' : p < -0.25 ? 'much weaker' : p < -0.08 ? 'weaker' : 'about the same';
   return (
     <div className="space-y-3">
-      {t.residential && top && r ? (
-        <div className="rounded-xl p-3 ring-1" style={{ background: `${top.color}14`, boxShadow: `inset 0 0 0 1px ${top.color}40` }}>
-          <div className="text-caption text-slate-600">Best match under {preset}</div>
-          <div className="font-display text-title font-bold text-slate-900">{top.label}</div>
-          <div className="text-small text-slate-700">
-            {matchText(r.topScore)}
-            {stability && <> · {stabilityWords(stability.share).label}: stays #1 in {stabilityWords(stability.share).n} of 10 small changes to the priorities</>}
-            {r.ranking[1] && <> · next: {tLabel(r.ranking[1])}</>}
-          </div>
-        </div>
-      ) : (
+      {!t.residential ? (
         <div className="hatch rounded-xl px-3 py-2 text-small text-slate-700">Not ranked: fewer than 25 households.</div>
+      ) : OnlineAnswer ? (
+        <Suspense fallback={null}>
+          <OnlineAnswer geoid={t.GEOID} fitOrder={fit} card={AnswerCard} />
+        </Suspense>
+      ) : (
+        <AnswerCard types={pl && hud ? recommend(pl, hud, plan.focus, planOptions(plan, fit)).types.map((x) => x.typology) : []} words={`${STANCE_LABEL[plan.focus]} · ${AMI[plan.level]}`} />
       )}
       <div className="space-y-2">
         {scoring.factors.map((f) => {
@@ -271,7 +290,7 @@ export default function PlaceSummary({ level, geoid, unit }: { level: Level; geo
         </Section>
       )}
       {tract ? (
-        <Section title={C.analysis} sub="Same numbers as the Analysis section, under the priorities set there">
+        <Section title={C.analysis} sub="Same answer as Analysis > Place">
           <AnalysisBlock t={tract} />
         </Section>
       ) : (

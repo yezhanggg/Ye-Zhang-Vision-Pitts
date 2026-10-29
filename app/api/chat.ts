@@ -17,6 +17,10 @@
 //
 // Provider: DeepSeek when DEEPSEEK_API_KEY is set, otherwise Claude when ANTHROPIC_API_KEY is set.
 // EXPLAIN_PROVIDER=deepseek|anthropic forces one; CHAT_MODEL (then EXPLAIN_MODEL) overrides the model id.
+//
+// mode "review" (the Second opinion on a project review or a policy scenario, asked on a click): always Claude, Haiku
+// unless REVIEW_MODEL says otherwise. The facts are the rules' own findings with their numbers; the model reads them
+// and says what matters most, under the same number check. It never decides the verdict.
 
 export interface Turn {
   role: 'user' | 'assistant';
@@ -26,6 +30,7 @@ export interface ChatPayload {
   question: string;
   facts: string;
   history?: Turn[];
+  mode?: 'chat' | 'review';
 }
 interface Provider {
   id: 'deepseek' | 'anthropic';
@@ -36,6 +41,8 @@ interface Provider {
 
 export const LIMITS = { question: 400, facts: 16000, history: 2, turn: 1500 };
 const MAX_TOKENS = 380;
+const REVIEW_MAX_TOKENS = 300;
+export const REVIEW_MODEL = 'claude-haiku-5-5';
 export const FACTS_ACK = 'Understood. I will answer from these facts first.';
 /** The one-sentence answer to a question outside the tool's scope. */
 export const DECLINE = 'I can only help with Pittsburgh housing and the data in VisionPitts.';
@@ -66,6 +73,20 @@ Rules:
 5. "Asking rent" figures come from licensed listings and lean toward market-rate units. Say so only when you quote an asking rent. "Median gross rent" is a census figure and needs no such note.
 6. Plain text only: no markdown, no asterisks, no headings. At most 120 words.
 7. Begin with one or two plain sentences that answer the question. When asked to describe the surroundings, name the nearest places and say what stands out about them and about the selected place. Add short lines that start with "• " only to compare figures, five lines at most. Do not repeat the facts line by line.`;
+
+/** The Second opinion's provider: Claude only (Haiku unless REVIEW_MODEL overrides it). */
+export function reviewProvider(env: Record<string, string | undefined>): Provider | null {
+  return env.ANTHROPIC_API_KEY ? { id: 'anthropic', label: 'Claude', key: env.ANTHROPIC_API_KEY, model: env.REVIEW_MODEL || REVIEW_MODEL } : null;
+}
+
+export const REVIEW_SYSTEM = `You are a senior housing development reviewer inside VisionPitts, a Pittsburgh housing planning tool.
+The FACTS are a project's (or a policy scenario's) inputs and the findings of the tool's own rules: zoning, height, overlays, fit with the area's renters, and the money, each with its numbers.
+
+Write a second opinion for a planner or developer, in plain text, at most 90 words:
+- First line: one sentence on whether the project (or scenario) holds up, in your own words; do not contradict the rules' verdict.
+- Then at most two lines starting "• Risk: " naming the two findings that matter most and why.
+- Then one line starting "• Try: " with one change to test next, chosen from the fixes listed or the inputs named in the facts.
+Rules: use only numbers written in the facts, exactly as written; never calculate, estimate or invent a figure; no markdown; no advice on where people should live; say plainly when the facts are not enough.`;
 
 // A light pre-check, so an obviously unrelated request never reaches (or bills) the model. It is permissive on purpose:
 // it only declines when the question reads as a known off-topic request AND names nothing in scope (a housing word,
@@ -112,7 +133,7 @@ export function clean(body: unknown): ChatPayload | null {
   }
   // A conversation starts with the user and alternates; anything else is dropped rather than repaired.
   const ok = history.every((t, i) => t.role === (i % 2 === 0 ? 'user' : 'assistant')) && history.length % 2 === 0;
-  return { question, facts, history: ok ? history : [] };
+  return { question, facts, history: ok ? history : [], mode: b.mode === 'review' ? 'review' : 'chat' };
 }
 
 /** Facts first (the part that repeats from one question to the next), then the last exchange, then the question. */
@@ -157,12 +178,12 @@ export interface Usage {
 type Done = { ok: true; text: string; usage: Usage } | { ok: false; status: number };
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 
-async function complete(p: Provider, messages: Turn[]): Promise<Done> {
+async function complete(p: Provider, messages: Turn[], system = SYSTEM, maxTokens = MAX_TOKENS): Promise<Done> {
   if (p.id === 'deepseek') {
     const r = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${p.key}` },
-      body: JSON.stringify({ model: p.model, max_tokens: MAX_TOKENS, temperature: TEMPERATURE, thinking: { type: 'disabled' }, messages: [{ role: 'system', content: SYSTEM }, ...messages.map((m) => ({ role: m.role, content: m.text }))] }),
+      body: JSON.stringify({ model: p.model, max_tokens: maxTokens, temperature: TEMPERATURE, thinking: { type: 'disabled' }, messages: [{ role: 'system', content: system }, ...messages.map((m) => ({ role: m.role, content: m.text }))] }),
     });
     if (!r.ok) return { ok: false, status: r.status };
     const data = (await r.json()) as { choices?: { message?: { content?: string } }[]; usage?: Record<string, unknown> };
@@ -172,7 +193,8 @@ async function complete(p: Provider, messages: Turn[]): Promise<Done> {
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': p.key, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: p.model, max_tokens: MAX_TOKENS, temperature: TEMPERATURE, system: SYSTEM, messages: messages.map((m) => ({ role: m.role, content: m.text })) }),
+    // The system text is marked for caching, so a repeat question bills it at the cached rate.
+    body: JSON.stringify({ model: p.model, max_tokens: maxTokens, temperature: TEMPERATURE, system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }], messages: messages.map((m) => ({ role: m.role, content: m.text })) }),
   });
   if (!r.ok) return { ok: false, status: r.status };
   const data = (await r.json()) as { content?: { type: string; text?: string }[]; usage?: Record<string, unknown> };
@@ -186,7 +208,6 @@ const WARM_MAX = 200;
 
 export default async function handler(req: { method?: string; body?: unknown }, res: { status: (n: number) => { json: (b: unknown) => void } }) {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, reason: 'POST only' });
-  const provider = pickProvider(process.env);
   let payload: ChatPayload | null;
   try {
     payload = clean(typeof req.body === 'string' ? JSON.parse(req.body) : req.body);
@@ -194,22 +215,26 @@ export default async function handler(req: { method?: string; body?: unknown }, 
     payload = null;
   }
   if (!payload) return res.status(400).json({ ok: false, reason: 'bad_request' });
+  const review = payload.mode === 'review';
+  const provider = review ? reviewProvider(process.env) : pickProvider(process.env);
+  const system = review ? REVIEW_SYSTEM : SYSTEM;
+  const maxTokens = review ? REVIEW_MAX_TOKENS : MAX_TOKENS;
   // Declined without calling the model: no key needed, no tokens spent. It has no figures, so it is checked.
-  if (offTopic(payload.question, payload.facts)) return res.status(200).json({ ok: true, text: DECLINE, provider: provider?.label ?? 'VisionPitts', model: provider?.model, checked: true, unmatched: [], declined: true, usage: { input: 0, cached: 0, output: 0 } });
+  if (!review && offTopic(payload.question, payload.facts)) return res.status(200).json({ ok: true, text: DECLINE, provider: provider?.label ?? 'VisionPitts', model: provider?.model, checked: true, unmatched: [], declined: true, usage: { input: 0, cached: 0, output: 0 } });
   if (!provider) return res.status(200).json({ ok: false, reason: 'no_api_key' });
 
   const messages = buildMessages(payload);
-  const cacheKey = JSON.stringify([provider.id, provider.model, messages]);
+  const cacheKey = JSON.stringify([provider.id, provider.model, payload.mode, messages]);
   const hit = warm.get(cacheKey);
   if (hit) return res.status(200).json({ ...hit, cached: true, usage: { input: 0, cached: 0, output: 0 } });
   const sources = [payload.facts, payload.question, ...(payload.history ?? []).map((t) => t.text)];
-  const first = await complete(provider, messages);
+  const first = await complete(provider, messages, system, maxTokens);
   if (!first.ok) return res.status(200).json({ ok: false, reason: `${provider.id}_${first.status}` });
   const usage: Usage = { ...first.usage };
   let text = tidy(first.text);
   let check = checkNumbers(text, sources);
   if (!check.ok) {
-    const again = await complete(provider, [...messages, { role: 'assistant', text: first.text }, { role: 'user', text: `These numbers are not in the facts: ${check.unmatched.join(', ')}. Rewrite the answer using only figures written in the facts, exactly as written. Do not calculate anything.` }]);
+    const again = await complete(provider, [...messages, { role: 'assistant', text: first.text }, { role: 'user', text: `These numbers are not in the facts: ${check.unmatched.join(', ')}. Rewrite the answer using only figures written in the facts, exactly as written. Do not calculate anything.` }], system, maxTokens);
     if (again.ok) {
       usage.input += again.usage.input;
       usage.cached += again.usage.cached;

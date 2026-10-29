@@ -44,7 +44,9 @@ describe('renderReportHtml', () => {
     expect(html).toContain('A &lt;b&gt;');
     expect(html).toContain('<td class="right">$1,200</td>');
     expect(html).toContain('evidence, not a decision — decisions belong to people');
-    expect(html).toContain('City of Pittsburgh');
+    // The letterhead is the tool's, never the City's.
+    expect(html).toContain('Not a City document');
+    expect(html).not.toContain('City of Pittsburgh');
     expect(html).toContain('September 27, 2026');
     expect(isNumericCell('±171')).toBe(false);
     expect(isNumericCell('12.5%')).toBe(true);

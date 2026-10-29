@@ -31,7 +31,7 @@ export interface AnalysisVar extends VariableDef {
 export const isAnalysis = (v: VariableDef | null | undefined): v is AnalysisVar => !!v && (v as AnalysisVar).source === 'analysis';
 
 export const ANALYSIS_GROUPS: GroupDef[] = [
-  { id: 'an_answer', label: 'Best fit by stance' },
+  { id: 'an_answer', label: 'Weighted fit by preset' },
   { id: 'an_ami', label: 'Income bands (AMI)' },
   { id: 'an_rents', label: 'Rents' },
   { id: 'an_lens', label: 'Market dynamics' },
@@ -67,7 +67,7 @@ const stanceResults = (id: string) => {
   return allResults(stanceWeights.get(id)!);
 };
 const answerVars: AnalysisVar[] = STANCES.filter((st) => scoring.presets.some((p) => p.id === st.id)).map((st) =>
-  def(`an_answer_${st.id}`, st.label, 'an_answer', 'class', 'Answer', `Housing type that fits best under the ${st.label} stance. A starting point, not a decision; Analysis shows the evidence and the rent arithmetic.`, { kind: 'cat', palette: scoring.typologies.map((t) => t.color), labels: scoring.typologies.map((t) => t.label) }, (t) => {
+  def(`an_answer_${st.id}`, st.label, 'an_answer', 'class', 'Answer', `Top of the weighted fit under the ${st.label} weights, across all five types and before the rules. Not the suggestion: Analysis > Place gives that.`, { kind: 'cat', palette: scoring.typologies.map((t) => t.color), labels: scoring.typologies.map((t) => t.label) }, (t) => {
     const top = stanceResults(st.id).get(t.GEOID)?.top;
     return top ? typIndex.get(top) ?? null : null;
   }, { classOf: (v) => v }),

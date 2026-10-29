@@ -192,7 +192,7 @@ export function buildCompareReport(i: CompareReportInput): Report {
       'Pittsburgh Regional Transit GTFS, June 2026 weekday schedule (frequent = at least 64 weekday departures)',
       'FEMA National Flood Hazard Layer (special flood hazard area share of land)',
       'LEHD LODES 2023 (jobs within 1 mile) · OpenStreetMap (services within ½ mile)',
-      'Suggestion rules: docs/assumptions.md §14 (lib/place/recommend)',
+      'Suggestion rules: docs/assumptions.md §14',
     ],
     filename: i.filename,
   };

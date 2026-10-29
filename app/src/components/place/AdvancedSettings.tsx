@@ -1,4 +1,4 @@
-// Advanced settings on Analysis > Match = the VisionPitts standard. Open, it first shows the standard setup for the
+// Advanced settings in the offline Match panel (MatchView) = the VisionPitts standard. Open, it first shows the standard setup for the
 // current focus (each factor's published weight in words, from config/scoring.json via presetWeights), then the
 // sliders and "Reset to VisionPitts standard". A "Custom" badge and highlighted rows mark any factor that differs.
 // The weights only order types inside the suggested set; the rules decide the suggestion. The open/closed state
@@ -17,8 +17,10 @@ import WeightPanel from '../WeightPanel';
 const num = (v: number) => (Math.round(v * 10) / 10).toString();
 const differs = (a: number | undefined, b: number | undefined) => Math.abs((a ?? 0) - (b ?? 0)) > 1e-6;
 
-export default function AdvancedSettings({ focus, weights, onChange, onReset }: { focus: Stance; weights: Weights; onChange: (w: Weights) => void; onReset: () => void; custom?: boolean }) {
+export default function AdvancedSettings({ focus, weights, onChange, onReset }: { focus: string; weights: Weights; onChange: (w: Weights) => void; onReset: () => void; custom?: boolean }) {
   const open = useApp((s) => s.ui.sections.settings === 'open');
+  // A stance, or Balanced (the equal-weights preset).
+  const name = STANCE_LABEL[focus as Stance] ?? 'Balanced';
   const setSection = useApp((s) => s.setSection);
   const standard = presetWeights(focus);
   const rows = activeFactors.map((f) => ({ id: f.id, name: factorName(f.id, f.label), std: standard[f.id] ?? 0, yours: weights[f.id] ?? 0 }));
@@ -40,12 +42,12 @@ export default function AdvancedSettings({ focus, weights, onChange, onReset }: 
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
             <div className="space-y-3 px-3 pb-3 pt-2">
               <div>
-                <div className="text-small font-semibold text-slate-900">VisionPitts standard · {STANCE_LABEL[focus]}</div>
+                <div className="text-small font-semibold text-slate-900">VisionPitts standard · {name}</div>
                 <p className="mt-0.5 text-caption leading-snug text-slate-600">
-                  The published weights for {STANCE_LABEL[focus]}. They only order the suggested housing types; the suggestion itself comes from the rules above.
+                  Published weights for {name}. They order the suggested types; the rules pick which types.
                 </p>
                 <table className="mt-1.5 w-full text-caption">
-                  <caption className="sr-only">Published weights for {STANCE_LABEL[focus]}</caption>
+                  <caption className="sr-only">Published weights for {name}</caption>
                   <tbody className="divide-y divide-stone-100">
                     {rows.map((r) => {
                       const d = differs(r.std, r.yours);

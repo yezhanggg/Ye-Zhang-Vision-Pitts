@@ -352,6 +352,14 @@ def write_tables(lots, m: dict, shaded: np.ndarray, cells: np.ndarray, manifest:
 # Map files
 
 
+def tile_xy(lon: np.ndarray, lat: np.ndarray, z: int) -> tuple[np.ndarray, np.ndarray]:
+    """The web map tile (x, y) at zoom `z` holding each point: the chunk a lot goes into (also used by lot_facts)."""
+    n = 1 << z
+    tx = np.floor((np.asarray(lon) + 180) / 360 * n).astype(int)
+    ty = np.floor((1 - np.arcsinh(np.tan(np.radians(np.asarray(lat)))) / np.pi) / 2 * n).astype(int)
+    return tx, ty
+
+
 def write_app(lots, m: dict, cells: np.ndarray, manifest: dict, dest: Path) -> dict:
     """The files the Explore map draws lots from (replacing what is in `dest`): manifest.json, and per chunk of the
     run's grid <x>_<y>.json (GeoJSON) and <x>_<y>.bin (one row of profile bytes per lot, in the same order).
@@ -375,9 +383,7 @@ def write_app(lots, m: dict, cells: np.ndarray, manifest: dict, dest: Path) -> d
     wgs = lots.geometry.to_crs("EPSG:4326")
     keep = np.flatnonzero(cells > 0)
     points = wgs.iloc[keep].representative_point()
-    n = 1 << z
-    tx = np.floor((points.x.to_numpy() + 180) / 360 * n).astype(int)
-    ty = np.floor((1 - np.arcsinh(np.tan(np.radians(points.y.to_numpy()))) / np.pi) / 2 * n).astype(int)
+    tx, ty = tile_xy(points.x.to_numpy(), points.y.to_numpy(), z)
     area = lots["sqft"].to_numpy()[keep]
     shapes = shapely.transform(wgs.to_numpy()[keep], lambda c: np.round(c, 6))
     bounds = shapely.bounds(shapes)

@@ -1,6 +1,6 @@
 # Find places for a project, and three ways to pay for it
 
-Added October 2026. Code: `app/src/lib/project/size.ts` (the size sweep), `app/src/lib/project/paths.ts` (the paths), `app/src/lib/finder/rank.ts` (the ranking), `app/src/lib/demand/depth.ts` (market depth), `app/src/lib/project/report.ts` (the project in the place PDF and CSV). Market depth data: `src/visionpitts/demand.py` `tract_depth`, written into `app/src/data/lazy/demand.json` by `scripts/17_build_demand.py`. Choices: [assumptions §18](../assumptions.md).
+Added October 2026. Code: `app/src/lib/project/size.ts` (the size sweep), `app/src/lib/project/paths.ts` (the paths), `app/src/lib/finder/rank.ts` and `app/src/components/place/finder/read.ts` (Find places), `app/src/lib/demand/depth.ts` (market depth), `app/src/lib/project/report.ts` (the project in the place PDF and CSV). Market depth data: `src/visionpitts/demand.py` `tract_depth`, written into `app/src/data/lazy/demand.json` by `scripts/17_build_demand.py`. Choices: [assumptions §18](../assumptions.md).
 
 These are screening tools. They rerun the project card's own model (mix → pencil → tax credit sheet) and never add a factor to the scoring.
 
@@ -8,7 +8,7 @@ These are screening tools. They rerun the project card's own model (mix → penc
 
 The same project is tested at a range of sizes.
 
-**The range.** It starts from the person's own range: the finder's "Homes from … to", or on the project card a third of the homes to twice them, and never fewer than 12. Two bounds can cut the top of that range:
+**The range.** It starts from the person's own range: on the project card a third of the homes to twice them, and never fewer than 12. (Find places no longer sweeps sizes: it reads the project at its own units, below.) Two bounds can cut the top of that range:
 
 - **By-right homes:** homes zoning allows by right on vacant and lived-in lots (`zoning_capacity.json`, tract totals).
 - **Market depth:** applies to tax credit paths only (below).
@@ -82,42 +82,55 @@ The range of the total comes from the same caps (`scoreSheet` in `lib/lihtc/scor
 
 ## Find places for a project
 
-On Analysis > Place, before a place is picked, "Or find places for a project" opens the finder. Its form is the section "Find places for a project" in the left panel; the ranked list is in the right panel's start card and is ranked again on Confirm. The flood and transit screens under Policies that apply here filter it.
+On Analysis > Place, at the Parcel level before a site is picked, "Or find places for a project" opens the finder (it ranks places by whether the project pencils, so it sits with the money). The ranked list is in the right panel's start card. Code: `app/src/lib/finder/rank.ts` (filters, order, words), `app/src/components/place/finder/read.ts` (one place read), `FinderCard.tsx` (the list and the filters).
 
-**The project:**
-- homes from–to
-- financing: 9% or 4%, 9%, 4%, or market rate
-- building type
-- highest cost a home
-- how many places to show
-- the planning level, taken from "Who you're planning for"
+Changed 2026-10-28 after planner and developer reviews: the finder no longer has a project of its own.
 
-**More filters:**
-- allowed by right on at least 5% of the land (the unverified by-right table; a conditional use counts when ticked)
-- most land in a FEMA flood zone
-- QCT or DDA only
-- inside or outside the inclusionary overlay
-- least market depth
+**The project is the one on the left.** The Project group above the finder sets it: development type, units, stories, income level and unit mix. The Capital inputs apply as well. The financing follows the project as Place reads it: market rate for Market, otherwise tax credits where units carry an income limit. The finder group mirrors the LIHTC pick (9% credits or 4% credits + bonds) and writes the same setting as Capital does. A Commercial project gets no list, since it has a zoning check only. The list waits 0.3 s after the last change, then reads every place again.
 
-**How places are tested.** Every one of the 114 ranked tracts is swept. "9% or 4%" keeps the better credit by the rule below. Places left out are counted by reason.
+**Each place is read as the Tract view reads it** (`readPlace`, which mirrors `useProjectRead` with scope `tract`):
+- the project model at the project's units;
+- the site: a lot the size the project needs, in a district there that allows it by right (`typicalIn`);
+- the zoning check on that lot;
+- the capital stack on that lot (`runCapital` / `capitalContext`), with the person's Capital changes;
+- the review and its verdict.
+
+A test (`finder/read.test.ts`) renders the Tract view's hook and holds the two reads equal. Clicking a row opens that tract at the Tract level, in Test a project mode, with the same project, so the row and the place show the same zoning, money and verdict.
+
+**The filters** (left panel):
+- **Allowed by right on a lot here**, on by default. This is the zoning check the Tract view runs, on the standards transcribed from the City's code (`config/zoning_standards.json`, every row verified; see [zoning_capacity.md](zoning_capacity.md)). A tract whose lot falls in a district that is not computed (downtown, riverfront, some mixed-use and planned districts) is left out as "district not computed". The older family table in `place.json` (`zoning.by_type`, marked unverified) is no longer read here.
+- Count a hearing (conditional use, special exception) as allowed.
+- QCT or DDA only.
+- Inside or outside the inclusionary overlay, read as the project reads it (the pin, else most of the tract).
+- Least market depth.
+- Most cost a unit (the capital stack's total ÷ units).
+- How many places to show.
+
+The flood and transit screens under Policies that apply here filter the list too. Places left out are counted by reason; when a filter alone holds out fewer than it counts, the count says so, e.g. "62 not allowed by right (40 by that alone)".
 
 **The order (printed under the list):**
-1. Tier: closes, then over PHFA's limit, then gap.
-2. Places whose range zoning and market depth left whole come first.
-3. The smaller gap a home at the reference size (headroom counts below zero). The reference size is the right size; otherwise the largest size that closes; otherwise the size with the smallest gap a home.
-4. More PHFA points from the place.
-5. The lower cost a home.
+1. The review's verdict: works, works with changes, doesn't work as is, district not computed.
+2. On tax credit paths, how far PHFA's minimum is: met; within reach of the design and financing lines; reached only with the site, partner and team lines still to confirm; out of reach even with every line at its top.
+3. Fewer findings to fix: stops first, then warnings.
+4. Less money a unit still to find. On tax credit paths this is the gap after every source. At market rate it is the equity a 1.5× return would not pay back; below zero, it is a cushion.
+5. More PHFA points from the place.
+6. The lower cost a unit.
 
 **Each row shows:**
-- its rank and tier
-- the sizes that close and the cost a home
-- PHFA points against the minimum
-- the drivers in words: 2BR market rent against the tax credit rent, QCT/DDA basis boost, homes by right, market depth, and the credit cap when it binds
-- the type the current stance suggests
+- **Name:** the neighborhood and the tract, e.g. "Bloomfield · Tract 802", since a neighborhood can hold several tracts.
+- **Verdict:** as the review gives it.
+- **Zoning and capital:** the Tract view's zoning and capital tiles, word for word. On tax credit paths, the row adds the LIHTC equity used against the amount the project could claim. Every row gives the cost a unit.
+- **Tax credit line:** what PHFA's minimum asks and where the points would come from. For example: "9% credits: 20 points now, 120 needed; design and financing choices reach 90, the other 30 must come from site, partner and team lines". When the bound is out of reach: "9% credits can't reach PHFA's 120 minimum here: 100 points at most". The bound adds every point the lines still to confirm could add to the score's high end. That makes it an upper bound, so "can't reach" is always true when it is shown. When most rows share the line, it is printed once above them.
+- **4% path:** where 9% credits need more than the design and financing choices, the 4% path is read as well, with the financing switched. Its capital tile and points are shown, e.g. "4% + bonds instead: Gap to fill $6.92M · 10 points, 120 needed".
+- **To fix:** the review's findings to fix, by title.
+- **Drivers:** 2BR market rent against the tax credit rent, the QCT/DDA basis boost, and market depth.
+- **The type the current stance suggests.**
 
 Rows can be shortlisted, and two shortlisted places open in Compare places.
 
-**One filter away** (`findPlaces` `nearMisses`, `relax`): places that fail exactly one filter are run through the same model, and one line under "Left out" says how many each filter alone holds out, e.g. "71 held out only by “not a QCT or DDA”". A test holds each count equal to re-running the finder without that filter. A place failing two filters or more is not run. With the transit screen on, the line also counts places it alone holds out.
+**One filter away** (`findPlaces` `nearMisses`, `relax`): places that fail exactly one filter are read the same way. A test holds each count equal to re-running the finder without that filter. A place failing two filters or more before it is read is not read.
+
+**Student tracts: not handled.** The full-time student rule makes most student households ineligible for tax credit homes. The data in this repository has no student count: no school enrollment (ACS B14001/B14007), no group quarters population (B26001) and no college population. The only nearby measure is renter householders aged 15–24 (ACS B25007, in `demand.json`). It runs high in Oakland: 645 of 839 renter householders in Central Oakland, Tract 405. Age is not student status, though, so the finder does not flag or demote these tracts. Doing that needs B14007 (enrollment in college or graduate school by age) per tract in `src/visionpitts/acs.py`, and then a rule for what share counts as "mostly students".
 
 ## Dates and the stamp
 

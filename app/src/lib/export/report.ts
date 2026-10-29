@@ -143,7 +143,7 @@ export function renderReportHtml(r: Report, date = new Date()): string {
     ? `<section class="sources"><h2>Sources</h2><ol>${r.sources.map((s) => `<li>${esc(s)}</li>`).join('')}</ol></section>`
     : '';
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(docTitle)}</title><style>${CSS}${footerCss}</style></head><body><div class="page">
-<header class="top"><div class="brand"><span class="mark"></span><span>Vision<span class="v">Pitts</span></span></div><div class="meta"><b>City of Pittsburgh</b><br>${esc(longDate(date))}</div></header>
+<header class="top"><div class="brand"><span class="mark"></span><span>Vision<span class="v">Pitts</span></span></div><div class="meta"><b>Not a City document</b><br>${esc(longDate(date))}</div></header>
 <h1>${esc(r.title)}</h1>${r.subtitle ? `<p class="subtitle">${esc(r.subtitle)}</p>` : ''}
 ${r.blocks.map(blockHtml).join('\n')}
 ${sources}

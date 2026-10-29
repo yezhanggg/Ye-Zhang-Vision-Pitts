@@ -1,6 +1,7 @@
 // VisionPitts Chat as a small pill in the top right of every view (online): as tall as the Home button, "Ask" in
 // words (or "Thinking…" while an answer is written) and the chat's moving thinking orb in place of the microphone, so
-// it is easy to find without covering the map. A click opens the chat under it; the microphone is left out there
+// it is easy to find without covering the map. A click opens the chat under it, in the page's flow: in a view's right
+// column (RightColumn) the panel below moves down and shrinks to leave room for it. The microphone is left out there
 // too. The offline file keeps the full boxes. Loaded on demand.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
@@ -47,8 +48,16 @@ function AiOrb({ busy }: { busy: boolean }) {
  * `extraFacts` / `prompts`: as on AnalysisChat (Equity & policy: its numbers and suggested questions); with prompts
  * the box is docked (the questions above its input), growing with the thread up to the window's height, then scrolling.
  */
-export default function ChatPill({ align = 'right', children, extraFacts, prompts }: { align?: 'right' | 'left'; children?: ReactNode; extraFacts?: string; prompts?: string[] }) {
+export default function ChatPill({ align = 'right', children, extraFacts, prompts, onHeight }: { align?: 'right' | 'left'; children?: ReactNode; extraFacts?: string; prompts?: string[]; /** The open box's height in px (0 closed), for a view without a right column to make room (Compare). */ onHeight?: (px: number) => void }) {
   const [open, setOpen] = useState(false);
+  const [box, setBox] = useState<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!onHeight) return;
+    if (!open || !box) return onHeight(0);
+    const ro = new ResizeObserver(() => onHeight(box.offsetHeight + 8));
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, [open, box, onHeight]);
   const busy = useChat((s) => s.busy);
   const asked = useChat((s) => s.messages.length > 0);
   const root = useRef<HTMLDivElement>(null);
@@ -68,7 +77,7 @@ export default function ChatPill({ align = 'right', children, extraFacts, prompt
   }, [open, asked]);
 
   return (
-    <div ref={root} className="pointer-events-auto relative z-30" data-chat-pill>
+    <div ref={root} className={cx('pointer-events-auto relative z-30 flex min-h-0 max-w-full flex-col', align === 'right' ? 'items-end' : 'items-start')} data-chat-pill>
       <style>{NO_MIC}</style>
       <motion.button
         type="button"
@@ -78,7 +87,7 @@ export default function ChatPill({ align = 'right', children, extraFacts, prompt
         transition={SPRING_TAB}
         aria-expanded={open}
         aria-label={open ? 'Close VisionPitts Chat' : 'Open VisionPitts Chat'}
-        className={cx('flex items-center gap-2 rounded-xl bg-white/95 py-1.5 pl-4 pr-1.5 text-small font-semibold text-slate-700 shadow-lg ring-1 backdrop-blur hover:bg-white hover:text-slate-900', open ? 'ring-violet-300' : 'ring-black/5')}
+        className={cx('flex shrink-0 items-center gap-2 rounded-xl bg-white/95 py-1.5 pl-4 pr-1.5 text-small font-semibold text-slate-700 shadow-lg ring-1 backdrop-blur hover:bg-white hover:text-slate-900', open ? 'ring-violet-300' : 'ring-black/5')}
       >
         <span>
           VisionPitts Chat: {busy ? <span className="shimmer-text">Thinking…</span> : <span className="text-violet-700">Ask</span>}
@@ -94,12 +103,13 @@ export default function ChatPill({ align = 'right', children, extraFacts, prompt
       <AnimatePresence>
         {open && (
           <motion.div
+            ref={setBox}
             initial={{ opacity: 0, y: -6, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.98, transition: { duration: 0.12 } }}
             transition={SPRING_PANEL}
-            style={{ transformOrigin: align === 'right' ? 'top right' : 'top left', width: 440, maxWidth: 'calc(100vw - 24px)', ...(prompts && { display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 90px)' }) }}
-            className={cx('absolute top-full mt-2', align === 'right' ? 'right-0' : 'left-0')}
+            style={{ transformOrigin: align === 'right' ? 'top right' : 'top left', width: 440, maxWidth: 'min(100%, calc(100vw - 24px))', ...(prompts && { display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 90px)' }) }}
+            className="mt-2 min-h-0"
           >
             {children ?? (prompts ? <AnalysisChat compact dock extraFacts={extraFacts} prompts={prompts} /> : <AnalysisChat extraFacts={extraFacts} />)}
           </motion.div>

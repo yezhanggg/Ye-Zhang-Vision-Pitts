@@ -19,6 +19,30 @@ export interface Site {
   /** What the map reads at the search or dropped pin (lib/zoning/atPin, Place online): the district under it, whether it
    *  has standards here, and whether the pin is in the IZ-O. Cleared when the pin goes. */
   pin?: { code: string | null; computed: boolean; near: boolean; why: string | null; izo: boolean | null };
+  /** The county lot picked at the Parcel level (lib/parcel/lots): where it is on the map, what it is and its facts.
+   *  Picking it fills `district`, `lotSqft` and `frontageFt`, which stay editable. */
+  lot?: SiteLot;
+}
+
+export interface SiteLot {
+  /** The By parcel chunk and row it is drawn from (the map outlines it). */
+  chunk: string;
+  row: number;
+  /** The county's lot and block label, e.g. "29-S-32". */
+  label: string;
+  /** Assessed use class: residential, commercial, industrial, vacant, institutional, other or unrecorded. */
+  use: string;
+  /** Where the pin sits on it. */
+  point: [number, number];
+  /** Lot area: the assessment's LOTAREA when the lot facts have it, else the shape's own area. */
+  sqft: number;
+  district: string | null;
+  frontageFt: number | null;
+  depthFt: number | null;
+  /** Homes on the lot today, from the assessed use; null when the use does not say. */
+  existing: number | null;
+  /** Percent of each day (June 21, September 22, December 21) in shadow; null where the lot is not rated. */
+  shade: (number | null)[];
 }
 
 export interface ProjectState {
@@ -32,6 +56,15 @@ export interface ProjectState {
   /** Open space as a share of the lot (lib/policy/sun), and who uses it. */
   openShare: number;
   openType: 'private' | 'shared' | 'public';
+  /** The kind of development at the Parcel level (lib/project/devType); unset: read from the planning inputs. */
+  devType?: 'market' | 'affordable' | 'senior' | 'mixed' | 'commercial';
+  /** Commercial floor area, sq ft (mixed use: the ground floor; commercial: the building). Zoning check only. */
+  commercialSf?: number | null;
+  /** The Parcel level's Capital inputs the person changed, by key (lib/project/capital); the rest are suggested. */
+  capital?: Record<string, number>;
+  /** The units and stories the last lot picked suggested (lib/project/draft suggestForLot), each null where the person's
+   *  own value was kept; `lot` names the lot (chunk:row). */
+  suggested?: { lot: string; units: number | null; stories: number | null };
 }
 
 export const EMPTY_ROW: Row = [0, 0, 0, 0];
@@ -74,6 +107,10 @@ export function parseProject(raw: string | null): ProjectState {
       pencil: s.pencil && typeof s.pencil === 'object' ? s.pencil : {},
       openShare: typeof s.openShare === 'number' && s.openShare >= 0 && s.openShare < 1 ? s.openShare : DEFAULT_PROJECT.openShare,
       openType: s.openType === 'private' || s.openType === 'public' ? s.openType : 'shared',
+      ...(['market', 'affordable', 'senior', 'mixed', 'commercial'].includes(s.devType as string) ? { devType: s.devType } : {}),
+      ...(typeof s.commercialSf === 'number' && Number.isFinite(s.commercialSf) && s.commercialSf >= 0 ? { commercialSf: s.commercialSf } : {}),
+      ...(s.capital && typeof s.capital === 'object' ? { capital: Object.fromEntries(Object.entries(s.capital).filter(([, v]) => typeof v === 'number' && Number.isFinite(v))) } : {}),
+      ...(s.suggested && typeof s.suggested === 'object' && typeof s.suggested.lot === 'string' ? { suggested: { lot: s.suggested.lot, units: typeof s.suggested.units === 'number' ? s.suggested.units : null, stories: typeof s.suggested.stories === 'number' ? s.suggested.stories : null } } : {}),
     };
   } catch {
     return DEFAULT_PROJECT;

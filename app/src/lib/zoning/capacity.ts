@@ -47,8 +47,10 @@ export interface Standards {
 
 export interface TractCapacity {
   lots: number;
-  vacant: { lots: number; acres: number; median_sqft: number | null; computed: number; below_min: number; homes: number; by_family: Record<string, number>; largest: { acres: number; homes: number; district: string } | null };
-  gentle: { lots: number; homes: number };
+  vacant: { lots: number; acres: number; median_sqft: number | null; computed: number; below_min: number; homes: number; by_family: Record<string, number>; largest: { acres: number; homes: number; district: string } | null; homes_old?: number; below_min_old?: number };
+  /** `homes_old`: under the minimum lot sizes before May 2025 (the Policy lab's before/after). `adu`, `up3`, `up4`: the Policy lab's
+   *  house-lot ideas (an accessory unit beside a single home, or up to 3 or 4 homes a lot), today's gain included. */
+  gentle: { lots: number; homes: number; homes_old?: number; adu?: number; up3?: number; up4?: number; adu_old?: number; up3_old?: number; up4_old?: number };
   districts: Record<string, number>;
   izo_share: number | null;
 }

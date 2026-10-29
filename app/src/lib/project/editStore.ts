@@ -9,9 +9,16 @@ export const useEditPart = create<{ open: EditPart | null }>(() => ({ open: 'set
 
 export const toggleEditPart = (p: EditPart) => useEditPart.setState((s) => ({ open: s.open === p ? null : p }));
 
-/** Open a part's inputs in the left panel (opening the panel too) and bring them into view. */
+/** The Place tab's numbered group (place/levels) that holds a part's inputs. */
+const PLACE_GROUP: Record<EditPart, string> = { setup: 'project', need: 'project', build: 'site', score: 'money', pencil: 'money', policy: 'policy', open: 'open' };
+
+/** Open a part's inputs in the left panel (opening the panel too) and bring them into view, in the view on screen only
+ *  (Compare places can stay mounted behind the Place tab with sections of the same names). */
 export function editOn(p: EditPart) {
   useEditPart.setState({ open: p });
   if (!useApp.getState().ui.left) useApp.getState().setUi({ left: true });
-  window.setTimeout(() => document.querySelector(`[data-edit="${p}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 300);
+  window.setTimeout(() => {
+    const root = document.querySelector('[data-view][data-active="true"]') ?? document;
+    (root.querySelector(`[data-edit="${PLACE_GROUP[p]}"]`) ?? root.querySelector(`[data-edit="${p}"]`))?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }, 300);
 }

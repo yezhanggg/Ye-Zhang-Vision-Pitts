@@ -5,7 +5,7 @@ import { classCounts, fmtAnalysis, isAnalysis, type AnalysisVar } from '../../li
 import { LEVEL_LABEL, bundledGeo, groups, hasHistoryFor, plainDescription, referenceSeries, unitTitle } from '../../lib/explore/catalog';
 import { histogram, topBottom } from '../../lib/explore/summary';
 import { HistogramChart, LineChart, SERIES, fmtK } from '../charts';
-import { estimates, fmtTick, fmtValue } from '../../lib/explore/bins';
+import { estimates, fmtTick, fmtValue, reliability } from '../../lib/explore/bins';
 import { EXPLORE_UI } from '../../lib/explore/copy';
 import { useReference } from '../../lib/explore/remote';
 import type { BrowseLevel, Estimate, Loaded, UnitFC, ValueMap, VariableDef } from '../../lib/explore/types';
@@ -106,6 +106,8 @@ function AcsSummary({ variable, level, values, fc }: { variable: VariableDef; le
   const ref = useReference(variable.id);
   const hist = useMemo(() => histogram(estimates(values.data), 12), [values.data]);
   const tb = useMemo(() => topBottom(values.data, 5), [values.data]);
+  // A value whose margin of error is large (coefficient of variation over 30%, mostly tiny samples) gets a star.
+  const low = (id: string) => reliability(values.data.get(id)?.cv) === 'low';
   const index = useMemo(() => new Map((fc ?? bundledGeo(level)).features.map((f) => [f.properties.GEOID, f.properties])), [level, fc]);
   const series = useMemo(() => referenceSeries(variable.id), [variable.id]);
   const group = groups.find((g) => g.id === variable.group)?.label ?? variable.group;
@@ -149,7 +151,10 @@ function AcsSummary({ variable, level, values, fc }: { variable: VariableDef; le
                     <li key={id}>
                       <button onClick={() => setBrowse({ selected: { level, geoid: id } })} className="flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left text-small hover:bg-violet-50">
                         <span className="min-w-0 truncate text-slate-800">{index.has(id) ? unitTitle(index.get(id)) : id}</span>
-                        <span className="shrink-0 font-semibold text-slate-900 tnum">{fmtValue(v, variable.unit)}</span>
+                        <span className="shrink-0 font-semibold text-slate-900 tnum">
+                          {fmtValue(v, variable.unit)}
+                          {low(id) ? ' *' : ''}
+                        </span>
                       </button>
                     </li>
                   ))}
@@ -157,6 +162,7 @@ function AcsSummary({ variable, level, values, fc }: { variable: VariableDef; le
               </div>
             ))}
           </div>
+          {[...tb.top, ...tb.bottom].some(([id]) => low(id)) && <p className="mt-1 text-caption text-slate-600">* Small sample: read with care.</p>}
         </section>
       )}
       {hasHistoryFor(variable.id) && series.city && series.county && (
